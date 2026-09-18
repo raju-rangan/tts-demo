@@ -231,15 +231,32 @@ def extract_article_from_url(url: str, timeout: float = 15.0) -> ExtractedArticl
         raise ValueError(f"Invalid URL format: '{clean_url}'. Must start with http:// or https:// and include a valid domain.")
 
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "User-Agent": "ApexBankKnowledgeVoice/1.0 (support@apexbank.com) Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        "Sec-Ch-Ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"macOS"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
     }
 
     logger.info(f"🌐 Fetching URL for extraction: {clean_url}")
     try:
         with httpx.Client(follow_redirects=True, timeout=timeout, headers=headers) as client:
             resp = client.get(clean_url)
+            # If rejected with 403, retry once with standard direct bot identification
+            if resp.status_code == 403:
+                fallback_headers = {
+                    "User-Agent": "ApexBankKnowledgeVoice/1.0 (support@apexbank.com)",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.9",
+                }
+                resp = client.get(clean_url, headers=fallback_headers)
+
             if resp.status_code != 200:
                 raise RuntimeError(f"HTTP {resp.status_code} ({resp.reason_phrase}) returned by server for {clean_url}")
             html_content = resp.text

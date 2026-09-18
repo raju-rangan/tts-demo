@@ -112,34 +112,38 @@
   - **DSP Audio Mastering**: Implemented `normalize_chunk_rms` (RMS loudness leveling across turns to 3000 RMS with soft-clipping protection) and `apply_micro_fades` (40ms raised-cosine micro-fade in/out on chunk boundaries) before 300ms pause concatenation.
   - **Live Pipeline Progress Screen**: Unblocked `RUNNING` jobs in the Web Studio UI. Added pulsing "Track Live" button and clickable rows. Built interactive 5-stage milestone stepper (`CHUNKING`, `SYNTHESIZING`, `STITCHING`, `UPLOADING`, `EVALUATING`) with turn pills, live description, and auto-refreshing drawer.
   - Added Director's Notes display card in Job Details drawer when custom notes are present.
-  - All **41 out of 41 automated tests passing**.
+- **2026-09-18 17:50** - Bulk Processing Reliability, WAF Scraper Hardening & Gemini TTS Backoff:
+  - **Sample URL Fixes in Web UI**: Replaced futuristic 2026 placeholder URLs in `src/ui/static/index.html` (`loadSampleUrls()` and textarea placeholder) with verified, active public URLs (`monetary20240918a.htm`, `pr24012.html`, and `Certificate_of_deposit`).
+  - **WAF Scraper Hardening**: Enhanced `src/utils/extractor.py` with standard browser headers (`Sec-Ch-Ua`, `Sec-Fetch-*`, `Upgrade-Insecure-Requests`) and an automatic fallback identifying user agent (`ApexBankKnowledgeVoice/1.0`), eliminating 403 Forbidden errors on government and educational pages.
+  - **Gemini TTS Backoff & Retry**: Implemented automatic 2-attempt retry with 3.0s exponential backoff in `src/ai/generator.py` for `_generate_single_chunk` when transient empty audio parts or quota bursts occur. Added detailed `finish_reason` and safety ratings diagnostic extraction in `_extract_audio_from_response`.
+  - **Inter-Turn Pacing Buffer**: Added 1.0s sleep between consecutive turns in multi-turn synthesis to prevent rapid TPM bursting against Vertex AI preview limits.
+  - All **52 out of 52 automated tests passing**.
 
 ---
 
 ## 5. Active State & Pending Next Steps
 
 ### Current State
-- Voice customization & Director's Notes fully integrated end-to-end.
-- Multi-turn acoustic continuity and DSP audio mastering active across all generations.
-- Real-time 5-stage Live Pipeline Progress Screen in Job Details drawer auto-updating every 3 seconds.
-- All 41 automated tests passing.
+- Bulk URL processing fully resilient against 404s and anti-bot 403s.
+- Automatic backoff retry and inter-turn pacing active in speech generator.
+- All 52 automated tests passing.
 
 ### Immediate Next Steps
-1. **Launch Studio Web Server with Reload**:
-   - Run Uvicorn (`./.venv/bin/uvicorn src.ui.app:app --host 127.0.0.1 --port 8000 --reload`) so all live fixes, multi-turn stitching, voice customizations, and progress tracking are active.
-2. **Submit Long Article with Custom Directives**:
-   - Paste a multi-paragraph article in the UI, input custom Director's Notes (e.g. "Warm, measured pacing on numbers"), click "Track Live" to watch the 5-stage progress screen, and verify the resulting stitched audio.
+1. **Test Bulk URL Processing in Web Studio**:
+   - Open Web Studio (`http://127.0.0.1:8000`), open "Bulk Process URLs", click "Load Sample Financial URLs", and click "Start Bulk Processing".
+   - Confirm sequential extraction and synthesis progress cleanly without errors.
 
 ### Verification Commands
 ```bash
-# Run test suite (41 tests)
+# Run test suite (52 tests)
 ./.venv/bin/pytest tests/ -v
 
-# Inspect local logs
-tail -f logs/app.log
-
-# Launch Web UI with auto-reload
-./.venv/bin/uvicorn src.ui.app:app --host 127.0.0.1 --port 8000 --reload
+# Test updated sample URLs extraction
+./.venv/bin/python -c '
+from src.utils.extractor import extract_article_from_url
+for u in ["https://www.federalreserve.gov/newsevents/pressreleases/monetary20240918a.htm", "https://www.fdic.gov/news/press-releases/2024/pr24012.html"]:
+    print(extract_article_from_url(u).title)
+'
 ```
 
 

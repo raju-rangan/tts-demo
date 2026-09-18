@@ -2,6 +2,7 @@
 import io
 import os
 import re
+import time
 import uuid
 import wave
 import logging
@@ -236,30 +237,36 @@ class GeminiAudioGenerator:
             f"pacing pauses, and financial pronunciation directives:\n\n{chunk_text}"
         )
 
-        try:
-            speech_config = types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name=persona.voice_name
+        max_attempts = 2
+        for attempt in range(1, max_attempts + 1):
+            try:
+                speech_config = types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                            voice_name=persona.voice_name
+                        )
                     )
                 )
-            )
-            config = types.GenerateContentConfig(
-                response_modalities=["AUDIO"],
-                speech_config=speech_config,
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
-            )
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=full_prompt,
-                config=config
-            )
-            raw_audio_bytes, _ = self._extract_audio_from_response(response)
-            usage_metadata = getattr(response, "usage_metadata", None)
-            return raw_audio_bytes, usage_metadata
-        except Exception as e:
-            logger.error(f"client.models.generate_content failed{turn_label}: {e}", exc_info=True)
-            raise RuntimeError(f"Could not generate audio using model '{self.model}'{turn_label} ({e}). Verify Vertex AI quota and model availability.")
+                config = types.GenerateContentConfig(
+                    response_modalities=["AUDIO"],
+                    speech_config=speech_config,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+                )
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=full_prompt,
+                    config=config
+                )
+                raw_audio_bytes, _ = self._extract_audio_from_response(response)
+                usage_metadata = getattr(response, "usage_metadata", None)
+                return raw_audio_bytes, usage_metadata
+            except Exception as e:
+                if attempt < max_attempts:
+                    logger.warning(f"client.models.generate_content attempt {attempt}/{max_attempts} failed{turn_label}: {e}. Retrying with backoff in 3.0s...")
+                    time.sleep(3.0)
+                else:
+                    logger.error(f"client.models.generate_content failed{turn_label} after {max_attempts} attempts: {e}", exc_info=True)
+                    raise RuntimeError(f"Could not generate audio using model '{self.model}'{turn_label} ({e}). Verify Vertex AI quota and model availability.")
 
     def generate_speech(
         self,
@@ -307,6 +314,10 @@ class GeminiAudioGenerator:
                     current_turn=idx,
                     total_turns=total_chunks
                 )
+            if idx > 1:
+                # Pacing buffer between consecutive turns to prevent rapid burst throttling
+                time.sleep(1.0)
+
             if total_chunks > 1:
                 logger.info(f"▶ [{job_id}] Processing turn {idx}/{total_chunks} ({len(chunk.split())} words)...")
             raw_pcm, usage = self._generate_single_chunk(
@@ -371,17 +382,24 @@ class GeminiAudioGenerator:
 
     def _extract_audio_from_response(self, response) -> Tuple[bytes, str]:
         """Extracts audio bytes from generate_content response parts."""
-        if not response.candidates or not response.candidates[0].content.parts:
-            raise ValueError("No content or audio parts returned by Gemini model.")
+        if not response.candidates:
+            prompt_feedback = getattr(response, "prompt_feedback", None)
+            raise ValueError(f"No candidates returned by Gemini model. (Prompt feedback: {prompt_feedback})")
 
-        for part in response.candidates[0].content.parts:
+        candidate = response.candidates[0]
+        finish_reason = getattr(candidate, "finish_reason", None)
+        if not candidate.content or not candidate.content.parts:
+            safety_ratings = getattr(candidate, "safety_ratings", None)
+            raise ValueError(f"No content or audio parts returned by Gemini model (finish_reason: {finish_reason}, safety: {safety_ratings}).")
+
+        for part in candidate.content.parts:
             if hasattr(part, "inline_data") and part.inline_data:
                 mime_type = part.inline_data.mime_type or "audio/wav"
                 data = part.inline_data.data
                 audio_bytes = base64.b64decode(data) if isinstance(data, str) else bytes(data)
                 return audio_bytes, mime_type
 
-        raise ValueError("No inline audio data found in Gemini response parts.")
+        raise ValueError(f"No inline audio data found in Gemini response parts (finish_reason: {finish_reason}).")
 
     def _transcode_pcm_to_mp3(self, raw_pcm_bytes: bytes, rate: int = 24000) -> Tuple[bytes, float]:
         """Transcodes raw 24kHz 16-bit mono PCM into broadcast MP3 @ 320kbps (or fallback WAV container)."""
