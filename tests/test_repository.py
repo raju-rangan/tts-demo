@@ -1,0 +1,105 @@
+"""Unit tests for Job Repository & Cost Telemetry Engine."""
+import os
+import pytest
+from src.db.models import JobRecord, TokenUsageDetails, CostBreakdown
+from src.db.repository import SQLiteJobRepository, get_job_repository
+from src.ai.cost_calculator import TokenCostCalculator
+
+@pytest.fixture
+def temp_repo(tmp_path):
+    db_file = os.path.join(tmp_path, "test_jobs.db")
+    return SQLiteJobRepository(db_path=db_file)
+
+def test_save_and_retrieve_job(temp_repo):
+    job = JobRecord(
+        job_id="job_test001",
+        persona="Retail Banking Guide",
+        audience="External Customers",
+        voice_name="Sulafat",
+        article_title="Test Banking Savings",
+        transcript="Test savings article content.",
+        word_count=4,
+        char_count=28,
+        gcs_uri="gs://test-bucket/external/audio/job_test001.mp3",
+        overall_score=4.5,
+        passed_rubric=True,
+        status="COMPLETED"
+    )
+    temp_repo.save_job(job)
+
+    retrieved = temp_repo.get_job("job_test001")
+    assert retrieved is not None
+    assert retrieved.job_id == "job_test001"
+    assert retrieved.persona == "Retail Banking Guide"
+    assert retrieved.overall_score == 4.5
+    assert retrieved.passed_rubric is True
+
+def test_list_jobs_and_persona_filter(temp_repo):
+    job1 = JobRecord(
+        job_id="job_filter_1",
+        persona="Wealth & Market Advisor",
+        audience="External Customers",
+        voice_name="Charon",
+        transcript="Wealth transcript",
+        word_count=2,
+        char_count=17,
+        gcs_uri="gs://test-bucket/external/audio/job_filter_1.mp3"
+    )
+    job2 = JobRecord(
+        job_id="job_filter_2",
+        persona="Regulatory & Policy Officer",
+        audience="Internal Employees",
+        voice_name="Kore",
+        transcript="Policy transcript",
+        word_count=2,
+        char_count=17,
+        gcs_uri="gs://test-bucket/internal/audio/job_filter_2.mp3"
+    )
+    temp_repo.save_job(job1)
+    temp_repo.save_job(job2)
+
+    all_jobs = temp_repo.list_jobs()
+    assert len(all_jobs) == 2
+
+    wealth_jobs = temp_repo.list_jobs(persona="Wealth & Market Advisor")
+    assert len(wealth_jobs) == 1
+    assert wealth_jobs[0].job_id == "job_filter_1"
+
+def test_token_cost_calculator():
+    sample_text = "This is a sample banking article with ten words in total."
+    duration_sec = 60.0
+
+    tokens, cost = TokenCostCalculator.calculate_pipeline_cost(
+        text=sample_text,
+        duration_seconds=duration_sec,
+        tts_model="gemini-3.1-flash-tts-preview",
+        judge_model="gemini-3.8-flash"
+    )
+
+    assert tokens.input_text_tokens > 0
+    assert tokens.audio_output_tokens > 0
+    assert tokens.total_tokens > 0
+    assert cost.tts_cost_usd > 0.0
+    assert cost.judge_cost_usd > 0.0
+    assert cost.total_cost_usd == pytest.approx(cost.tts_cost_usd + cost.judge_cost_usd, rel=1e-5)
+
+def test_delete_job(temp_repo):
+    job = JobRecord(
+        job_id="job_to_delete",
+        persona="Retail Banking Guide",
+        audience="External Customers",
+        voice_name="Sulafat",
+        transcript="Test content",
+        word_count=2,
+        char_count=12,
+        gcs_uri="gs://test-bucket/external/audio/job_to_delete.mp3"
+    )
+    temp_repo.save_job(job)
+    assert temp_repo.get_job("job_to_delete") is not None
+
+    deleted = temp_repo.delete_job("job_to_delete")
+    assert deleted is True
+    assert temp_repo.get_job("job_to_delete") is None
+
+    # Deleting non-existent job returns False
+    assert temp_repo.delete_job("job_to_delete") is False

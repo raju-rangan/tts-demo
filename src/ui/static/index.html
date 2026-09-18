@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-zinc-950 text-zinc-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apex Bank — Knowledge Article to Speech & Quality Audit Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['DM Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'DM Sans', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #09090b; }
+    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+  </style>
+</head>
+<body class="h-full flex flex-col antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- ================= AUTHENTICATION MODAL / SCREEN ================= -->
+  <div id="loginSection" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950 px-4">
+    <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+      <div class="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl"></div>
+      <div class="flex items-center space-x-3 mb-6">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+          <i data-lucide="shield-check" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold text-white tracking-tight">Apex Global Bank</h2>
+          <p class="text-xs text-zinc-400">Knowledge-to-Speech Studio</p>
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold text-zinc-200">Sign in to Enterprise Studio</h3>
+        <p class="text-sm text-zinc-400 mt-1">Authenticate to monitor voice jobs, quality scorecards, and token telemetry.</p>
+      </div>
+
+      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-zinc-300 uppercase tracking-wider mb-1">Corporate Email</label>
+          <input type="email" id="loginEmail" value="admin@apexbank.com" required
+            class="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-700 rounded-xl text-zinc-100 text-sm focus:outline-none focus:border-emerald-500 transition">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-zinc-300 uppercase tracking-wider mb-1">Security Password</label>
+          <input type="password" id="loginPassword" value="demo1234" required
+            class="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-700 rounded-xl text-zinc-100 text-sm focus:outline-none focus:border-emerald-500 transition">
+        </div>
+
+        <div id="loginError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 p-2.5 rounded-lg"></div>
+
+        <button type="submit" id="loginBtn"
+          class="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 font-semibold rounded-xl text-sm transition shadow-lg shadow-emerald-500/10 flex items-center justify-center space-x-2">
+          <span>Authenticate Session</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+
+        <div class="pt-2">
+          <button type="button" onclick="quickLogin()" class="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-xl transition flex items-center justify-center space-x-2">
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>One-Click Demo Evaluation Sign In</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MAIN APP DASHBOARD ================= -->
+  <div id="appSection" class="hidden flex-1 flex flex-col h-full overflow-hidden">
+    
+    <!-- Top Navigation Bar -->
+    <header class="h-16 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur px-6 flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-4">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-md">
+          <i data-lucide="volume-2" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-white tracking-tight">Apex Bank</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">Enterprise TTS</span>
+          </div>
+        </div>
+
+        <div class="hidden lg:flex items-center space-x-2 pl-4 border-l border-zinc-800 text-xs font-mono">
+          <span class="px-2 py-1 bg-zinc-800/80 rounded text-zinc-400 flex items-center space-x-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>GCP: <span id="navProjectId" class="text-zinc-200">cs-poc-edgd4dliruu2xvksuvo4r3g</span></span>
+          </span>
+          <span class="px-2 py-1 bg-zinc-800/80 rounded text-zinc-400">Voice: <span class="text-emerald-400">gemini-3.1-flash-tts-preview</span></span>
+          <span class="px-2 py-1 bg-zinc-800/80 rounded text-zinc-400">Judge: <span class="text-purple-400">gemini-3.8-flash</span></span>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <button onclick="openNewJobModal()"
+          class="px-3.5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-lg shadow-emerald-500/10">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>New Voice Synthesis</span>
+        </button>
+
+        <div class="flex items-center space-x-2 pl-3 border-l border-zinc-800">
+          <div class="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-semibold text-zinc-300" id="userAvatar">
+            SJ
+          </div>
+          <div class="hidden md:block text-left">
+            <div id="userName" class="text-xs font-medium text-zinc-200">Sarah Jenkins</div>
+            <div id="userRole" class="text-[10px] text-zinc-400">Chief Communications Officer</div>
+          </div>
+          <button onclick="handleLogout()" title="Sign Out" class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition ml-1">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+
+      <!-- KPI Summary Analytics Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Total Jobs Run</span>
+            <span class="p-2 rounded-xl bg-zinc-800/60 text-zinc-400"><i data-lucide="layers" class="w-4 h-4"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline space-x-2">
+            <span id="kpiTotalJobs" class="text-2xl font-bold font-mono text-white">--</span>
+            <span class="text-xs text-emerald-400 font-medium">All Synced</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1">Tracked in <span id="kpiDbBackend">Storage</span></p>
+        </div>
+
+        <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Avg Quality Score</span>
+            <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400"><i data-lucide="award" class="w-4 h-4"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline space-x-2">
+            <span id="kpiAvgScore" class="text-2xl font-bold font-mono text-emerald-400">--</span>
+            <span class="text-xs text-zinc-400">/ 5.0</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1">Audited by Gemini 3.8 Flash</p>
+        </div>
+
+        <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Audio Generated</span>
+            <span class="p-2 rounded-xl bg-purple-500/10 text-purple-400"><i data-lucide="mic" class="w-4 h-4"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline space-x-2">
+            <span id="kpiTotalAudio" class="text-2xl font-bold font-mono text-white">--</span>
+            <span class="text-xs text-zinc-400">minutes</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1">24kHz 320kbps MP3</p>
+        </div>
+
+        <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Total Pipeline Cost</span>
+            <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400"><i data-lucide="badge-dollar-sign" class="w-4 h-4"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline space-x-2">
+            <span id="kpiTotalCost" class="text-2xl font-bold font-mono text-amber-400">$0.0000</span>
+            <span class="text-xs text-zinc-400">USD</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1">TTS + Multimodal Judge</p>
+        </div>
+      </div>
+
+      <!-- Job Directory & Filters -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
+        
+        <!-- Filter Header -->
+        <div class="p-5 border-b border-zinc-800/80 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h3 class="text-base font-semibold text-white">Synthesis & Quality Audit Job History</h3>
+            <p class="text-xs text-zinc-400 mt-0.5">Click on any job to inspect full transcripts, GCS storage paths, token metrics, and diagnostic scorecards.</p>
+          </div>
+
+          <div class="flex items-center space-x-3">
+            <select id="personaFilter" onchange="filterJobs()"
+              class="px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 transition">
+              <option value="All">All Voice Personas</option>
+              <option value="Retail Banking Guide">Retail Banking Guide</option>
+              <option value="Wealth & Market Advisor">Wealth & Market Advisor</option>
+              <option value="Regulatory & Policy Officer">Regulatory & Policy Officer</option>
+              <option value="Employee Enablement & Operations">Employee Enablement & Operations</option>
+              <option value="Fraud & Security Alert">Fraud & Security Alert</option>
+            </select>
+
+            <button onclick="loadJobs()" title="Refresh" class="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Jobs Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-zinc-950/60 text-zinc-400 uppercase tracking-wider font-mono text-[11px] border-b border-zinc-800">
+              <tr>
+                <th class="px-5 py-3.5">Job ID & Timestamp</th>
+                <th class="px-5 py-3.5">Article Title</th>
+                <th class="px-5 py-3.5">Persona & Voice</th>
+                <th class="px-5 py-3.5">Audience & Prefix</th>
+                <th class="px-5 py-3.5">Audio Duration</th>
+                <th class="px-5 py-3.5">Quality Gate</th>
+                <th class="px-5 py-3.5">Estimated Cost</th>
+                <th class="px-5 py-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="jobsTableBody" class="divide-y divide-zinc-800/60">
+              <tr>
+                <td colspan="8" class="px-5 py-8 text-center text-zinc-500">
+                  <div class="flex items-center justify-center space-x-2">
+                    <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-emerald-400"></i>
+                    <span>Loading speech jobs telemetry...</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ================= JOB DETAIL DRAWER / MODAL ================= -->
+  <div id="jobDetailModal" onclick="if(event.target === this) closeDetailModal()" class="hidden fixed inset-0 z-50 overflow-hidden bg-zinc-950/80 backdrop-blur-sm flex justify-end">
+    <div class="w-full max-w-2xl bg-zinc-900 border-l border-zinc-800 h-full flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-right duration-200">
+      
+      <!-- Drawer Header -->
+      <div class="p-6 border-b border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-900">
+        <div class="flex items-center space-x-3">
+          <div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <i data-lucide="file-audio" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span id="detailJobId" class="font-mono text-sm font-bold text-white">job_xxxx</span>
+              <span id="detailStatusBadge" class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">COMPLETED</span>
+            </div>
+            <p id="detailTimestamp" class="text-xs text-zinc-400 mt-0.5">--</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button id="modalRetryBtn" onclick="retryCurrentJob()" title="Retry Voice Synthesis"
+            class="px-2.5 py-1.5 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/50 border border-cyan-800/40 rounded-xl transition flex items-center space-x-1.5 text-xs font-medium">
+            <i data-lucide="rotate-cw" id="modalRetryIcon" class="w-3.5 h-3.5"></i>
+            <span id="modalRetryText">Retry</span>
+          </button>
+          <button id="modalDeleteBtn" onclick="deleteCurrentJob()" title="Delete Job"
+            class="px-2.5 py-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 border border-rose-800/40 rounded-xl transition flex items-center space-x-1.5 text-xs font-medium">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Delete</span>
+          </button>
+          <button onclick="closeDetailModal()" class="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Drawer Body (Scrollable) -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+        <!-- Error / Warning Banner -->
+        <div id="jobErrorBanner" class="hidden p-4 bg-rose-950/40 border border-rose-800/60 rounded-2xl space-y-2">
+          <div class="flex items-center space-x-2 text-rose-400 font-semibold text-xs">
+            <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+            <span id="jobErrorTitle">Job Failure Diagnostics</span>
+          </div>
+          <p id="jobErrorMessage" class="text-xs text-rose-200/90 font-mono leading-relaxed break-words pl-6"></p>
+          <div id="errorBannerRetryContainer" class="pl-6 pt-1">
+            <button onclick="retryCurrentJob()" class="px-3 py-1.5 bg-rose-900/40 hover:bg-rose-900/70 text-rose-200 hover:text-white border border-rose-700/60 rounded-xl text-xs font-medium transition flex items-center space-x-1.5">
+              <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+              <span>Retry Synthesis Now</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- In-Progress Live Pipeline Progress Screen -->
+        <div id="jobRunningBanner" class="hidden bg-zinc-950 border border-amber-500/30 rounded-2xl p-5 space-y-4 shadow-lg shadow-amber-500/5">
+          <div class="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+            <div class="flex items-center space-x-2.5">
+              <div class="relative flex items-center justify-center w-3 h-3">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </div>
+              <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">Live Pipeline Progress</span>
+            </div>
+            <span id="runningStagePill" class="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              SYNTHESIZING
+            </span>
+          </div>
+
+          <!-- Current status headline -->
+          <div class="space-y-1">
+            <div id="runningStageMessage" class="text-xs font-semibold text-zinc-100 flex items-center space-x-2">
+              <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0"></i>
+              <span id="runningMessageText">Executing speech generation...</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed pl-5">Real-time telemetry from Gemini TTS & audio mastering pipeline. Updates live every 3 seconds.</p>
+          </div>
+
+          <!-- Turn Progress Indicator (if multi-turn) -->
+          <div id="runningTurnsContainer" class="hidden space-y-2 p-3 bg-zinc-900/80 border border-zinc-800/80 rounded-xl">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-zinc-400 font-medium">Multi-Turn Batch Progress</span>
+              <span id="runningTurnCounter" class="font-mono text-amber-400 font-semibold">Turn 1 of 3</span>
+            </div>
+            <div id="runningTurnsPills" class="flex flex-wrap gap-1.5 pt-0.5">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- 5-Stage Stepper -->
+          <div class="space-y-2 pt-1">
+            <span class="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 block">Pipeline Execution Milestones</span>
+            
+            <div class="space-y-1.5 text-xs">
+              <!-- Milestone 1: Chunking -->
+              <div id="stepChunking" class="flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition">
+                <div id="stepChunkingIcon" class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-400 font-mono">1</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-zinc-200 text-xs">Text Partitioning & Boundary Analysis</div>
+                  <div class="text-[10px] text-zinc-500 truncate">Sentence-safe splitting near ~400 words</div>
+                </div>
+                <div id="stepChunkingStatus" class="text-[11px] font-mono text-zinc-500 shrink-0">Pending</div>
+              </div>
+
+              <!-- Milestone 2: Synthesizing -->
+              <div id="stepSynthesizing" class="flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition">
+                <div id="stepSynthesizingIcon" class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-400 font-mono">2</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-zinc-200 text-xs">Gemini Neural Voice Synthesis</div>
+                  <div class="text-[10px] text-zinc-500 truncate">Multi-turn TTS with studio acoustic directives</div>
+                </div>
+                <div id="stepSynthesizingStatus" class="text-[11px] font-mono text-zinc-500 shrink-0">Pending</div>
+              </div>
+
+              <!-- Milestone 3: Stitching -->
+              <div id="stepStitching" class="flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition">
+                <div id="stepStitchingIcon" class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-400 font-mono">3</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-zinc-200 text-xs">DSP Mastering & Cross-Fade Stitching</div>
+                  <div class="text-[10px] text-zinc-500 truncate">3000 RMS loudness leveling + 40ms raised-cosine fades</div>
+                </div>
+                <div id="stepStitchingStatus" class="text-[11px] font-mono text-zinc-500 shrink-0">Pending</div>
+              </div>
+
+              <!-- Milestone 4: Uploading -->
+              <div id="stepUploading" class="flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition">
+                <div id="stepUploadingIcon" class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-400 font-mono">4</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-zinc-200 text-xs">Google Cloud Storage Distribution</div>
+                  <div class="text-[10px] text-zinc-500 truncate">Audience prefix routing with 30-day retention</div>
+                </div>
+                <div id="stepUploadingStatus" class="text-[11px] font-mono text-zinc-500 shrink-0">Pending</div>
+              </div>
+
+              <!-- Milestone 5: Evaluating -->
+              <div id="stepEvaluating" class="flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition">
+                <div id="stepEvaluatingIcon" class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-400 font-mono">5</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-zinc-200 text-xs">Multimodal Quality Audit</div>
+                  <div class="text-[10px] text-zinc-500 truncate">Gemini 3.8 Flash direct audio evaluation on 6 rubric metrics</div>
+                </div>
+                <div id="stepEvaluatingStatus" class="text-[11px] font-mono text-zinc-500 shrink-0">Pending</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1. Interactive Audio Player Card -->
+        <div id="audioPlayerCard" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="play-circle" class="w-4 h-4 text-emerald-400"></i>
+              <span>Spoken Audio Broadcast Playback</span>
+            </span>
+            <span id="detailAudioFormat" class="text-xs font-mono text-zinc-500">MP3 24kHz @ 320kbps</span>
+          </div>
+
+          <audio id="audioElement" controls class="w-full mt-2 rounded-lg accent-emerald-500 bg-zinc-900"></audio>
+
+          <div class="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+            <div class="text-zinc-400">
+              Latency: <span id="detailSynthesisLatency" class="font-mono text-zinc-200">--s</span>
+            </div>
+            <a id="downloadAudioLink" href="#" download="generated_audio.mp3"
+              class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg transition flex items-center space-x-1.5 text-xs font-medium">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Download MP3</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 2. Cloud Storage Coordinates -->
+        <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-3">
+          <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+            <i data-lucide="cloud" class="w-4 h-4 text-cyan-400"></i>
+            <span>Google Cloud Storage Coordinates</span>
+          </span>
+
+          <div class="space-y-2 text-xs">
+            <div>
+              <div class="text-zinc-400 mb-1">GCS Object URI:</div>
+              <div class="flex items-center space-x-2">
+                <input id="detailGcsUri" readonly class="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl font-mono text-emerald-400 text-xs select-all">
+                <button onclick="copyToClipboard('detailGcsUri')" class="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition" title="Copy URI">
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+              <div class="p-3 bg-zinc-900 rounded-xl">
+                <span class="text-zinc-500 block text-[11px]">Audience Prefix Key</span>
+                <span id="detailPrefixKey" class="font-mono text-zinc-200 font-medium">external/audio/</span>
+              </div>
+              <div class="p-3 bg-zinc-900 rounded-xl">
+                <span class="text-zinc-500 block text-[11px]">Lifecycle Retention</span>
+                <span class="font-mono text-amber-400 font-medium">30 Days Auto-Delete</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Token Telemetry & Financial Cost Breakdown -->
+        <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="calculator" class="w-4 h-4 text-amber-400"></i>
+              <span>Token Telemetry & Estimated Spend</span>
+            </span>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono font-medium">Official Gemini Pricing</span>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-center font-mono">
+            <div class="p-3 bg-zinc-900 border border-zinc-800/80 rounded-xl">
+              <span class="text-[10px] text-zinc-400 uppercase block font-sans">Text Input</span>
+              <span id="tokenTextInput" class="text-base font-bold text-zinc-100">--</span>
+              <span class="text-[10px] text-zinc-500 block">tokens</span>
+            </div>
+            <div class="p-3 bg-zinc-900 border border-zinc-800/80 rounded-xl">
+              <span class="text-[10px] text-zinc-400 uppercase block font-sans">Audio Output</span>
+              <span id="tokenAudioOutput" class="text-base font-bold text-purple-400">--</span>
+              <span class="text-[10px] text-zinc-500 block">tokens</span>
+            </div>
+            <div class="p-3 bg-zinc-900 border border-zinc-800/80 rounded-xl">
+              <span class="text-[10px] text-zinc-400 uppercase block font-sans">Judge Tokens</span>
+              <span id="tokenJudge" class="text-base font-bold text-cyan-400">--</span>
+              <span class="text-[10px] text-zinc-500 block">tokens</span>
+            </div>
+            <div class="p-3 bg-zinc-900 border border-zinc-800/80 rounded-xl">
+              <span class="text-[10px] text-zinc-400 uppercase block font-sans">Total Cost</span>
+              <span id="costTotalUsd" class="text-base font-bold text-emerald-400">$0.000</span>
+              <span class="text-[10px] text-zinc-500 block">USD</span>
+            </div>
+          </div>
+
+          <div class="border-t border-zinc-800 pt-3 text-xs space-y-1.5 font-mono">
+            <div class="flex justify-between text-zinc-400">
+              <span>TTS Synthesis Cost (Gemini 3.1 Flash):</span>
+              <span id="costTtsUsd" class="text-zinc-200">$0.000000</span>
+            </div>
+            <div class="flex justify-between text-zinc-400">
+              <span>Multimodal Judge Cost (Gemini 3.8 Flash):</span>
+              <span id="costJudgeUsd" class="text-zinc-200">$0.000000</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Multimodal Quality Scorecard -->
+        <div id="scorecardCard" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="scale" class="w-4 h-4 text-purple-400"></i>
+              <span>Multimodal Quality Scorecard</span>
+            </span>
+            <span id="detailVerdictBadge" class="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">PASSED</span>
+          </div>
+
+          <div class="flex items-center space-x-4 p-4 bg-zinc-900 rounded-xl">
+            <div class="text-center shrink-0">
+              <div id="detailOverallScore" class="text-3xl font-black font-mono text-emerald-400">4.64</div>
+              <div class="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Overall Score</div>
+            </div>
+            <div class="border-l border-zinc-800 pl-4 text-xs text-zinc-300">
+              Audited by <span id="detailJudgeModel" class="font-mono text-purple-400 font-semibold">gemini-3.8-flash</span> against 6 financial service rubric dimensions with zero audio downloading.
+            </div>
+          </div>
+
+          <!-- Overall Score Reasoning Callout -->
+          <div id="overallReasoningContainer" class="hidden p-4 bg-purple-950/20 border border-purple-800/40 rounded-xl space-y-1.5">
+            <span class="text-xs font-semibold text-purple-400 flex items-center space-x-1.5">
+              <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i>
+              <span>Multimodal Judge Overall Rationale</span>
+            </span>
+            <p id="detailOverallReasoning" class="text-xs text-zinc-300 leading-relaxed italic"></p>
+          </div>
+
+          <!-- Rubric Dimensions List -->
+          <div id="rubricDimensionsList" class="space-y-3 pt-2"></div>
+
+          <!-- Actionable Feedback Callout -->
+          <div id="actionableFeedbackContainer" class="p-4 bg-amber-950/20 border border-amber-800/40 rounded-xl space-y-2">
+            <span class="text-xs font-semibold text-amber-400 flex items-center space-x-1.5">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>Actionable Recommendations</span>
+            </span>
+            <ul id="actionableFeedbackList" class="text-xs text-zinc-300 space-y-1 list-disc pl-4"></ul>
+          </div>
+        </div>
+
+        <!-- 4b. Director's Notes / Voice Customization -->
+        <div id="detailVoiceCustomizationCard" class="hidden bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-2">
+          <span class="text-xs font-semibold text-teal-400 uppercase tracking-wider flex items-center space-x-1.5">
+            <i data-lucide="sliders" class="w-4 h-4"></i>
+            <span>Director's Notes & Vocal Delivery Customization</span>
+          </span>
+          <p id="detailVoiceCustomizationText" class="text-xs text-zinc-300 italic p-3 bg-zinc-900/80 border border-zinc-800/80 rounded-xl leading-relaxed"></p>
+        </div>
+
+        <!-- 5. Full Transcript Viewer -->
+        <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="file-text" class="w-4 h-4 text-zinc-400"></i>
+              <span>Article Transcript Sent to Speech Model</span>
+            </span>
+            <div class="flex items-center space-x-3 text-xs text-zinc-400">
+              <span><span id="detailWordCount" class="font-mono text-zinc-200">281</span> words</span>
+              <button onclick="copyToClipboard('detailTranscriptText')" class="p-1 text-zinc-400 hover:text-zinc-200 transition" title="Copy Transcript">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <div id="detailTranscriptText" class="p-4 bg-zinc-900 border border-zinc-800/80 rounded-xl text-xs text-zinc-300 leading-relaxed max-h-72 overflow-y-auto whitespace-pre-wrap font-sans select-all">
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= NEW JOB MODAL ================= -->
+  <div id="newJobModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm px-4">
+    <div class="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
+            <i data-lucide="plus" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Create Voice Synthesis Job</h3>
+            <p class="text-xs text-zinc-400">Gemini 3.1 Flash TTS + Gemini 3.8 Flash Multimodal Quality Gate</p>
+          </div>
+        </div>
+        <button onclick="closeNewJobModal()" class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="newJobForm" onsubmit="submitNewJob(event)" class="space-y-4 pt-4">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Financial Voice Persona</label>
+          <select id="inputPersona" required class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition">
+            <option value="Retail Banking Guide">Retail Banking Guide (External Customers | Voice: Sulafat)</option>
+            <option value="Wealth & Market Advisor">Wealth & Market Advisor (External Customers | Voice: Charon)</option>
+            <option value="Regulatory & Policy Officer">Regulatory & Policy Officer (Internal Employees | Voice: Kore)</option>
+            <option value="Employee Enablement & Operations">Employee Enablement & Operations (Internal Employees | Voice: Puck)</option>
+            <option value="Fraud & Security Alert">Fraud & Security Alert (Shared / Universal | Voice: Schedar)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <span>Voice Customization & Delivery Directives</span>
+            <span class="text-[11px] text-zinc-400 font-normal">Director's Notes (Optional)</span>
+          </label>
+          <input type="text" id="inputVoiceCustomization" placeholder="e.g. Speak with an empathetic, reassuring tone and slightly slower cadence on regulatory disclosures..."
+            class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition">
+          <p class="text-[11px] text-zinc-500 mt-1">Directly guides pacing, vocal warmth, emphasis, or emotional nuance in Gemini TTS generation.</p>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">Article / Knowledge Transcript</label>
+            <button type="button" onclick="loadSampleText()" class="text-xs text-emerald-400 hover:underline">
+              Load Sample Banking Article
+            </button>
+          </div>
+          <textarea id="inputText" rows="7" required oninput="updateInputStats()" placeholder="Paste banking guidance article, policy document, or customer explainer here..."
+            class="w-full p-3 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition leading-relaxed"></textarea>
+          <div class="flex items-center justify-between text-[11px] text-zinc-400 mt-1 px-1">
+            <span id="inputWordCount">0 words • 0 characters</span>
+            <span id="inputWordWarning" class="hidden text-blue-400 font-medium flex items-center space-x-1">
+              <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+              <span id="inputWordWarningText">Multi-turn auto-chunking active (~400 words/turn). Audio will be stitched seamlessly.</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="inputRunJudge" checked class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-950 border-zinc-700">
+          <label for="inputRunJudge" class="text-xs text-zinc-300 cursor-pointer">
+            Run automated Multimodal Quality Audit with <span class="font-mono text-purple-400">Gemini 3.8 Flash</span>
+          </label>
+        </div>
+
+        <div id="newJobStatus" class="hidden p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex items-center space-x-2">
+          <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-emerald-400"></i>
+          <span id="newJobStatusText" class="text-zinc-300">Enqueuing job...</span>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end space-x-3">
+          <button type="button" onclick="closeNewJobModal()" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-xl transition">
+            Cancel
+          </button>
+          <button type="submit" id="submitJobBtn" class="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 text-xs font-bold rounded-xl transition shadow-lg shadow-emerald-500/10 flex items-center space-x-1.5">
+            <i data-lucide="mic" class="w-4 h-4"></i>
+            <span>Generate Spoken Audio</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= JAVASCRIPT APPLICATION LOGIC ================= -->
+  <script>
+    let AUTH_TOKEN = localStorage.getItem('apex_tts_token') || null;
+    let ALL_JOBS = [];
+    let CURRENT_JOB = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      if (AUTH_TOKEN) {
+        verifySession();
+      } else {
+        showLogin();
+      }
+    });
+
+    // Authentication Handlers
+    function showLogin() {
+      document.getElementById('loginSection').classList.remove('hidden');
+      document.getElementById('appSection').classList.add('hidden');
+    }
+
+    function showApp() {
+      document.getElementById('loginSection').classList.add('hidden');
+      document.getElementById('appSection').classList.remove('hidden');
+      loadStats();
+      loadJobs();
+    }
+
+    async function quickLogin() {
+      document.getElementById('loginEmail').value = 'admin@apexbank.com';
+      document.getElementById('loginPassword').value = 'demo1234';
+      document.getElementById('loginBtn').click();
+    }
+
+    async function handleLogin(e) {
+      if (e) e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errBox = document.getElementById('loginError');
+      errBox.classList.add('hidden');
+
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Login failed');
+
+        AUTH_TOKEN = data.token;
+        localStorage.setItem('apex_tts_token', AUTH_TOKEN);
+        setUserHeader(data.user);
+        showApp();
+      } catch (err) {
+        errBox.textContent = err.message;
+        errBox.classList.remove('hidden');
+      }
+    }
+
+    async function verifySession() {
+      try {
+        const resp = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+        });
+        if (!resp.ok) throw new Error('Session expired');
+        const data = await resp.json();
+        setUserHeader(data.user);
+        showApp();
+      } catch {
+        AUTH_TOKEN = null;
+        localStorage.removeItem('apex_tts_token');
+        showLogin();
+      }
+    }
+
+    function setUserHeader(user) {
+      document.getElementById('userName').textContent = user.name;
+      document.getElementById('userRole').textContent = user.role;
+      const initials = user.name.split(' ').map(n => n[0]).join('').substring(0, 2);
+      document.getElementById('userAvatar').textContent = initials;
+    }
+
+    function handleLogout() {
+      AUTH_TOKEN = null;
+      localStorage.removeItem('apex_tts_token');
+      showLogin();
+    }
+
+    // Analytics Stats
+    async function loadStats() {
+      try {
+        const resp = await fetch('/api/stats', {
+          headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+        });
+        const data = await resp.json();
+        document.getElementById('kpiTotalJobs').textContent = data.total_jobs;
+        document.getElementById('kpiAvgScore').textContent = data.avg_quality_score.toFixed(2);
+        document.getElementById('kpiTotalAudio').textContent = data.total_audio_minutes;
+        document.getElementById('kpiTotalCost').textContent = `$${data.total_cost_usd.toFixed(4)}`;
+        document.getElementById('kpiDbBackend').textContent = data.gcp_environment.repository_type.replace('JobRepository', '');
+        document.getElementById('navProjectId').textContent = data.gcp_environment.project_id;
+      } catch (err) {
+        console.error('Error fetching stats:', err);
+      }
+    }
+
+    let POLLING_INTERVAL = null;
+
+    // Jobs Directory
+    async function loadJobs() {
+      const tbody = document.getElementById('jobsTableBody');
+      try {
+        const resp = await fetch('/api/jobs', {
+          headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+        });
+        ALL_JOBS = await resp.json();
+        filterJobs();
+        checkAndStartPolling();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-5 py-6 text-center text-rose-400">Failed to load jobs: ${err.message}</td></tr>`;
+      }
+    }
+
+    async function loadJobsSilently() {
+      try {
+        const resp = await fetch('/api/jobs', {
+          headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+        });
+        if (resp.ok) {
+          ALL_JOBS = await resp.json();
+          filterJobs();
+          checkAndStartPolling();
+        }
+      } catch (err) {
+        console.error('Silent jobs polling error:', err);
+      }
+    }
+
+    function checkAndStartPolling() {
+      const hasRunning = ALL_JOBS.some(j => j.status === 'RUNNING');
+      if (hasRunning && !POLLING_INTERVAL) {
+        POLLING_INTERVAL = setInterval(async () => {
+          await loadStats();
+          await loadJobsSilently();
+
+          // Auto-refresh detail modal ONLY if user currently has the drawer open
+          const modalEl = document.getElementById('jobDetailModal');
+          const isModalOpen = modalEl && !modalEl.classList.contains('hidden');
+          if (isModalOpen && CURRENT_JOB && CURRENT_JOB.status === 'RUNNING') {
+            const updated = ALL_JOBS.find(j => j.job_id === CURRENT_JOB.job_id);
+            if (updated) {
+              openJobDetail(updated.job_id);
+            }
+          }
+        }, 3000);
+      } else if (!hasRunning && POLLING_INTERVAL) {
+        clearInterval(POLLING_INTERVAL);
+        POLLING_INTERVAL = null;
+      }
+    }
+
+    function filterJobs() {
+      const persona = document.getElementById('personaFilter').value;
+      if (persona === 'All') {
+        renderJobs(ALL_JOBS);
+      } else {
+        renderJobs(ALL_JOBS.filter(j => j.persona === persona));
+      }
+    }
+
+    function renderJobs(jobs) {
+      const tbody = document.getElementById('jobsTableBody');
+      if (!jobs || jobs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-5 py-8 text-center text-zinc-500">No voice synthesis jobs found. Click "+ New Voice Synthesis" to create one.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = jobs.map(j => {
+        const timeStr = new Date(j.created_at).toLocaleString();
+        
+        let scoreBadge = '';
+        if (j.status === 'RUNNING') {
+          scoreBadge = `<span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-flex items-center space-x-1.5"><i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i><span>Synthesizing...</span></span>`;
+        } else if (j.status === 'FAILED') {
+          scoreBadge = `<span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">FAILED</span>`;
+        } else if (j.overall_score !== null && j.overall_score !== undefined) {
+          scoreBadge = `<span class="px-2 py-0.5 rounded text-xs font-mono font-bold ${j.overall_score >= 4.0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}">★ ${j.overall_score.toFixed(1)} / 5.0</span>`;
+        } else {
+          scoreBadge = `<span class="text-zinc-500 font-mono text-xs">Audit Pending</span>`;
+        }
+        
+        const audienceColor = j.audience.includes('External') ? 'text-amber-400' : (j.audience.includes('Internal') ? 'text-blue-400' : 'text-purple-400');
+        const prefixKey = j.audience.includes('External') ? 'external/audio/' : (j.audience.includes('Internal') ? 'internal/audio/' : 'shared/audio/');
+        const costStr = j.cost ? `$${j.cost.total_cost_usd.toFixed(4)}` : '$0.0000';
+
+        let actionBtn = '';
+        if (j.status === 'RUNNING') {
+          actionBtn = `
+            <button onclick="openJobDetail('${j.job_id}')"
+              class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-medium transition flex items-center space-x-1.5 ml-auto animate-pulse">
+              <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+              <span>Track Live</span>
+            </button>
+          `;
+        } else if (j.status === 'FAILED') {
+          actionBtn = `
+            <button onclick="openJobDetail('${j.job_id}')"
+              class="px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 rounded-lg text-xs font-medium transition flex items-center space-x-1 ml-auto">
+              <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+              <span>Error Details</span>
+            </button>
+          `;
+        } else {
+          actionBtn = `
+            <button onclick="openJobDetail('${j.job_id}')"
+              class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-xs font-medium transition flex items-center space-x-1 ml-auto">
+              <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+              <span>Details</span>
+            </button>
+          `;
+        }
+
+        const rowClick = `onclick="openJobDetail('${j.job_id}')"`;
+        const cursorStyle = 'cursor-pointer hover:bg-zinc-800/40';
+
+        let durationDisplay = '--';
+        if (j.duration_seconds) {
+          durationDisplay = `${j.duration_seconds.toFixed(1)}s`;
+        } else if (j.status === 'RUNNING') {
+          if (j.current_turn && j.total_turns && j.total_turns > 1) {
+            durationDisplay = `<span class="animate-pulse text-amber-400 font-mono text-[11px]">turn ${j.current_turn}/${j.total_turns}</span>`;
+          } else {
+            const stageLabel = (j.progress_stage || 'synthesizing').toLowerCase();
+            durationDisplay = `<span class="animate-pulse text-amber-400 font-mono text-[11px]">${stageLabel}</span>`;
+          }
+        }
+
+        return `
+          <tr class="${cursorStyle} transition" ${rowClick}>
+            <td class="px-5 py-4 whitespace-nowrap">
+              <div class="font-mono font-bold text-white text-xs">${j.job_id}</div>
+              <div class="text-[11px] text-zinc-500">${timeStr}</div>
+            </td>
+            <td class="px-5 py-4">
+              <div class="font-medium text-zinc-200 max-w-xs truncate">${j.article_title || 'Financial Article'}</div>
+              <div class="text-[11px] text-zinc-500 font-mono">${j.word_count} words • ${j.char_count} chars</div>
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap">
+              <div class="text-zinc-200 font-medium">${j.persona}</div>
+              <div class="text-[11px] text-zinc-500">Voice: <span class="text-emerald-400 font-mono">${j.voice_name}</span></div>
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap">
+              <div class="text-xs font-medium ${audienceColor}">${j.audience}</div>
+              <div class="text-[10px] text-zinc-500 font-mono">${prefixKey}</div>
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap font-mono text-zinc-300">
+              ${durationDisplay}
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap">
+              ${scoreBadge}
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap font-mono text-emerald-400 font-semibold">
+              ${costStr}
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap text-right" onclick="event.stopPropagation()">
+              <div class="flex items-center justify-end space-x-1.5">
+                ${j.status === 'FAILED' ? `
+                <button onclick="retryJob('${j.job_id}', event)" title="Retry Voice Synthesis"
+                  class="p-1.5 bg-zinc-800/80 hover:bg-cyan-950/60 text-zinc-400 hover:text-cyan-400 border border-zinc-700/60 hover:border-cyan-800/60 rounded-lg transition flex items-center justify-center">
+                  <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+                </button>` : ''}
+                ${actionBtn}
+                <button onclick="deleteJob('${j.job_id}', event)" title="Delete Job"
+                  class="p-1.5 bg-zinc-800/80 hover:bg-rose-950/60 text-zinc-400 hover:text-rose-400 border border-zinc-700/60 hover:border-rose-800/60 rounded-lg transition flex items-center justify-center">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Job Detail Modal Handlers
+    function openJobDetail(jobId) {
+      const job = ALL_JOBS.find(j => j.job_id === jobId);
+      if (!job) return;
+      CURRENT_JOB = job;
+
+      document.getElementById('detailJobId').textContent = job.job_id;
+      document.getElementById('detailTimestamp').textContent = new Date(job.created_at).toUTCString();
+      document.getElementById('detailGcsUri').value = job.gcs_uri || 'N/A';
+      document.getElementById('detailPrefixKey').textContent = job.audience.includes('External') ? 'external/audio/' : (job.audience.includes('Internal') ? 'internal/audio/' : 'shared/audio/');
+      document.getElementById('detailAudioFormat').textContent = job.audio_format || 'MP3 24kHz @ 320kbps';
+      document.getElementById('detailSynthesisLatency').textContent = `${(job.synthesis_latency_sec || 0).toFixed(2)}s`;
+      document.getElementById('detailWordCount').textContent = job.word_count || 0;
+      document.getElementById('detailTranscriptText').textContent = job.transcript;
+
+      // Director's Notes / Voice Customization
+      const voiceCustCard = document.getElementById('detailVoiceCustomizationCard');
+      const voiceCustText = document.getElementById('detailVoiceCustomizationText');
+      if (voiceCustCard && voiceCustText) {
+        if (job.voice_customization && job.voice_customization.trim()) {
+          voiceCustCard.classList.remove('hidden');
+          voiceCustText.textContent = `"${job.voice_customization.trim()}"`;
+        } else {
+          voiceCustCard.classList.add('hidden');
+        }
+      }
+
+      const statusBadge = document.getElementById('detailStatusBadge');
+      const errBanner = document.getElementById('jobErrorBanner');
+      const runningBanner = document.getElementById('jobRunningBanner');
+      const audioCard = document.getElementById('audioPlayerCard');
+      const scorecardCard = document.getElementById('scorecardCard');
+      const reasoningContainer = document.getElementById('overallReasoningContainer');
+      const retryBtn = document.getElementById('modalRetryBtn');
+
+      if (retryBtn) {
+        if (job.status === 'RUNNING') {
+          retryBtn.disabled = true;
+          retryBtn.classList.add('opacity-50', 'cursor-not-allowed');
+          retryBtn.title = 'Synthesis is currently running in background';
+        } else {
+          retryBtn.disabled = false;
+          retryBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          retryBtn.title = 'Retry Voice Synthesis';
+        }
+      }
+
+      if (job.status === 'RUNNING') {
+        statusBadge.textContent = 'RUNNING';
+        statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse';
+        runningBanner.classList.remove('hidden');
+        errBanner.classList.add('hidden');
+        audioCard.classList.add('hidden');
+        scorecardCard.classList.add('hidden');
+        reasoningContainer.classList.add('hidden');
+
+        // Update Live Progress Screen
+        const currentStage = (job.progress_stage || 'SYNTHESIZING').toUpperCase();
+        document.getElementById('runningStagePill').textContent = currentStage;
+        document.getElementById('runningMessageText').textContent = job.progress_message || 'Executing speech generation pipeline...';
+
+        // Multi-Turn Progress Indicator
+        const turnsContainer = document.getElementById('runningTurnsContainer');
+        const turnsPills = document.getElementById('runningTurnsPills');
+        const turnCounter = document.getElementById('runningTurnCounter');
+        if (job.total_turns && job.total_turns > 1) {
+          turnsContainer.classList.remove('hidden');
+          const curTurn = job.current_turn || 1;
+          turnCounter.textContent = `Turn ${curTurn} of ${job.total_turns}`;
+          let pillsHtml = '';
+          for (let t = 1; t <= job.total_turns; t++) {
+            if (t < curTurn) {
+              pillsHtml += `<span class="px-2 py-0.5 bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 rounded text-[10px] font-mono flex items-center space-x-1"><i data-lucide="check" class="w-3 h-3"></i><span>Turn ${t} Done</span></span>`;
+            } else if (t === curTurn && (currentStage === 'SYNTHESIZING' || currentStage === 'CHUNKING')) {
+              pillsHtml += `<span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded text-[10px] font-mono flex items-center space-x-1 animate-pulse"><i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i><span>Turn ${t} Synthesizing</span></span>`;
+            } else if (t === curTurn && currentStage !== 'SYNTHESIZING' && currentStage !== 'CHUNKING') {
+              pillsHtml += `<span class="px-2 py-0.5 bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 rounded text-[10px] font-mono flex items-center space-x-1"><i data-lucide="check" class="w-3 h-3"></i><span>Turn ${t} Synthesized</span></span>`;
+            } else {
+              pillsHtml += `<span class="px-2 py-0.5 bg-zinc-800/60 text-zinc-500 border border-zinc-700/40 rounded text-[10px] font-mono">Turn ${t}</span>`;
+            }
+          }
+          turnsPills.innerHTML = pillsHtml;
+        } else {
+          turnsContainer.classList.add('hidden');
+        }
+
+        // 5-Stage Stepper Update
+        const stages = ['CHUNKING', 'SYNTHESIZING', 'STITCHING', 'UPLOADING', 'EVALUATING'];
+        const stageIdx = stages.indexOf(currentStage) !== -1 ? stages.indexOf(currentStage) : 1;
+        const stepConfigs = [
+          { id: 'stepChunking', iconId: 'stepChunkingIcon', statusId: 'stepChunkingStatus', num: 1 },
+          { id: 'stepSynthesizing', iconId: 'stepSynthesizingIcon', statusId: 'stepSynthesizingStatus', num: 2 },
+          { id: 'stepStitching', iconId: 'stepStitchingIcon', statusId: 'stepStitchingStatus', num: 3 },
+          { id: 'stepUploading', iconId: 'stepUploadingIcon', statusId: 'stepUploadingStatus', num: 4 },
+          { id: 'stepEvaluating', iconId: 'stepEvaluatingIcon', statusId: 'stepEvaluatingStatus', num: 5 }
+        ];
+
+        stepConfigs.forEach((sc, idx) => {
+          const el = document.getElementById(sc.id);
+          const iconEl = document.getElementById(sc.iconId);
+          const statEl = document.getElementById(sc.statusId);
+          if (!el || !iconEl || !statEl) return;
+
+          if (idx < stageIdx) {
+            el.className = 'flex items-center space-x-3 p-2 rounded-xl border border-emerald-800/50 bg-emerald-950/20 transition';
+            iconEl.className = 'w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-emerald-500 text-zinc-950 font-mono';
+            iconEl.innerHTML = '<i data-lucide="check" class="w-3 h-3"></i>';
+            statEl.className = 'text-[11px] font-mono text-emerald-400 font-semibold shrink-0';
+            statEl.textContent = 'Completed';
+          } else if (idx === stageIdx) {
+            el.className = 'flex items-center space-x-3 p-2 rounded-xl border border-amber-500/50 bg-amber-950/30 transition animate-pulse';
+            iconEl.className = 'w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-amber-500 text-zinc-950 font-mono';
+            iconEl.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>';
+            statEl.className = 'text-[11px] font-mono text-amber-400 font-bold shrink-0';
+            statEl.textContent = 'Active';
+          } else {
+            el.className = 'flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition';
+            iconEl.className = 'w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-500 font-mono';
+            iconEl.textContent = sc.num;
+            statEl.className = 'text-[11px] font-mono text-zinc-500 shrink-0';
+            statEl.textContent = 'Pending';
+          }
+        });
+      } else if (job.status === 'FAILED') {
+        statusBadge.textContent = 'FAILED';
+        statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20';
+        runningBanner.classList.add('hidden');
+        errBanner.classList.remove('hidden');
+        document.getElementById('jobErrorTitle').textContent = 'Speech Generation Failed';
+        document.getElementById('jobErrorMessage').textContent = job.error_message || 'The Gemini TTS engine encountered an error during audio generation. Verify model quota and article length.';
+        audioCard.classList.add('hidden');
+        scorecardCard.classList.add('hidden');
+        reasoningContainer.classList.add('hidden');
+      } else {
+        statusBadge.textContent = 'COMPLETED';
+        statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        runningBanner.classList.add('hidden');
+        audioCard.classList.remove('hidden');
+
+        // Audio Source
+        const audioEl = document.getElementById('audioElement');
+        audioEl.src = `/api/audio/${job.job_id}`;
+        document.getElementById('downloadAudioLink').href = `/api/audio/${job.job_id}`;
+
+        // Evaluation Warning
+        if (job.error_message) {
+          errBanner.classList.remove('hidden');
+          document.getElementById('jobErrorTitle').textContent = 'Quality Audit Notice';
+          document.getElementById('jobErrorMessage').textContent = job.error_message;
+        } else {
+          errBanner.classList.add('hidden');
+        }
+
+        // Overall Reasoning
+        if (job.overall_reasoning) {
+          reasoningContainer.classList.remove('hidden');
+          document.getElementById('detailOverallReasoning').textContent = job.overall_reasoning;
+        } else {
+          reasoningContainer.classList.add('hidden');
+        }
+      }
+
+      // Token & Cost Breakdown
+      if (job.token_usage) {
+        document.getElementById('tokenTextInput').textContent = (job.token_usage.input_text_tokens || 0).toLocaleString();
+        document.getElementById('tokenAudioOutput').textContent = (job.token_usage.audio_output_tokens || 0).toLocaleString();
+        document.getElementById('tokenJudge').textContent = ((job.token_usage.judge_input_tokens || 0) + (job.token_usage.judge_output_tokens || 0)).toLocaleString();
+      }
+      if (job.cost) {
+        document.getElementById('costTotalUsd').textContent = `$${job.cost.total_cost_usd.toFixed(6)}`;
+        document.getElementById('costTtsUsd').textContent = `$${job.cost.tts_cost_usd.toFixed(6)}`;
+        document.getElementById('costJudgeUsd').textContent = `$${job.cost.judge_cost_usd.toFixed(6)}`;
+      }
+
+      // Quality Scorecard
+      if (job.overall_score !== null && job.overall_score !== undefined) {
+        scorecardCard.classList.remove('hidden');
+        document.getElementById('detailOverallScore').textContent = job.overall_score.toFixed(2);
+        document.getElementById('detailJudgeModel').textContent = job.judge_model || 'gemini-3.8-flash';
+        
+        const verdictEl = document.getElementById('detailVerdictBadge');
+        if (job.passed_rubric) {
+          verdictEl.textContent = 'PASSED QUALITY GATE';
+          verdictEl.className = 'px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        } else {
+          verdictEl.textContent = 'NEEDS REVISION';
+          verdictEl.className = 'px-2 py-0.5 rounded text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20';
+        }
+
+        // Render rubric dimensions
+        const listEl = document.getElementById('rubricDimensionsList');
+        if (job.rubric_metrics) {
+          listEl.innerHTML = Object.entries(job.rubric_metrics).map(([key, metric]) => {
+            const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const percent = (metric.score / 5.0) * 100;
+            const barColor = metric.score >= 4.0 ? 'bg-emerald-500' : (metric.score >= 3.0 ? 'bg-amber-500' : 'bg-rose-500');
+
+            return `
+              <div class="p-3 bg-zinc-900 border border-zinc-800/80 rounded-xl space-y-1.5">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-semibold text-zinc-200">${label} <span class="text-[10px] text-zinc-500">(${parseInt(metric.weight * 100)}%)</span></span>
+                  <span class="font-mono font-bold text-zinc-100">${metric.score.toFixed(1)} / 5.0</span>
+                </div>
+                <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div class="${barColor} h-full rounded-full transition-all" style="width: ${percent}%"></div>
+                </div>
+                <p class="text-[11px] text-zinc-400 italic mt-1">${metric.rationale}</p>
+              </div>
+            `;
+          }).join('');
+        }
+
+        // Actionable feedback
+        const feedbackContainer = document.getElementById('actionableFeedbackContainer');
+        const feedbackList = document.getElementById('actionableFeedbackList');
+        if (job.actionable_feedback && job.actionable_feedback.length > 0) {
+          feedbackContainer.classList.remove('hidden');
+          feedbackList.innerHTML = job.actionable_feedback.map(f => `<li>${f}</li>`).join('');
+        } else {
+          feedbackContainer.classList.add('hidden');
+        }
+      } else {
+        scorecardCard.classList.add('hidden');
+      }
+
+      document.getElementById('jobDetailModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeDetailModal() {
+      const audioEl = document.getElementById('audioElement');
+      if (audioEl) audioEl.pause();
+      document.getElementById('jobDetailModal').classList.add('hidden');
+      CURRENT_JOB = null;
+    }
+
+    async function deleteJob(jobId, event) {
+      if (event) event.stopPropagation();
+      if (!confirm(`Are you sure you want to permanently delete job ${jobId}? This will remove the database record and audio artifacts.`)) {
+        return;
+      }
+      try {
+        const resp = await fetch(`/api/jobs/${jobId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+        });
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          alert(`Failed to delete job: ${errData.detail || resp.statusText}`);
+          return;
+        }
+        // Remove from local array
+        ALL_JOBS = ALL_JOBS.filter(j => j.job_id !== jobId);
+        filterJobs();
+        await loadStats();
+        if (CURRENT_JOB && CURRENT_JOB.job_id === jobId) {
+          closeDetailModal();
+        }
+      } catch (err) {
+        alert(`Error deleting job: ${err.message}`);
+      }
+    }
+
+    async function deleteCurrentJob() {
+      if (!CURRENT_JOB) return;
+      await deleteJob(CURRENT_JOB.job_id);
+    }
+
+    async function retryJob(jobId, event) {
+      if (event) event.stopPropagation();
+      const retryBtn = document.getElementById('modalRetryBtn');
+      const retryIcon = document.getElementById('modalRetryIcon');
+      const retryText = document.getElementById('modalRetryText');
+
+      if (retryBtn) {
+        retryBtn.disabled = true;
+        if (retryIcon) retryIcon.classList.add('animate-spin');
+        if (retryText) retryText.textContent = 'Retrying...';
+      }
+
+      try {
+        const resp = await fetch(`/api/jobs/${jobId}/retry`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${AUTH_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          alert(`Failed to retry job: ${errData.detail || resp.statusText}`);
+          return;
+        }
+
+        const data = await resp.json();
+        // Update job in local ALL_JOBS array
+        const idx = ALL_JOBS.findIndex(j => j.job_id === jobId);
+        if (idx !== -1) {
+          ALL_JOBS[idx] = data.job;
+        } else {
+          ALL_JOBS.unshift(data.job);
+        }
+        filterJobs();
+        await loadStats();
+
+        // Refresh detail modal ONLY if user currently has the drawer open for this job
+        const modalEl = document.getElementById('jobDetailModal');
+        const isModalOpen = modalEl && !modalEl.classList.contains('hidden');
+        if (isModalOpen && CURRENT_JOB && CURRENT_JOB.job_id === jobId) {
+          CURRENT_JOB = data.job;
+          openJobDetail(jobId);
+        }
+
+        // Trigger polling so status and subsequent completion update live
+        checkAndStartPolling();
+      } catch (err) {
+        alert(`Error retrying job: ${err.message}`);
+      } finally {
+        if (retryBtn) {
+          retryBtn.disabled = false;
+          if (retryIcon) retryIcon.classList.remove('animate-spin');
+          if (retryText) retryText.textContent = 'Retry';
+        }
+      }
+    }
+
+    async function retryCurrentJob() {
+      if (!CURRENT_JOB) return;
+      await retryJob(CURRENT_JOB.job_id);
+    }
+
+    // Copy to Clipboard Utility
+    function copyToClipboard(elementId) {
+      const el = document.getElementById(elementId);
+      const text = el.value !== undefined ? el.value : el.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+      });
+    }
+
+    // New Job Modal
+    function openNewJobModal() {
+      document.getElementById('newJobModal').classList.remove('hidden');
+      updateInputStats();
+    }
+
+    function closeNewJobModal() {
+      document.getElementById('newJobModal').classList.add('hidden');
+      document.getElementById('newJobStatus').classList.add('hidden');
+      const voiceInput = document.getElementById('inputVoiceCustomization');
+      if (voiceInput) voiceInput.value = '';
+    }
+
+    function updateInputStats() {
+      const text = document.getElementById('inputText').value.trim();
+      const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+      const chars = text.length;
+      document.getElementById('inputWordCount').textContent = `${words.toLocaleString()} words • ${chars.toLocaleString()} characters`;
+      
+      const warningEl = document.getElementById('inputWordWarning');
+      const warningText = document.getElementById('inputWordWarningText');
+      if (words > 400) {
+        const turns = Math.ceil(words / 400);
+        warningText.textContent = `Long article (${words.toLocaleString()} words): Auto-split into ${turns} complete-sentence turns (~400 words/turn) & stitched losslessly.`;
+        warningEl.classList.remove('hidden');
+      } else {
+        warningEl.classList.add('hidden');
+      }
+    }
+
+    function loadSampleText() {
+      document.getElementById('inputText').value = `High-Yield Savings Accounts vs. Certificates of Deposit (CDs): A Financial Guide for Retail Banking Customers.\n\nWhen planning your short-to-medium-term savings strategy, two of the most secure instruments available are High-Yield Savings Accounts (HYSA) and Certificates of Deposit (CDs). Both products are FDIC-insured up to $250,000 per depositor, per institution, offering principal protection alongside competitive yields.\n\n1. High-Yield Savings Accounts: Flexibility & Liquidity. A high-yield savings account is an interest-bearing deposit account that typically offers an Annual Percentage Yield (APY) significantly higher than traditional brick-and-mortar savings accounts. The defining advantage is liquidity: funds can be deposited or withdrawn at any time via electronic funds transfers (EFT) or Automated Clearing House (ACH) withdrawals, subject to standard federal and bank transaction limits. These accounts are ideal for emergency funds or near-term expenses.\n\n2. Certificates of Deposit: Guaranteed Rate Certainty. A CD is a time-deposit account where you commit a lump sum for a fixed term—ranging from 3 months to 5 years—in exchange for a guaranteed APY that remains locked regardless of Federal Reserve interest rate fluctuations. However, withdrawing funds prior to the maturity date triggers an early withdrawal penalty, typically calculated as several months of interest.\n\n3. Regulatory & Compliance Safeguards. Both HYSAs and CDs require standard Customer Identification Programs (CIP) and Know Your Customer (KYC) verification in accordance with the Bank Secrecy Act (BSA) and anti-money laundering (AML) regulations.`;
+      updateInputStats();
+    }
+
+    async function submitNewJob(e) {
+      e.preventDefault();
+      const text = document.getElementById('inputText').value.trim();
+      const persona = document.getElementById('inputPersona').value;
+      const voice_customization = document.getElementById('inputVoiceCustomization')?.value?.trim() || null;
+      const run_judge = document.getElementById('inputRunJudge').checked;
+      
+      const statusBox = document.getElementById('newJobStatus');
+      const statusText = document.getElementById('newJobStatusText');
+      const submitBtn = document.getElementById('submitJobBtn');
+
+      statusBox.classList.remove('hidden');
+      statusText.textContent = 'Enqueuing speech generation in background...';
+      submitBtn.disabled = true;
+
+      try {
+        const resp = await fetch('/api/jobs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${AUTH_TOKEN}`
+          },
+          body: JSON.stringify({ text, persona, run_judge, voice_customization })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Job creation failed');
+
+        statusText.textContent = `Job ${data.job_id} launched! Tracking progress...`;
+        
+        setTimeout(async () => {
+          closeNewJobModal();
+          submitBtn.disabled = false;
+          loadStats();
+          await loadJobs();
+          openJobDetail(data.job_id);
+        }, 800);
+
+      } catch (err) {
+        statusText.textContent = `Error: ${err.message}`;
+        submitBtn.disabled = false;
+      }
+    }
+
+    // Escape key closes open modals
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeDetailModal();
+        closeNewJobModal();
+      }
+    });
+  </script>
+</body>
+</html>
