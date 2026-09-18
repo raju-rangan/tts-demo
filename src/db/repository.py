@@ -106,6 +106,7 @@ class SQLiteJobRepository(BaseJobRepository):
                 ("progress_message", "TEXT"),
                 ("current_turn", "INTEGER"),
                 ("total_turns", "INTEGER"),
+                ("source_url", "TEXT"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} {col_type}")
@@ -124,8 +125,9 @@ class SQLiteJobRepository(BaseJobRepository):
                     duration_seconds, synthesis_latency_sec, status, token_usage_json,
                     cost_json, overall_score, overall_reasoning, passed_rubric, rubric_metrics_json,
                     actionable_feedback_json, judge_model, judge_latency_sec, error_message,
-                    voice_customization, progress_stage, progress_message, current_turn, total_turns
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    voice_customization, progress_stage, progress_message, current_turn, total_turns,
+                    source_url
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 job.job_id, job.created_at, job.persona, job.audience, job.voice_name, job.article_title,
                 job.transcript, job.word_count, job.char_count, job.gcs_uri, job.signed_url, job.audio_format,
@@ -144,7 +146,8 @@ class SQLiteJobRepository(BaseJobRepository):
                 job.progress_stage,
                 job.progress_message,
                 job.current_turn,
-                job.total_turns
+                job.total_turns,
+                job.source_url
             ))
             conn.commit()
 
@@ -203,6 +206,7 @@ class SQLiteJobRepository(BaseJobRepository):
         progress_message = row["progress_message"] if "progress_message" in row.keys() else None
         current_turn = row["current_turn"] if "current_turn" in row.keys() else None
         total_turns = row["total_turns"] if "total_turns" in row.keys() else None
+        source_url = row["source_url"] if "source_url" in row.keys() else None
 
         return JobRecord(
             job_id=row["job_id"],
@@ -234,7 +238,8 @@ class SQLiteJobRepository(BaseJobRepository):
             progress_stage=progress_stage,
             progress_message=progress_message,
             current_turn=current_turn,
-            total_turns=total_turns
+            total_turns=total_turns,
+            source_url=source_url
         )
 
 

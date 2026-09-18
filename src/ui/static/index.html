@@ -119,6 +119,12 @@
       </div>
 
       <div class="flex items-center space-x-3">
+        <button onclick="openBulkJobModal()"
+          class="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 border border-zinc-700 shadow-sm hover:border-zinc-600">
+          <i data-lucide="layers" class="w-4 h-4 text-teal-400"></i>
+          <span>Bulk Process URLs</span>
+        </button>
+
         <button onclick="openNewJobModal()"
           class="px-3.5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-lg shadow-emerald-500/10">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
@@ -550,6 +556,27 @@
           <p id="detailVoiceCustomizationText" class="text-xs text-zinc-300 italic p-3 bg-zinc-900/80 border border-zinc-800/80 rounded-xl leading-relaxed"></p>
         </div>
 
+        <!-- 4c. Source Web URL (for Bulk URL jobs) -->
+        <div id="detailSourceUrlCard" class="hidden bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-teal-400 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="globe" class="w-4 h-4"></i>
+              <span>Original Web Article Source</span>
+            </span>
+            <a id="detailSourceUrlLink" href="#" target="_blank" rel="noopener noreferrer"
+              class="text-xs text-teal-400 hover:text-teal-300 hover:underline flex items-center space-x-1 font-mono">
+              <span id="detailSourceUrlDomain">Visit Source</span>
+              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            </a>
+          </div>
+          <div class="flex items-center space-x-2">
+            <input id="detailSourceUrlInput" readonly class="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl font-mono text-teal-300 text-xs select-all">
+            <button onclick="copyToClipboard('detailSourceUrlInput')" class="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition" title="Copy URL">
+              <i data-lucide="copy" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
         <!-- 5. Full Transcript Viewer -->
         <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-3">
           <div class="flex items-center justify-between">
@@ -650,6 +677,89 @@
           <button type="submit" id="submitJobBtn" class="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 text-xs font-bold rounded-xl transition shadow-lg shadow-emerald-500/10 flex items-center space-x-1.5">
             <i data-lucide="mic" class="w-4 h-4"></i>
             <span>Generate Spoken Audio</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= BULK URL JOB MODAL ================= -->
+  <div id="bulkJobModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm px-4">
+    <div class="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-teal-500/10 text-teal-400 rounded-xl">
+            <i data-lucide="layers" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Bulk Process Web URLs</h3>
+            <p class="text-xs text-zinc-400">Extract clean main article content & synthesize audio sequentially</p>
+          </div>
+        </div>
+        <button onclick="closeBulkJobModal()" class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="bulkJobForm" onsubmit="submitBulkJobs(event)" class="space-y-4 pt-4">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Financial Voice Persona</label>
+          <select id="inputBulkPersona" required class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-teal-500 transition">
+            <option value="Retail Banking Guide">Retail Banking Guide (External Customers | Voice: Sulafat)</option>
+            <option value="Wealth & Market Advisor">Wealth & Market Advisor (External Customers | Voice: Charon)</option>
+            <option value="Regulatory & Policy Officer">Regulatory & Policy Officer (Internal Employees | Voice: Kore)</option>
+            <option value="Employee Enablement & Operations">Employee Enablement & Operations (Internal Employees | Voice: Puck)</option>
+            <option value="Fraud & Security Alert">Fraud & Security Alert (Shared / Universal | Voice: Schedar)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <span>Voice Customization & Delivery Directives</span>
+            <span class="text-[11px] text-zinc-400 font-normal">Director's Notes (Optional)</span>
+          </label>
+          <input type="text" id="inputBulkVoiceCustomization" placeholder="e.g. Speak with an authoritative, measured cadence on market insights..."
+            class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500 transition">
+          <p class="text-[11px] text-zinc-500 mt-1">Applies custom vocal delivery instructions to every article in the batch.</p>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">Target Article URLs (One per line)</label>
+            <button type="button" onclick="loadSampleUrls()" class="text-xs text-teal-400 hover:underline">
+              Load Sample Financial URLs
+            </button>
+          </div>
+          <textarea id="inputBulkUrls" rows="6" required oninput="updateBulkUrlStats()" placeholder="https://www.federalreserve.gov/newsevents/pressreleases/monetary20260918a.htm&#10;https://www.fdic.gov/news/press-releases/2026/pr26012.html"
+            class="w-full p-3 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 font-mono focus:outline-none focus:border-teal-500 transition leading-relaxed"></textarea>
+          <div class="flex items-center justify-between text-[11px] text-zinc-400 mt-1 px-1">
+            <span id="bulkUrlStats">0 URLs entered</span>
+            <span id="bulkUrlValidationWarning" class="hidden text-amber-400 font-medium flex items-center space-x-1">
+              <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+              <span id="bulkUrlValidationText"></span>
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="inputBulkRunJudge" checked class="w-4 h-4 rounded text-teal-500 focus:ring-teal-500 bg-zinc-950 border-zinc-700">
+          <label for="inputBulkRunJudge" class="text-xs text-zinc-300 cursor-pointer">
+            Run automated Multimodal Quality Audit with <span class="font-mono text-purple-400">Gemini 3.8 Flash</span>
+          </label>
+        </div>
+
+        <div id="bulkJobStatus" class="hidden p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex items-center space-x-2">
+          <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-teal-400"></i>
+          <span id="bulkJobStatusText" class="text-zinc-300">Enqueuing bulk jobs...</span>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end space-x-3">
+          <button type="button" onclick="closeBulkJobModal()" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-xl transition">
+            Cancel
+          </button>
+          <button type="submit" id="submitBulkJobBtn" class="px-5 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-zinc-950 text-xs font-bold rounded-xl transition shadow-lg shadow-teal-500/10 flex items-center space-x-1.5">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+            <span>Start Bulk Processing</span>
           </button>
         </div>
       </form>
@@ -901,7 +1011,10 @@
               <div class="text-[11px] text-zinc-500">${timeStr}</div>
             </td>
             <td class="px-5 py-4">
-              <div class="font-medium text-zinc-200 max-w-xs truncate">${j.article_title || 'Financial Article'}</div>
+              <div class="font-medium text-zinc-200 max-w-xs truncate flex items-center space-x-1.5">
+                ${j.source_url ? `<i data-lucide="globe" class="w-3.5 h-3.5 text-teal-400 shrink-0" title="Source: ${j.source_url}"></i>` : ''}
+                <span class="truncate">${j.article_title || 'Financial Article'}</span>
+              </div>
               <div class="text-[11px] text-zinc-500 font-mono">${j.word_count} words • ${j.char_count} chars</div>
             </td>
             <td class="px-5 py-4 whitespace-nowrap">
@@ -966,6 +1079,26 @@
           voiceCustText.textContent = `"${job.voice_customization.trim()}"`;
         } else {
           voiceCustCard.classList.add('hidden');
+        }
+      }
+
+      // Source Web URL (for bulk processed jobs)
+      const sourceCard = document.getElementById('detailSourceUrlCard');
+      const sourceInput = document.getElementById('detailSourceUrlInput');
+      const sourceLink = document.getElementById('detailSourceUrlLink');
+      const sourceDomain = document.getElementById('detailSourceUrlDomain');
+      if (sourceCard && sourceInput) {
+        if (job.source_url) {
+          sourceCard.classList.remove('hidden');
+          sourceInput.value = job.source_url;
+          sourceLink.href = job.source_url;
+          try {
+            sourceDomain.textContent = new URL(job.source_url).hostname;
+          } catch(e) {
+            sourceDomain.textContent = 'Visit Source';
+          }
+        } else {
+          sourceCard.classList.add('hidden');
         }
       }
 
@@ -1361,11 +1494,127 @@
       }
     }
 
+    // Bulk Process Modal Handlers
+    function openBulkJobModal() {
+      document.getElementById('bulkJobModal').classList.remove('hidden');
+      updateBulkUrlStats();
+      lucide.createIcons();
+    }
+
+    function closeBulkJobModal() {
+      document.getElementById('bulkJobModal').classList.add('hidden');
+      document.getElementById('bulkJobStatus').classList.add('hidden');
+      const textEl = document.getElementById('inputBulkUrls');
+      if (textEl) textEl.value = '';
+      const voiceInput = document.getElementById('inputBulkVoiceCustomization');
+      if (voiceInput) voiceInput.value = '';
+    }
+
+    function updateBulkUrlStats() {
+      const text = document.getElementById('inputBulkUrls').value;
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const countEl = document.getElementById('bulkUrlStats');
+      const warnEl = document.getElementById('bulkUrlValidationWarning');
+      const warnText = document.getElementById('bulkUrlValidationText');
+
+      if (lines.length === 0) {
+        countEl.textContent = '0 URLs entered';
+        warnEl.classList.add('hidden');
+        return;
+      }
+
+      let invalidCount = 0;
+      for (const line of lines) {
+        if (!line.startsWith('http://') && !line.startsWith('https://')) {
+          invalidCount++;
+        } else {
+          try {
+            const u = new URL(line);
+            if (!u.hostname.includes('.')) invalidCount++;
+          } catch(e) {
+            invalidCount++;
+          }
+        }
+      }
+
+      const validCount = lines.length - invalidCount;
+      countEl.textContent = `${lines.length} URL${lines.length === 1 ? '' : 's'} (${validCount} valid)`;
+
+      if (invalidCount > 0) {
+        warnText.textContent = `${invalidCount} line${invalidCount === 1 ? '' : 's'} not a valid HTTP/HTTPS URL`;
+        warnEl.classList.remove('hidden');
+      } else {
+        warnEl.classList.add('hidden');
+      }
+    }
+
+    function loadSampleUrls() {
+      document.getElementById('inputBulkUrls').value = [
+        'https://www.federalreserve.gov/newsevents/pressreleases/monetary20260918a.htm',
+        'https://www.fdic.gov/news/press-releases/2026/pr26012.html',
+        'https://www.consumerfinance.gov/about-us/newsroom/cfpb-annual-report-consumer-credit-markets/'
+      ].join('\n');
+      updateBulkUrlStats();
+      lucide.createIcons();
+    }
+
+    async function submitBulkJobs(e) {
+      e.preventDefault();
+      const text = document.getElementById('inputBulkUrls').value;
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const persona = document.getElementById('inputBulkPersona').value;
+      const voice_customization = document.getElementById('inputBulkVoiceCustomization')?.value?.trim() || null;
+      const run_judge = document.getElementById('inputBulkRunJudge').checked;
+
+      const statusBox = document.getElementById('bulkJobStatus');
+      const statusText = document.getElementById('bulkJobStatusText');
+      const submitBtn = document.getElementById('submitBulkJobBtn');
+
+      if (lines.length === 0) {
+        alert('Please enter at least one URL.');
+        return;
+      }
+
+      statusBox.classList.remove('hidden');
+      statusText.textContent = `Validating & enqueuing ${lines.length} URLs for sequential processing...`;
+      submitBtn.disabled = true;
+
+      try {
+        const resp = await fetch('/api/jobs/bulk', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${AUTH_TOKEN}`
+          },
+          body: JSON.stringify({ urls: lines, persona, voice_customization, run_judge })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Bulk processing failed to enqueue');
+
+        statusText.textContent = `Enqueued ${data.total_enqueued} jobs! Processing sequentially in background...`;
+
+        setTimeout(async () => {
+          closeBulkJobModal();
+          submitBtn.disabled = false;
+          loadStats();
+          await loadJobs();
+          if (data.jobs && data.jobs.length > 0) {
+            openJobDetail(data.jobs[0].job_id);
+          }
+        }, 1000);
+
+      } catch (err) {
+        statusText.textContent = `Error: ${err.message}`;
+        submitBtn.disabled = false;
+      }
+    }
+
     // Escape key closes open modals
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeDetailModal();
         closeNewJobModal();
+        closeBulkJobModal();
       }
     });
   </script>

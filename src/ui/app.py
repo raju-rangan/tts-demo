@@ -13,6 +13,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from urllib.parse import urlparse
+
 from src.config import settings
 from src.utils.logger import setup_logging, get_recent_logs
 from src.db.models import JobRecord, TokenUsageDetails, CostBreakdown
@@ -22,6 +24,7 @@ from src.ai.generator import GeminiAudioGenerator
 from src.ai.judge import MultimodalAudioJudge
 from src.storage.gcs_client import GCSStorageClient
 from src.ai.cost_calculator import TokenCostCalculator
+from src.utils.extractor import validate_url, extract_article_from_url
 
 # Initialize GCP Cloud Logging + Persistent Local Rotating File + Console
 setup_logging()
@@ -77,6 +80,12 @@ class CreateJobRequest(BaseModel):
     persona: str = Field(default="Retail Banking Guide")
     run_judge: bool = Field(default=True)
     title: Optional[str] = Field(default=None)
+    voice_customization: Optional[str] = Field(default=None, description="Custom director notes or vocal delivery directives")
+
+class BulkJobRequest(BaseModel):
+    urls: List[str] = Field(..., min_length=1, description="List of article URLs to extract and synthesize")
+    persona: str = Field(default="Retail Banking Guide")
+    run_judge: bool = Field(default=True)
     voice_customization: Optional[str] = Field(default=None, description="Custom director notes or vocal delivery directives")
 
 def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
@@ -306,7 +315,8 @@ def _execute_async_synthesis(
     persona_name: str,
     run_judge: bool,
     title: str,
-    voice_customization: Optional[str] = None
+    voice_customization: Optional[str] = None,
+    source_url: Optional[str] = None
 ):
     """Background worker that runs TTS synthesis, GCS upload, and Multimodal Judge."""
     repo = get_job_repository()
@@ -429,7 +439,8 @@ def _execute_async_synthesis(
             error_message=f"Audio generated, but Multimodal Judge evaluation failed: {judge_error}" if judge_error else None,
             voice_customization=voice_customization,
             progress_stage="COMPLETED",
-            progress_message="Pipeline execution completed successfully"
+            progress_message="Pipeline execution completed successfully",
+            source_url=source_url
         )
         repo.save_job(record)
         logger.info(f"✓ [{job_id}] Async job completed successfully | Total Cost: ${cost.total_cost_usd:.4f} | Total Tokens: {token_usage.total_tokens}")
@@ -452,7 +463,8 @@ def _execute_async_synthesis(
             error_message=str(e),
             voice_customization=voice_customization,
             progress_stage="FAILED",
-            progress_message=str(e)
+            progress_message=str(e),
+            source_url=source_url
         )
         try:
             repo.save_job(failed_record)
@@ -540,7 +552,8 @@ def retry_job(
         error_message=None,
         voice_customization=job.voice_customization,
         progress_stage="CHUNKING",
-        progress_message="Partitioning text for synthesis retry..."
+        progress_message="Partitioning text for synthesis retry...",
+        source_url=job.source_url
     )
     repo.save_job(updated_job)
 
@@ -554,7 +567,8 @@ def retry_job(
         persona_name=job.persona,
         run_judge=True,
         title=job.article_title,
-        voice_customization=job.voice_customization
+        voice_customization=job.voice_customization,
+        source_url=job.source_url
     )
 
     return {
@@ -562,6 +576,169 @@ def retry_job(
         "status": "RUNNING",
         "message": f"Retry started for job '{job.job_id}'",
         "job": updated_job
+    }
+
+
+def _execute_bulk_url_processing(
+    job_items: List[Dict[str, str]],
+    persona_name: str,
+    run_judge: bool,
+    voice_customization: Optional[str] = None
+):
+    """Background worker that sequentially extracts content from URLs and executes speech synthesis jobs one by one."""
+    repo = get_job_repository()
+    persona_obj = get_persona(persona_name)
+    total = len(job_items)
+    logger.info(f"🚀 Starting sequential bulk URL processing for {total} items with persona '{persona_name}'")
+
+    for idx, item in enumerate(job_items, start=1):
+        job_id = item["job_id"]
+        url = item["url"]
+        logger.info(f"▶ [{idx}/{total}] Processing bulk URL: {url} (job_id: {job_id})")
+
+        # Step 1: Update status to EXTRACTING
+        try:
+            repo.update_job_progress(
+                job_id=job_id,
+                progress_stage="EXTRACTING",
+                progress_message=f"[{idx}/{total}] Extracting main article content from web source..."
+            )
+        except Exception as pe:
+            logger.warning(f"Could not update progress for {job_id}: {pe}")
+
+        # Step 2: Extract main content
+        try:
+            extracted = extract_article_from_url(url)
+            logger.info(f"✓ [{job_id}] Extracted '{extracted.title}' ({extracted.word_count} words)")
+
+            job = repo.get_job(job_id)
+            if job:
+                job.article_title = extracted.title
+                job.transcript = extracted.text
+                job.word_count = extracted.word_count
+                job.char_count = extracted.char_count
+                job.progress_stage = "CHUNKING"
+                job.progress_message = f"Partitioning article text ({extracted.word_count} words)..."
+                repo.save_job(job)
+
+            # Step 3: Run synthesis and judge sequentially for this job
+            _execute_async_synthesis(
+                job_id=job_id,
+                text=extracted.text,
+                persona_name=persona_name,
+                run_judge=run_judge,
+                title=extracted.title,
+                voice_customization=voice_customization,
+                source_url=url
+            )
+        except Exception as e:
+            logger.error(f"✗ [{job_id}] Bulk processing extraction failed for {url}: {e}", exc_info=True)
+            failed_job = repo.get_job(job_id)
+            if not failed_job:
+                failed_job = JobRecord(
+                    job_id=job_id,
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                    persona=persona_name,
+                    audience=persona_obj.audience,
+                    voice_name=persona_obj.voice_name,
+                    article_title=url,
+                    transcript=f"Failed to extract content from {url}",
+                    word_count=0,
+                    char_count=0,
+                    gcs_uri="N/A",
+                    status="FAILED",
+                    error_message=str(e),
+                    voice_customization=voice_customization,
+                    progress_stage="FAILED",
+                    progress_message=f"Extraction error: {str(e)}",
+                    source_url=url
+                )
+            else:
+                failed_job.status = "FAILED"
+                failed_job.error_message = str(e)
+                failed_job.progress_stage = "FAILED"
+                failed_job.progress_message = f"Extraction error: {str(e)}"
+            repo.save_job(failed_job)
+
+    logger.info(f"✓ Finished sequential bulk URL processing for {total} items")
+
+
+@app.post("/api/jobs/bulk")
+def create_bulk_jobs(
+    req: BulkJobRequest,
+    background_tasks: BackgroundTasks,
+    user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Enqueues a list of article URLs to be extracted and synthesized sequentially one by one."""
+    raw_urls = [u.strip() for u in req.urls if u.strip()]
+    if not raw_urls:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one valid URL must be provided."
+        )
+
+    valid_urls = []
+    invalid_urls = []
+    for u in raw_urls:
+        if validate_url(u):
+            valid_urls.append(u)
+        else:
+            invalid_urls.append(u)
+
+    if not valid_urls:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No valid HTTP/HTTPS URLs found. Invalid entries: {', '.join(invalid_urls[:3])}"
+        )
+
+    persona_obj = get_persona(req.persona)
+    repo = get_job_repository()
+
+    job_items = []
+    created_jobs = []
+
+    for url in valid_urls:
+        job_id = f"job_{secrets.token_hex(4)}"
+        job_items.append({"job_id": job_id, "url": url})
+
+        parsed = urlparse(url)
+        path_hint = parsed.path.strip("/").split("/")[-1].replace("-", " ").replace("_", " ").title()
+        title_hint = path_hint or f"Article from {parsed.netloc}"
+
+        initial_job = JobRecord(
+            job_id=job_id,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            persona=req.persona,
+            audience=persona_obj.audience,
+            voice_name=persona_obj.voice_name,
+            article_title=f"Extracting: {title_hint[:60]}",
+            transcript=f"Source URL: {url}\nPending content extraction...",
+            word_count=0,
+            char_count=0,
+            gcs_uri=f"gs://knowledge-to-audio-poc/pending/{job_id}",
+            status="RUNNING",
+            voice_customization=req.voice_customization,
+            progress_stage="QUEUED",
+            progress_message="Queued for sequential bulk extraction and synthesis...",
+            source_url=url
+        )
+        repo.save_job(initial_job)
+        created_jobs.append(initial_job)
+
+    background_tasks.add_task(
+        _execute_bulk_url_processing,
+        job_items=job_items,
+        persona_name=req.persona,
+        run_judge=req.run_judge,
+        voice_customization=req.voice_customization
+    )
+
+    return {
+        "status": "enqueued",
+        "total_enqueued": len(created_jobs),
+        "invalid_urls": invalid_urls,
+        "message": f"Successfully enqueued {len(created_jobs)} URL(s) for sequential voice synthesis.",
+        "jobs": created_jobs
     }
 
 

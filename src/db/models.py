@@ -55,3 +55,5 @@ class JobRecord(BaseModel):
     progress_message: Optional[str] = Field(default=None, description="Human-readable live progress description")
     current_turn: Optional[int] = Field(default=None, description="Active turn index being processed")
     total_turns: Optional[int] = Field(default=None, description="Total turns count for the article")
+    source_url: Optional[str] = Field(default=None, description="Original web article URL if generated via bulk processing")
+
