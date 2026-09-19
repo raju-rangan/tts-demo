@@ -21,6 +21,12 @@ try:
 except Exception:
     AudioSegment = None
 
+# Optional lameenc for fast in-memory MP3 encoding (zero OS-level dependencies, Cloud Run optimized)
+try:
+    import lameenc
+except Exception:
+    lameenc = None
+
 from src.config import settings
 from src.ai.personas import get_persona, VoicePersona
 
@@ -405,7 +411,28 @@ class GeminiAudioGenerator:
         """Transcodes raw 24kHz 16-bit mono PCM into broadcast MP3 @ 320kbps (or fallback WAV container)."""
         duration_sec = len(raw_pcm_bytes) / (rate * 2.0)
 
-        # 1. Preferred & Fast: Direct ffmpeg subprocess pipe
+        # 1. Preferred & Cloud Run Optimized: In-memory pure Python C-extension (lameenc)
+        if lameenc is not None:
+            try:
+                try:
+                    kbps = int(settings.bitrate.lower().replace("k", "").strip())
+                except (ValueError, AttributeError):
+                    kbps = 320
+
+                encoder = lameenc.Encoder()
+                encoder.set_channels(1)
+                encoder.set_in_sample_rate(rate)
+                encoder.set_bit_rate(kbps)
+                encoder.set_quality(2)  # High-quality LAME psychoacoustic profile (0=best, 2=high, 7=fast)
+                mp3_data = encoder.encode(raw_pcm_bytes)
+                mp3_data += encoder.flush()
+                mp3_bytes = bytes(mp3_data)
+                if mp3_bytes:
+                    return mp3_bytes, duration_sec
+            except Exception as e:
+                logger.warning(f"lameenc in-memory transcode failed: {e}. Attempting fallback...")
+
+        # 2. Secondary: Direct ffmpeg subprocess pipe (if ffmpeg is available in environment)
         try:
             cmd = [
                 "ffmpeg", "-y",
@@ -422,7 +449,7 @@ class GeminiAudioGenerator:
         except Exception as e:
             logger.debug(f"Direct ffmpeg transcode not available or failed: {e}")
 
-        # 2. Secondary: pydub if audioop is available
+        # 3. Tertiary: pydub if audioop is available
         if AudioSegment is not None:
             try:
                 segment = AudioSegment.from_raw(
@@ -437,7 +464,7 @@ class GeminiAudioGenerator:
             except Exception as e:
                 logger.debug(f"pydub export failed: {e}")
 
-        # 3. Standard Library Fallback: 16-bit PCM WAV container
+        # 4. Standard Library Fallback: 16-bit PCM WAV container
         logger.info("Packaging audio into standard WAV container...")
         wav_buf = io.BytesIO()
         with wave.open(wav_buf, "wb") as wf:

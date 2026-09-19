@@ -125,6 +125,22 @@ def test_transcode_pcm_wav_fallback():
     assert len(audio_bytes) > 0
     assert abs(dur - 0.1) < 0.01
 
+
+def test_transcode_pcm_to_mp3_lameenc():
+    """Verify in-memory MP3 transcoding with lameenc generates valid MP3 header."""
+    from src.ai.generator import GeminiAudioGenerator, lameenc
+    assert lameenc is not None, "lameenc should be installed in the environment"
+    gen = GeminiAudioGenerator()
+    # 0.5 seconds of 24kHz 16-bit mono PCM (24000 bytes)
+    sample_pcm = b"\x05\x00" * 12000
+    audio_bytes, dur = gen._transcode_pcm_to_mp3(sample_pcm, rate=24000)
+    assert len(audio_bytes) > 0
+    assert abs(dur - 0.5) < 0.01
+    # Check MPEG audio frame sync header (0xFF and first 3 bits of byte 2 are 111)
+    assert audio_bytes[0] == 0xFF
+    assert (audio_bytes[1] & 0xE0) == 0xE0
+
+
 def test_judge_client_initialization(monkeypatch):
     """Verify MultimodalAudioJudge initializes Vertex AI client with global location and handles API key."""
     from unittest.mock import patch, MagicMock

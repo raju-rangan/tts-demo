@@ -38,7 +38,7 @@ flowchart TD
     end
 
     subgraph DSP_CHAIN["4. DSP Mastering & Transcoding"]
-        DSP["Audio DSP Engine<br/>• RMS Loudness Normalizer (3000 RMS)<br/>• 40ms Raised-Cosine Micro-Fades<br/>• 300ms Silence Inter-Turn Stitching<br/>• ffmpeg MP3 Transcoder (320kbps)"]
+        DSP["Audio DSP Engine<br/>• RMS Loudness Normalizer (3000 RMS)<br/>• 40ms Raised-Cosine Micro-Fades<br/>• 300ms Silence Inter-Turn Stitching<br/>• In-Memory MP3 Transcoder (lameenc 320kbps)"]
     end
 
     subgraph PERSISTENCE["5. Google Cloud Storage & Telemetry"]
@@ -85,14 +85,7 @@ make help
   # macOS / Linux
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
-- **System Audio Utility**: [`ffmpeg`](https://ffmpeg.org/) (required for broadcast MP3 transcoding at 320kbps):
-  ```bash
-  # macOS (Homebrew)
-  brew install ffmpeg
-
-  # Ubuntu / Debian
-  sudo apt-get update && sudo apt-get install -y ffmpeg
-  ```
+- **Zero OS-Level Audio Dependencies**: No `brew install ffmpeg` or `apt-get install -y ffmpeg` is needed! The platform uses [`lameenc`](https://pypi.org/project/lameenc/), an ultra-lightweight (<500KB) pure-Python C-wheel that encodes raw PCM to broadcast 320kbps MP3 in-memory. This design keeps container images minimal and makes the platform 100% portable for **Google Cloud Run** deployment.
 - **Google Cloud Access**:
   - A Google Cloud Project with the **Vertex AI API** and **Cloud Storage API** enabled.
   - The Google Cloud CLI (`gcloud`) installed and accessible in your `$PATH`.
@@ -343,20 +336,16 @@ Each turn's raw PCM audio undergoes digital signal processing before concatenati
 1. **RMS Loudness Normalization**: [`normalize_chunk_rms()`](file:///Users/rrangan/Documents/customers/tts-demo/src/ai/generator.py#L105-L137) calculates Root Mean Square loudness and applies bounded gain scaling to eliminate volume jumps.
 2. **Micro-Fading**: [`apply_micro_fades()`](file:///Users/rrangan/Documents/customers/tts-demo/src/ai/generator.py#L139-L165) applies a 40ms raised-cosine fade-in/out to prevent boundary DC-offset clicks.
 3. **Turn Stitching**: Concatenates chunks with a **300ms natural silence pause** (`b"\x00"`).
-4. **MP3 Transcoding**: Piped into `ffmpeg` at 24kHz @ 320kbps:
+4. **In-Memory MP3 Transcoding**: Encoded via [`lameenc`](https://pypi.org/project/lameenc/) at 24kHz mono @ 320kbps directly in C memory (with graceful fallback to `ffmpeg` or `wave` container):
 
 ```python
 # From src/ai/generator.py
-cmd = [
-    "ffmpeg", "-y",
-    "-f", "s16le", "-ar", "24000", "-ac", "1",
-    "-i", "pipe:0",
-    "-b:a", "320k",
-    "-f", "mp3",
-    "pipe:1"
-]
-res = subprocess.run(cmd, input=raw_pcm_bytes, capture_output=True, check=True)
-mp3_bytes = res.stdout
+encoder = lameenc.Encoder()
+encoder.set_channels(1)
+encoder.set_in_sample_rate(24000)
+encoder.set_bit_rate(320)
+encoder.set_quality(2)  # High-quality LAME psychoacoustic profile
+mp3_bytes = bytes(encoder.encode(raw_pcm_bytes) + encoder.flush())
 ```
 
 ---
