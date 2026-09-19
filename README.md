@@ -127,11 +127,15 @@ Follow these steps using the `Makefile`:
    GCS_BUCKET_NAME=tts-bank-audio-prod
    ```
 
-2. **Authenticate with GCP**:
+2. **Authenticate with GCP (CLI & Application Default Credentials)**:
    ```bash
    make auth
    ```
-   *Sets the active `gcloud` project, launches `gcloud auth application-default login`, and configures the ADC quota project to match `$(GCP_PROJECT_ID)`.*
+   *Performs complete authentication: logs in your user account for `gcloud` CLI commands (`gcloud auth login`), sets the active project, and configures Application Default Credentials (`gcloud auth application-default login`) for Vertex AI Python SDK access.*
+
+   *Alternatively, authenticate individual credential layers:*
+   - `make auth-cli`: Authenticates only the `gcloud` CLI account.
+   - `make auth-adc`: Authenticates only Application Default Credentials for the Python SDK.
 
 3. **Verify and Auto-Align Authentication**:
    ```bash

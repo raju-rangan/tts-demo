@@ -44,18 +44,34 @@ install: ## Sync and install dependencies using uv
 # ------------------------------------------------------------------------------
 
 .PHONY: auth
-auth: ## Authenticate to GCP and configure Application Default Credentials (ADC)
-	@if [ -z "$(GCP_PROJECT_ID)" ] || [ "$(GCP_PROJECT_ID)" = "your-gcp-project-id" ]; then \
+auth: ## Authenticate both gcloud CLI user and Application Default Credentials (ADC)
+	@if [ -z "$(CLEAN_PROJECT_ID)" ] || [ "$(CLEAN_PROJECT_ID)" = "your-gcp-project-id" ]; then \
 		echo "⚠️ Warning: GCP_PROJECT_ID is not set in .env. Please configure .env first."; \
 		exit 1; \
 	fi
-	@echo "🔐 Configuring Google Cloud Project: $(GCP_PROJECT_ID)..."
-	@gcloud config set project $(GCP_PROJECT_ID)
-	@echo "🔐 Setting up Application Default Credentials (ADC)..."
+	@echo "🔐 1. Authenticating gcloud CLI user account..."
+	@gcloud auth login
+	@echo "🔐 2. Configuring active Google Cloud Project: $(CLEAN_PROJECT_ID)..."
+	@gcloud config set project $(CLEAN_PROJECT_ID)
+	@echo "🔐 3. Setting up Application Default Credentials (ADC) for Python SDK..."
 	@gcloud auth application-default login
-	@echo "🔐 Setting ADC Quota Project to $(GCP_PROJECT_ID)..."
-	@gcloud auth application-default set-quota-project $(GCP_PROJECT_ID)
-	@echo "✓ GCP Authentication complete for project: $(GCP_PROJECT_ID)"
+	@echo "🔐 4. Setting ADC Quota Project to $(CLEAN_PROJECT_ID)..."
+	@gcloud auth application-default set-quota-project $(CLEAN_PROJECT_ID)
+	@echo "✓ GCP Authentication complete for CLI and ADC (project: $(CLEAN_PROJECT_ID))"
+
+.PHONY: auth-cli
+auth-cli: ## Authenticate only the gcloud CLI user account (gcloud auth login)
+	@echo "🔐 Authenticating gcloud CLI user account..."
+	@gcloud auth login
+	@gcloud config set project $(CLEAN_PROJECT_ID)
+	@echo "✓ gcloud CLI authenticated for project: $(CLEAN_PROJECT_ID)"
+
+.PHONY: auth-adc
+auth-adc: ## Authenticate only Application Default Credentials (ADC) for Python SDK
+	@echo "🔐 Authenticating ADC for Python SDK..."
+	@gcloud auth application-default login
+	@gcloud auth application-default set-quota-project $(CLEAN_PROJECT_ID)
+	@echo "✓ ADC configured for quota project: $(CLEAN_PROJECT_ID)"
 
 .PHONY: enable-apis
 enable-apis: ## Enable required GCP APIs (Cloud Run, Cloud Build, Artifact Registry, Vertex AI, GCS)
