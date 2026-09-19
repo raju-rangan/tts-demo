@@ -11,6 +11,18 @@ ifneq (,$(wildcard ./.env))
     export $(shell sed 's/=.*//' .env)
 endif
 
+# Strip quotes and sanitize env variables for gcloud CLI & scripts
+ACTIVE_GCLOUD_PROJECT := $(shell gcloud config get-value project 2>/dev/null)
+RAW_PROJECT_ID := $(subst ",,$(GCP_PROJECT_ID))
+CLEAN_PROJECT_ID := $(if $(filter your-gcp-project-id,$(RAW_PROJECT_ID)),$(ACTIVE_GCLOUD_PROJECT),$(or $(RAW_PROJECT_ID),$(ACTIVE_GCLOUD_PROJECT)))
+CLEAN_LOCATION := $(or $(subst ",,$(GCP_LOCATION)),us-central1)
+CLEAN_BUCKET := $(subst ",,$(GCS_BUCKET_NAME))
+CLEAN_VOICE_MODEL := $(or $(subst ",,$(GEMINI_VOICE_MODEL)),gemini-3.1-flash-tts-preview)
+CLEAN_JUDGE_MODEL := $(or $(subst ",,$(GEMINI_JUDGE_MODEL)),gemini-3.8-flash)
+CLEAN_JUDGE_LOCATION := $(or $(subst ",,$(GEMINI_JUDGE_LOCATION)),global)
+CLEAN_PERSONA := $(or $(subst ",,$(DEFAULT_VOICE_PERSONA)),Retail Banking Guide)
+CLEAN_BITRATE := $(or $(subst ",,$(AUDIO_BITRATE)),320k)
+
 .DEFAULT_GOAL := help
 
 .PHONY: help
@@ -45,8 +57,8 @@ install: ## Sync and install dependencies using uv
 
 .PHONY: auth
 auth: ## Authenticate GCP CLI and ADC (auto-bypasses if already authenticated)
-	@if [ -z "$(CLEAN_PROJECT_ID)" ] || [ "$(CLEAN_PROJECT_ID)" = "your-gcp-project-id" ]; then \
-		echo "⚠️ Warning: GCP_PROJECT_ID is not set in .env. Please configure .env first."; \
+	@if [ -z "$(CLEAN_PROJECT_ID)" ]; then \
+		echo "⚠️ Warning: GCP_PROJECT_ID is not set in .env and no active gcloud project found. Please configure .env or gcloud first."; \
 		exit 1; \
 	fi
 	@echo "🔍 Checking GCP authentication state for $(CLEAN_PROJECT_ID)..."
@@ -81,8 +93,8 @@ auth: ## Authenticate GCP CLI and ADC (auto-bypasses if already authenticated)
 
 .PHONY: auth-force
 auth-force: ## Force full interactive re-login for both gcloud CLI and ADC
-	@if [ -z "$(CLEAN_PROJECT_ID)" ] || [ "$(CLEAN_PROJECT_ID)" = "your-gcp-project-id" ]; then \
-		echo "⚠️ Warning: GCP_PROJECT_ID is not set in .env. Please configure .env first."; \
+	@if [ -z "$(CLEAN_PROJECT_ID)" ]; then \
+		echo "⚠️ Warning: GCP_PROJECT_ID is not set in .env and no active gcloud project found. Please configure .env or gcloud first."; \
 		exit 1; \
 	fi
 	@echo "🔐 1. Force re-authenticating gcloud CLI user account..."
@@ -205,16 +217,6 @@ clean: ## Remove caches, build artifacts, and virtual environment
 
 SERVICE_NAME ?= tts-studio
 
-# Strip quotes and sanitize env variables for gcloud CLI
-CLEAN_PROJECT_ID := $(subst ",,$(GCP_PROJECT_ID))
-CLEAN_LOCATION := $(or $(subst ",,$(GCP_LOCATION)),us-central1)
-CLEAN_BUCKET := $(subst ",,$(GCS_BUCKET_NAME))
-CLEAN_VOICE_MODEL := $(or $(subst ",,$(GEMINI_VOICE_MODEL)),gemini-3.1-flash-tts-preview)
-CLEAN_JUDGE_MODEL := $(or $(subst ",,$(GEMINI_JUDGE_MODEL)),gemini-3.8-flash)
-CLEAN_JUDGE_LOCATION := $(or $(subst ",,$(GEMINI_JUDGE_LOCATION)),global)
-CLEAN_PERSONA := $(or $(subst ",,$(DEFAULT_VOICE_PERSONA)),Retail Banking Guide)
-CLEAN_BITRATE := $(or $(subst ",,$(AUDIO_BITRATE)),320k)
-
 .PHONY: docker-build
 docker-build: ## Build local Docker container image with Python 3.13
 	@echo "🐳 Building Docker image $(SERVICE_NAME):latest using Python 3.13..."
@@ -227,8 +229,8 @@ docker-run: ## Run Docker container locally on http://localhost:8080
 
 .PHONY: deploy
 deploy: ## Deploy application directly to Google Cloud Run via Cloud Build
-	@if [ -z "$(CLEAN_PROJECT_ID)" ] || [ "$(CLEAN_PROJECT_ID)" = "your-gcp-project-id" ]; then \
-		echo "⚠️ Error: GCP_PROJECT_ID is not set in .env. Please configure .env first."; \
+	@if [ -z "$(CLEAN_PROJECT_ID)" ]; then \
+		echo "⚠️ Error: GCP_PROJECT_ID is not set in .env and no active gcloud project found. Please configure .env first."; \
 		exit 1; \
 	fi
 	@echo "🚀 Deploying $(SERVICE_NAME) to Google Cloud Run..."
@@ -239,8 +241,13 @@ deploy: ## Deploy application directly to Google Cloud Run via Cloud Build
 		--project $(CLEAN_PROJECT_ID) \
 		--region $(CLEAN_LOCATION) \
 		--source . \
-		--allow-unauthenticated \
+		--no-invoker-iam-check \
 		--set-env-vars '^##^GCP_PROJECT_ID=$(CLEAN_PROJECT_ID)##GCP_LOCATION=$(CLEAN_LOCATION)##GCS_BUCKET_NAME=$(CLEAN_BUCKET)##GEMINI_VOICE_MODEL=$(CLEAN_VOICE_MODEL)##GEMINI_JUDGE_MODEL=$(CLEAN_JUDGE_MODEL)##GEMINI_JUDGE_LOCATION=$(CLEAN_JUDGE_LOCATION)##DEFAULT_VOICE_PERSONA=$(CLEAN_PERSONA)##AUDIO_BITRATE=$(CLEAN_BITRATE)'
+
+.PHONY: cloud-run-proxy
+cloud-run-proxy: ## Launch local authenticated proxy tunnel to the Cloud Run service
+	@echo "🌐 Starting authenticated Cloud Run proxy for $(SERVICE_NAME) on http://localhost:8080..."
+	gcloud run services proxy $(SERVICE_NAME) --project $(CLEAN_PROJECT_ID) --region $(CLEAN_LOCATION) --port 8080
 
 .PHONY: cloud-run-logs
 cloud-run-logs: ## Stream live logs from the deployed Cloud Run service
