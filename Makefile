@@ -57,6 +57,18 @@ auth: ## Authenticate to GCP and configure Application Default Credentials (ADC)
 	@gcloud auth application-default set-quota-project $(GCP_PROJECT_ID)
 	@echo "✓ GCP Authentication complete for project: $(GCP_PROJECT_ID)"
 
+.PHONY: enable-apis
+enable-apis: ## Enable required GCP APIs (Cloud Run, Cloud Build, Artifact Registry, Vertex AI, GCS)
+	@echo "🔑 Enabling required GCP APIs for $(CLEAN_PROJECT_ID)..."
+	gcloud services enable \
+		run.googleapis.com \
+		cloudbuild.googleapis.com \
+		artifactregistry.googleapis.com \
+		aiplatform.googleapis.com \
+		storage.googleapis.com \
+		--project $(CLEAN_PROJECT_ID)
+	@echo "✓ Required Google Cloud APIs enabled."
+
 .PHONY: auth-check
 auth-check: ## Strictly verify authentication to the specific project in .env
 	@$(UV) run python scripts/verify_gcp_auth.py
