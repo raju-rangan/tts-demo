@@ -74,6 +74,10 @@ def test_authenticated_jobs_and_stats(client):
     assert stats["total_jobs"] >= 2
     assert "avg_quality_score" in stats
     assert "total_cost_usd" in stats
+    assert "pass_rate" in stats
+    assert "audited_count" in stats
+    assert "compliant_count" in stats
+    assert "flagged_count" in stats
 
 def test_stream_audio_isolation(client):
     """Verify failed/running/unknown jobs do not leak or cross-contaminate audio."""
@@ -411,3 +415,39 @@ def test_html_modal_nesting_and_structure(client):
     assert tracker.found_bulk_modal is True, "bulkJobModal must exist in DOM"
     assert tracker.modal_parent_of_new is False, "newJobModal must NOT be nested inside jobDetailModal"
     assert tracker.modal_parent_of_bulk is False, "bulkJobModal must NOT be nested inside other modals"
+
+
+def test_home_hub_and_auditor_view(client):
+    """Verify Home Hub navigation, persona sections, and compliance elements in the UI."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # Home Hub / Profile Select Screen
+    assert 'id="profileSelectSection"' in html
+    assert "Select Workspace Persona" in html
+    assert "Enter as Content Creator" in html
+    assert "Enter as Compliance Auditor" in html
+
+    # Top Navigation Switch Persona Button
+    assert "Switch Persona" in html
+    assert 'onclick="showProfileSelect()"' in html
+
+    # Creator Studio Section
+    assert 'id="creatorStudioSection"' in html
+    assert 'id="btnNavNewJob"' in html
+    assert 'id="btnNavBulk"' in html
+
+    # Compliance Auditor Console Section
+    assert 'id="auditorConsoleSection"' in html
+    assert 'id="auditorModeBanner"' in html
+    assert 'id="btnNavFinOps"' in html
+    assert 'id="kpiPassRate"' in html
+    assert 'id="kpiAuditedDisclosures"' in html
+    assert 'id="kpiFlaggedItems"' in html
+    assert 'id="kpiAuditorCost"' in html
+
+    # Compliance Filter Tabs
+    assert 'id="complianceFilterTabs"' in html
+    assert 'setComplianceFilter(' in html
+

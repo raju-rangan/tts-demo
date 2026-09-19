@@ -170,15 +170,18 @@
     <!-- Top Navigation Bar -->
     <header class="h-16 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur px-6 flex items-center justify-between shrink-0">
       <div class="flex items-center space-x-4">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-md">
-          <i data-lucide="volume-2" class="w-4 h-4"></i>
-        </div>
-        <div>
-          <div class="flex items-center space-x-2">
-            <span class="font-bold text-white tracking-tight">Apex Bank</span>
-            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">Enterprise TTS</span>
+        <!-- Clickable Brand Logo to return Home -->
+        <button type="button" onclick="showProfileSelect()" class="flex items-center space-x-3 group text-left focus:outline-none" title="Return to Persona Hub (Home)">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+            <i data-lucide="volume-2" class="w-4 h-4"></i>
           </div>
-        </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-white tracking-tight group-hover:text-emerald-300 transition">Apex Bank</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">Enterprise TTS</span>
+            </div>
+          </div>
+        </button>
 
         <div class="hidden lg:flex items-center space-x-2 pl-4 border-l border-zinc-800 text-xs font-mono">
           <span class="px-2 py-1 bg-zinc-800/80 rounded text-zinc-400 flex items-center space-x-1.5">
@@ -191,41 +194,35 @@
       </div>
 
       <div class="flex items-center space-x-3">
-        <!-- Interactive Persona Selector Switcher -->
-        <div class="flex items-center bg-zinc-950 p-1 rounded-xl border border-zinc-800 space-x-1 shadow-inner" id="personaSwitcher">
-          <button id="btnPersonaCreator" onclick="selectPersona('creator')"
-            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 transition bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm"
-            title="Switch to Content Creator View (Sarah Jenkins)">
-            <img src="/static/avatars/creator_sarah.jpg" class="w-5 h-5 rounded-full object-cover border border-emerald-400/60 shadow-sm" alt="Sarah Jenkins">
-            <span>Creator View</span>
-          </button>
-          
-          <button id="btnPersonaAuditor" onclick="selectPersona('auditor')"
-            class="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-2 transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border border-transparent"
-            title="Switch to Compliance Auditor View (David Chen)">
-            <img src="/static/avatars/auditor_david.jpg" class="w-5 h-5 rounded-full object-cover border border-zinc-600 shadow-sm" alt="David Chen">
-            <span>Auditor View</span>
-          </button>
+        <!-- Switch Persona / Home Hub Button -->
+        <button type="button" onclick="showProfileSelect()"
+          class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white text-xs font-semibold rounded-xl transition flex items-center space-x-2 border border-zinc-700 shadow-sm group"
+          title="Return to Persona Selection Screen (Home)">
+          <i data-lucide="layout-grid" class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform"></i>
+          <span>Switch Persona</span>
+        </button>
 
-          <button onclick="showProfileSelect()"
-            class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition"
-            title="Open Persona Selection Screen">
-            <i data-lucide="users" class="w-3.5 h-3.5"></i>
-          </button>
-        </div>
-
-        <button onclick="openBulkJobModal()"
+        <!-- Creator Actions (Only visible in Creator View) -->
+        <button id="btnNavBulk" onclick="openBulkJobModal()"
           class="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 border border-zinc-700 shadow-sm hover:border-zinc-600">
           <i data-lucide="layers" class="w-4 h-4 text-teal-400"></i>
           <span>Bulk Process URLs</span>
         </button>
 
-        <button onclick="openNewJobModal()"
+        <button id="btnNavNewJob" onclick="openNewJobModal()"
           class="px-3.5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-lg shadow-emerald-500/10">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
           <span>New Voice Synthesis</span>
         </button>
 
+        <!-- Auditor Action (Only visible in Auditor View) -->
+        <button id="btnNavFinOps" onclick="openFinOpsDrawer()"
+          class="hidden px-3.5 py-2 bg-purple-900/40 hover:bg-purple-900/60 text-purple-200 border border-purple-500/30 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+          <i data-lucide="sliders" class="w-4 h-4 text-purple-300"></i>
+          <span>Inspect FinOps & Governance</span>
+        </button>
+
+        <!-- User Profile Pill -->
         <div class="flex items-center space-x-2.5 pl-3 border-l border-zinc-800">
           <div class="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-semibold text-zinc-300 overflow-hidden shadow-sm" id="userAvatar">
             <img src="/static/avatars/creator_sarah.jpg" alt="Sarah Jenkins" class="w-full h-full object-cover">
@@ -245,74 +242,159 @@
     <!-- Main Content Area -->
     <main class="flex-1 overflow-y-auto px-6 py-6 space-y-6">
 
-      <!-- Auditor Mode Banner (Active when Auditor View is selected) -->
-      <div id="auditorModeBanner" class="hidden bg-gradient-to-r from-purple-950/50 via-indigo-950/30 to-purple-950/50 border border-purple-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-purple-950/20">
-        <div class="flex items-center space-x-3.5">
-          <img src="/static/avatars/auditor_david.jpg" class="w-11 h-11 rounded-xl object-cover border border-purple-400/50 shadow-md">
-          <div>
-            <div class="flex items-center space-x-2">
-              <span class="text-xs font-bold text-purple-200 uppercase tracking-wide">Compliance & Regulatory Auditor Console</span>
-              <span class="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-[10px] text-purple-300 font-medium">Auditor Mode Active</span>
+      <!-- ================= CREATOR STUDIO SECTION (SARAH JENKINS) ================= -->
+      <div id="creatorStudioSection" class="space-y-6">
+        <!-- Creator Banner -->
+        <div class="bg-gradient-to-r from-emerald-950/40 via-teal-950/20 to-zinc-900 border border-emerald-500/30 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg shadow-emerald-950/10">
+          <div class="flex items-center space-x-3.5">
+            <img src="/static/avatars/creator_sarah.jpg" class="w-12 h-12 rounded-2xl object-cover border border-emerald-400/50 shadow-md">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-xs font-bold text-emerald-300 uppercase tracking-wide">Enterprise Speech Production Studio</span>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-medium">Creator Mode</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1 max-w-2xl leading-relaxed">
+                Operating as <strong>Sarah Jenkins</strong> (Chief Communications Officer). Convert wealth advisories, regulatory disclosures, and customer articles into natural spoken speech using <strong>Gemini 3.1 Flash TTS</strong>.
+              </p>
             </div>
-            <p class="text-xs text-zinc-400 mt-0.5">Operating as <strong>David Chen</strong> (VP Regulatory Compliance). Auditing Gemini 3.8 Flash Multimodal Quality Scorecards, Disclosures & FinOps.</p>
+          </div>
+          <div class="flex items-center space-x-2 shrink-0">
+            <button onclick="openBulkJobModal()" class="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 border border-zinc-700">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-teal-400"></i>
+              <span>Bulk URLs</span>
+            </button>
+            <button onclick="openNewJobModal()" class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 text-xs font-bold rounded-xl transition flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>New Voice Job</span>
+            </button>
           </div>
         </div>
-        <div class="flex items-center space-x-2 shrink-0">
-          <button onclick="openFinOpsDrawer()" class="px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 text-purple-100 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-sm">
-            <i data-lucide="sliders" class="w-3.5 h-3.5 text-purple-300"></i>
-            <span>Inspect FinOps & Compliance</span>
-          </button>
+
+        <!-- Creator KPI Summary Analytics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Total Jobs Run</span>
+              <span class="p-2 rounded-xl bg-zinc-800/60 text-zinc-400"><i data-lucide="layers" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiTotalJobs" class="text-2xl font-bold font-mono text-white">--</span>
+              <span class="text-xs text-emerald-400 font-medium">All Synced</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">Tracked in <span id="kpiDbBackend">Storage</span></p>
+          </div>
+
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Avg Quality Score</span>
+              <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400"><i data-lucide="award" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiAvgScore" class="text-2xl font-bold font-mono text-emerald-400">--</span>
+              <span class="text-xs text-zinc-400">/ 5.0</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">Audited by Gemini 3.8 Flash</p>
+          </div>
+
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Audio Generated</span>
+              <span class="p-2 rounded-xl bg-purple-500/10 text-purple-400"><i data-lucide="mic" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiTotalAudio" class="text-2xl font-bold font-mono text-white">--</span>
+              <span class="text-xs text-zinc-400">minutes</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">24kHz 320kbps MP3</p>
+          </div>
+
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Total Pipeline Cost</span>
+              <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400"><i data-lucide="badge-dollar-sign" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiTotalCost" class="text-2xl font-bold font-mono text-amber-400">$0.0000</span>
+              <span class="text-xs text-zinc-400">USD</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">TTS + Multimodal Judge</p>
+          </div>
         </div>
       </div>
 
-      <!-- KPI Summary Analytics Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Total Jobs Run</span>
-            <span class="p-2 rounded-xl bg-zinc-800/60 text-zinc-400"><i data-lucide="layers" class="w-4 h-4"></i></span>
+      <!-- ================= AUDITOR CONSOLE SECTION (DAVID CHEN) ================= -->
+      <div id="auditorConsoleSection" class="hidden space-y-6">
+        <!-- Auditor Mode Banner -->
+        <div id="auditorModeBanner" class="bg-gradient-to-r from-purple-950/50 via-indigo-950/30 to-purple-950/50 border border-purple-500/40 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg shadow-purple-950/20">
+          <div class="flex items-center space-x-3.5">
+            <img src="/static/avatars/auditor_david.jpg" class="w-12 h-12 rounded-2xl object-cover border border-purple-400/50 shadow-md">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-xs font-bold text-purple-200 uppercase tracking-wide">Compliance & Regulatory Auditor Console</span>
+                <span class="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-[10px] text-purple-300 font-medium">Auditor Mode Active</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1 max-w-2xl leading-relaxed">
+                Operating as <strong>David Chen</strong> (VP Regulatory Compliance). Overseeing <strong>Gemini 3.8 Flash Multimodal Quality Scorecards</strong>, disclosure clarity, Truth in Lending verification, and FinOps governance.
+              </p>
+            </div>
           </div>
-          <div class="mt-3 flex items-baseline space-x-2">
-            <span id="kpiTotalJobs" class="text-2xl font-bold font-mono text-white">--</span>
-            <span class="text-xs text-emerald-400 font-medium">All Synced</span>
+          <div class="flex items-center space-x-2 shrink-0">
+            <button onclick="openFinOpsDrawer()" class="px-3.5 py-2 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 text-purple-100 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+              <i data-lucide="sliders" class="w-3.5 h-3.5 text-purple-300"></i>
+              <span>Inspect FinOps & Compliance</span>
+            </button>
           </div>
-          <p class="text-xs text-zinc-500 mt-1">Tracked in <span id="kpiDbBackend">Storage</span></p>
         </div>
 
-        <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Avg Quality Score</span>
-            <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400"><i data-lucide="award" class="w-4 h-4"></i></span>
+        <!-- Auditor Executive Compliance KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Compliance Pass Rate</span>
+              <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400"><i data-lucide="shield-check" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiPassRate" class="text-2xl font-bold font-mono text-emerald-400">--%</span>
+              <span class="text-xs text-zinc-400 font-medium">Score &ge; 4.0</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">Regulatory Quality Gate Passed</p>
           </div>
-          <div class="mt-3 flex items-baseline space-x-2">
-            <span id="kpiAvgScore" class="text-2xl font-bold font-mono text-emerald-400">--</span>
-            <span class="text-xs text-zinc-400">/ 5.0</span>
-          </div>
-          <p class="text-xs text-zinc-500 mt-1">Audited by Gemini 3.8 Flash</p>
-        </div>
 
-        <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Audio Generated</span>
-            <span class="p-2 rounded-xl bg-purple-500/10 text-purple-400"><i data-lucide="mic" class="w-4 h-4"></i></span>
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Audited Disclosures</span>
+              <span class="p-2 rounded-xl bg-purple-500/10 text-purple-400"><i data-lucide="file-check" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiAuditedDisclosures" class="text-2xl font-bold font-mono text-white">--</span>
+              <span class="text-xs text-zinc-400">Audio Assets</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">Scored by Gemini 3.8 Flash</p>
           </div>
-          <div class="mt-3 flex items-baseline space-x-2">
-            <span id="kpiTotalAudio" class="text-2xl font-bold font-mono text-white">--</span>
-            <span class="text-xs text-zinc-400">minutes</span>
-          </div>
-          <p class="text-xs text-zinc-500 mt-1">24kHz 320kbps MP3</p>
-        </div>
 
-        <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Total Pipeline Cost</span>
-            <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400"><i data-lucide="badge-dollar-sign" class="w-4 h-4"></i></span>
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Flagged Disclosures</span>
+              <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400"><i data-lucide="alert-triangle" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiFlaggedItems" class="text-2xl font-bold font-mono text-amber-400">--</span>
+              <span class="text-xs text-amber-400/80 font-medium">Require Review</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">Score &lt; 4.0 or Disclosure Gaps</p>
           </div>
-          <div class="mt-3 flex items-baseline space-x-2">
-            <span id="kpiTotalCost" class="text-2xl font-bold font-mono text-amber-400">$0.0000</span>
-            <span class="text-xs text-zinc-400">USD</span>
+
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Audit FinOps Governance</span>
+              <span class="p-2 rounded-xl bg-purple-500/10 text-purple-300"><i data-lucide="badge-dollar-sign" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiAuditorCost" class="text-2xl font-bold font-mono text-purple-300">$0.0000</span>
+              <span class="text-xs text-zinc-400">USD</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">Multimodal Audit & Speech Spend</p>
           </div>
-          <p class="text-xs text-zinc-500 mt-1">TTS + Multimodal Judge</p>
         </div>
       </div>
 
@@ -322,11 +404,18 @@
         <!-- Filter Header -->
         <div class="p-5 border-b border-zinc-800/80 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h3 class="text-base font-semibold text-white">Synthesis & Quality Audit Job History</h3>
-            <p class="text-xs text-zinc-400 mt-0.5">Click on any job to inspect full transcripts, GCS storage paths, token metrics, and diagnostic scorecards.</p>
+            <h3 id="tableTitle" class="text-base font-semibold text-white">Synthesis & Quality Audit Job History</h3>
+            <p id="tableSubtitle" class="text-xs text-zinc-400 mt-0.5">Click on any job to inspect full transcripts, GCS storage paths, token metrics, and diagnostic scorecards.</p>
           </div>
 
-          <div class="flex items-center space-x-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <!-- Auditor Compliance Filter Tabs -->
+            <div id="complianceFilterTabs" class="hidden flex items-center bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs font-medium">
+              <button id="filterTabAll" onclick="setComplianceFilter('all')" class="px-3 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 transition font-semibold">All Disclosures</button>
+              <button id="filterTabCompliant" onclick="setComplianceFilter('compliant')" class="px-3 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 border border-transparent transition">Compliant (&ge; 4.0)</button>
+              <button id="filterTabFlagged" onclick="setComplianceFilter('flagged')" class="px-3 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 border border-transparent transition">Needs Review (&lt; 4.0)</button>
+            </div>
+
             <select id="personaFilter" onchange="filterJobs(true)"
               class="px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 transition">
               <option value="All">All Voice Personas</option>
@@ -955,6 +1044,24 @@
       return Object.assign(h, extra);
     }
 
+    let COMPLIANCE_FILTER = 'all';
+
+    function setComplianceFilter(filterVal) {
+      COMPLIANCE_FILTER = filterVal;
+      const tabAll = document.getElementById('filterTabAll');
+      const tabComp = document.getElementById('filterTabCompliant');
+      const tabFlag = document.getElementById('filterTabFlagged');
+
+      const activeCls = "px-3 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 transition font-semibold";
+      const inactiveCls = "px-3 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 border border-transparent transition";
+
+      if (tabAll) tabAll.className = filterVal === 'all' ? activeCls : inactiveCls;
+      if (tabComp) tabComp.className = filterVal === 'compliant' ? activeCls : inactiveCls;
+      if (tabFlag) tabFlag.className = filterVal === 'flagged' ? activeCls : inactiveCls;
+
+      filterJobs(true);
+    }
+
     async function selectPersona(personaType) {
       CURRENT_PERSONA = personaType;
       localStorage.setItem('apex_tts_persona', personaType);
@@ -973,31 +1080,35 @@
     }
 
     function updatePersonaUI() {
-      const btnCreator = document.getElementById('btnPersonaCreator');
-      const btnAuditor = document.getElementById('btnPersonaAuditor');
-      const auditorBanner = document.getElementById('auditorModeBanner');
+      const creatorSection = document.getElementById('creatorStudioSection');
+      const auditorSection = document.getElementById('auditorConsoleSection');
+      const btnNavNewJob = document.getElementById('btnNavNewJob');
+      const btnNavBulk = document.getElementById('btnNavBulk');
+      const btnNavFinOps = document.getElementById('btnNavFinOps');
+      const complianceTabs = document.getElementById('complianceFilterTabs');
+      const tableTitle = document.getElementById('tableTitle');
+      const tableSubtitle = document.getElementById('tableSubtitle');
 
       if (CURRENT_PERSONA === 'auditor') {
-        if (btnAuditor) {
-          btnAuditor.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 transition bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm";
-        }
-        if (btnCreator) {
-          btnCreator.className = "px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-2 transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border border-transparent";
-        }
-        if (auditorBanner) {
-          auditorBanner.classList.remove('hidden');
-        }
+        if (creatorSection) creatorSection.classList.add('hidden');
+        if (auditorSection) auditorSection.classList.remove('hidden');
+        if (btnNavNewJob) btnNavNewJob.classList.add('hidden');
+        if (btnNavBulk) btnNavBulk.classList.add('hidden');
+        if (btnNavFinOps) btnNavFinOps.classList.remove('hidden');
+        if (complianceTabs) complianceTabs.classList.remove('hidden');
+        if (tableTitle) tableTitle.textContent = "Regulatory Compliance & Disclosure Audio Registry";
+        if (tableSubtitle) tableSubtitle.textContent = "Auditing Gemini 3.8 Flash Multimodal quality gate, disclosure clarity, and regulatory adherence.";
       } else {
-        if (btnCreator) {
-          btnCreator.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 transition bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm";
-        }
-        if (btnAuditor) {
-          btnAuditor.className = "px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-2 transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border border-transparent";
-        }
-        if (auditorBanner) {
-          auditorBanner.classList.add('hidden');
-        }
+        if (creatorSection) creatorSection.classList.remove('hidden');
+        if (auditorSection) auditorSection.classList.add('hidden');
+        if (btnNavNewJob) btnNavNewJob.classList.remove('hidden');
+        if (btnNavBulk) btnNavBulk.classList.remove('hidden');
+        if (btnNavFinOps) btnNavFinOps.classList.add('hidden');
+        if (complianceTabs) complianceTabs.classList.add('hidden');
+        if (tableTitle) tableTitle.textContent = "Synthesis & Quality Audit Job History";
+        if (tableSubtitle) tableSubtitle.textContent = "Click on any job to inspect full transcripts, GCS storage paths, token metrics, and diagnostic scorecards.";
       }
+      lucide.createIcons();
     }
 
     // Initialize GCIP Authentication
@@ -1107,7 +1218,8 @@
       document.getElementById('loginSection').classList.add('hidden');
       document.getElementById('appSection').classList.add('hidden');
       const gateEmailEl = document.getElementById('gateUserEmail');
-      if (gateEmailEl && email) gateEmailEl.textContent = email;
+      const activeEmail = email || document.getElementById('userGoogleEmail')?.textContent || gateEmailEl?.textContent;
+      if (gateEmailEl && activeEmail) gateEmailEl.textContent = activeEmail;
       const selectSection = document.getElementById('profileSelectSection');
       if (selectSection) {
         selectSection.classList.remove('hidden');
@@ -1289,12 +1401,20 @@
           headers: getAuthHeaders()
         });
         const data = await resp.json();
-        document.getElementById('kpiTotalJobs').textContent = data.total_jobs;
-        document.getElementById('kpiAvgScore').textContent = data.avg_quality_score.toFixed(2);
-        document.getElementById('kpiTotalAudio').textContent = data.total_audio_minutes;
-        document.getElementById('kpiTotalCost').textContent = `$${data.total_cost_usd.toFixed(4)}`;
-        document.getElementById('kpiDbBackend').textContent = data.gcp_environment.repository_type.replace('JobRepository', '');
-        document.getElementById('navProjectId').textContent = data.gcp_environment.project_id;
+
+        // Creator KPIs
+        if (document.getElementById('kpiTotalJobs')) document.getElementById('kpiTotalJobs').textContent = data.total_jobs;
+        if (document.getElementById('kpiAvgScore')) document.getElementById('kpiAvgScore').textContent = data.avg_quality_score.toFixed(2);
+        if (document.getElementById('kpiTotalAudio')) document.getElementById('kpiTotalAudio').textContent = data.total_audio_minutes;
+        if (document.getElementById('kpiTotalCost')) document.getElementById('kpiTotalCost').textContent = `$${data.total_cost_usd.toFixed(4)}`;
+        if (document.getElementById('kpiDbBackend')) document.getElementById('kpiDbBackend').textContent = data.gcp_environment.repository_type.replace('JobRepository', '');
+        if (document.getElementById('navProjectId')) document.getElementById('navProjectId').textContent = data.gcp_environment.project_id;
+
+        // Auditor KPIs
+        if (document.getElementById('kpiPassRate')) document.getElementById('kpiPassRate').textContent = `${(data.pass_rate !== undefined ? data.pass_rate : 100).toFixed(1)}%`;
+        if (document.getElementById('kpiAuditedDisclosures')) document.getElementById('kpiAuditedDisclosures').textContent = data.audited_count ?? data.total_jobs;
+        if (document.getElementById('kpiFlaggedItems')) document.getElementById('kpiFlaggedItems').textContent = data.flagged_count ?? 0;
+        if (document.getElementById('kpiAuditorCost')) document.getElementById('kpiAuditorCost').textContent = `$${data.total_cost_usd.toFixed(4)}`;
       } catch (err) {
         console.error('Error fetching stats:', err);
       }
@@ -1357,11 +1477,21 @@
 
     function filterJobs(resetPage = true) {
       const persona = document.getElementById('personaFilter').value;
-      if (persona === 'All') {
-        FILTERED_JOBS = [...ALL_JOBS];
-      } else {
-        FILTERED_JOBS = ALL_JOBS.filter(j => j.persona === persona);
+      let list = [...ALL_JOBS];
+
+      if (persona !== 'All') {
+        list = list.filter(j => j.persona === persona);
       }
+
+      if (CURRENT_PERSONA === 'auditor' && COMPLIANCE_FILTER !== 'all') {
+        if (COMPLIANCE_FILTER === 'compliant') {
+          list = list.filter(j => j.overall_score !== null && j.overall_score !== undefined && j.overall_score >= 4.0);
+        } else if (COMPLIANCE_FILTER === 'flagged') {
+          list = list.filter(j => j.status === 'FAILED' || (j.overall_score !== null && j.overall_score !== undefined && j.overall_score < 4.0));
+        }
+      }
+
+      FILTERED_JOBS = list;
       if (resetPage) {
         CURRENT_PAGE = 1;
       }
@@ -1371,7 +1501,10 @@
     function renderJobs(jobs) {
       const tbody = document.getElementById('jobsTableBody');
       if (!jobs || jobs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="px-5 py-8 text-center text-zinc-500">No voice synthesis jobs found. Click "+ New Voice Synthesis" to create one.</td></tr>`;
+        const emptyMsg = CURRENT_PERSONA === 'auditor'
+          ? 'No audited disclosures matching the selected compliance filter.'
+          : 'No voice synthesis jobs found. Click "+ New Voice Synthesis" to create one.';
+        tbody.innerHTML = `<tr><td colspan="8" class="px-5 py-8 text-center text-zinc-500">${emptyMsg}</td></tr>`;
         return;
       }
 
@@ -1410,6 +1543,14 @@
               <span>Error Details</span>
             </button>
           `;
+        } else if (CURRENT_PERSONA === 'auditor') {
+          actionBtn = `
+            <button onclick="openJobDetail('${j.job_id}')"
+              class="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/40 text-purple-200 border border-purple-500/30 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 ml-auto shadow-sm">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-purple-300"></i>
+              <span>Audit Scorecard</span>
+            </button>
+          `;
         } else {
           actionBtn = `
             <button onclick="openJobDetail('${j.job_id}')"
@@ -1434,6 +1575,8 @@
             durationDisplay = `<span class="animate-pulse text-amber-400 font-mono text-[11px]">${stageLabel}</span>`;
           }
         }
+
+        const showAdminActions = CURRENT_PERSONA !== 'auditor';
 
         return `
           <tr class="${cursorStyle} transition" ${rowClick}>
@@ -1467,16 +1610,17 @@
             </td>
             <td class="px-5 py-4 whitespace-nowrap text-right" onclick="event.stopPropagation()">
               <div class="flex items-center justify-end space-x-1.5">
-                ${j.status === 'FAILED' ? `
+                ${showAdminActions && j.status === 'FAILED' ? `
                 <button onclick="retryJob('${j.job_id}', event)" title="Retry Voice Synthesis"
                   class="p-1.5 bg-zinc-800/80 hover:bg-cyan-950/60 text-zinc-400 hover:text-cyan-400 border border-zinc-700/60 hover:border-cyan-800/60 rounded-lg transition flex items-center justify-center">
                   <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
                 </button>` : ''}
                 ${actionBtn}
+                ${showAdminActions ? `
                 <button onclick="deleteJob('${j.job_id}', event)" title="Delete Job"
                   class="p-1.5 bg-zinc-800/80 hover:bg-rose-950/60 text-zinc-400 hover:text-rose-400 border border-zinc-700/60 hover:border-rose-800/60 rounded-lg transition flex items-center justify-center">
                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                </button>
+                </button>` : ''}
               </div>
             </td>
           </tr>
@@ -1626,16 +1770,24 @@
       const scorecardCard = document.getElementById('scorecardCard');
       const reasoningContainer = document.getElementById('overallReasoningContainer');
       const retryBtn = document.getElementById('modalRetryBtn');
+      const deleteBtn = document.getElementById('modalDeleteBtn');
 
-      if (retryBtn) {
-        if (job.status === 'RUNNING') {
-          retryBtn.disabled = true;
-          retryBtn.classList.add('opacity-50', 'cursor-not-allowed');
-          retryBtn.title = 'Synthesis is currently running in background';
-        } else {
-          retryBtn.disabled = false;
-          retryBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-          retryBtn.title = 'Retry Voice Synthesis';
+      if (CURRENT_PERSONA === 'auditor') {
+        if (retryBtn) retryBtn.classList.add('hidden');
+        if (deleteBtn) deleteBtn.classList.add('hidden');
+      } else {
+        if (deleteBtn) deleteBtn.classList.remove('hidden');
+        if (retryBtn) {
+          retryBtn.classList.remove('hidden');
+          if (job.status === 'RUNNING') {
+            retryBtn.disabled = true;
+            retryBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            retryBtn.title = 'Synthesis is currently running in background';
+          } else {
+            retryBtn.disabled = false;
+            retryBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            retryBtn.title = 'Retry Voice Synthesis';
+          }
         }
       }
 
@@ -1819,6 +1971,16 @@
 
       document.getElementById('jobDetailModal').classList.remove('hidden');
       lucide.createIcons();
+
+      if (CURRENT_PERSONA === 'auditor' && job.overall_score !== null && job.overall_score !== undefined) {
+        setTimeout(() => {
+          const scrollable = document.querySelector('#jobDetailModal .overflow-y-auto');
+          const scorecardEl = document.getElementById('scorecardCard');
+          if (scrollable && scorecardEl) {
+            scorecardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }, 120);
+      }
     }
 
     function closeDetailModal() {

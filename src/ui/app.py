@@ -425,12 +425,21 @@ def get_dashboard_stats(user: Dict[str, Any] = Depends(get_current_user)):
     avg_score = round(sum(scored_jobs) / len(scored_jobs), 2) if scored_jobs else 4.72
     total_tokens = sum(j.token_usage.total_tokens for j in jobs)
 
+    audited_count = len(scored_jobs)
+    compliant_count = len([s for s in scored_jobs if s >= 4.0])
+    flagged_count = len([s for s in scored_jobs if s < 4.0])
+    pass_rate = round((compliant_count / audited_count * 100.0), 1) if audited_count else 100.0
+
     return {
         "total_jobs": total_jobs,
         "total_cost_usd": round(total_cost, 4),
         "total_audio_minutes": round(total_duration_sec / 60.0, 1),
         "avg_quality_score": avg_score,
         "total_tokens": total_tokens,
+        "audited_count": audited_count,
+        "compliant_count": compliant_count,
+        "flagged_count": flagged_count,
+        "pass_rate": pass_rate,
         "active_models": {
             "voice_model": settings.voice_model,
             "judge_model": settings.judge_model
