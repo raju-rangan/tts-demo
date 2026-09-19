@@ -192,7 +192,8 @@ def get_current_user(
 
     if ALLOWED_DOMAINS:
         domain = email.split("@")[-1] if "@" in email else ""
-        if domain not in ALLOWED_DOMAINS and email not in ALLOWED_USERS:
+        domain_match = any(domain == d or domain.endswith("." + d) for d in ALLOWED_DOMAINS)
+        if not domain_match and email not in ALLOWED_USERS:
             logger.warning(f"User {email} denied: domain @{domain} not in ALLOWED_DOMAINS")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -235,7 +236,8 @@ def create_google_session(req: GoogleSessionRequest):
 
     if ALLOWED_DOMAINS:
         domain = email.split("@")[-1] if "@" in email else ""
-        if domain not in ALLOWED_DOMAINS and email not in ALLOWED_USERS:
+        domain_match = any(domain == d or domain.endswith("." + d) for d in ALLOWED_DOMAINS)
+        if not domain_match and email not in ALLOWED_USERS:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied: domain '@{domain}' is not authorized for this platform"

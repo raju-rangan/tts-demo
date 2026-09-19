@@ -157,3 +157,47 @@ def test_get_current_user_demo_auth_success():
         assert user["email"] == "admin@apexbank.com"
         assert user["name"] == "Sarah Jenkins"
         assert user["persona_type"] == "creator"
+
+
+def test_create_google_session_success():
+    """Verify POST /api/auth/google-session authenticates allowed corporate user and enables persona selection."""
+    client = TestClient(app)
+    with patch("src.ui.app.ALLOWED_DOMAINS", ["altostrat.com", "google.com"]), \
+         patch("src.ui.app.ALLOWED_USERS", []):
+        resp = client.post("/api/auth/google-session", json={"email": "admin@rrangan.altostrat.com"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "token" in data
+        assert data["token"].startswith("google_")
+        assert data["user"]["email"] == "admin@rrangan.altostrat.com"
+        assert data["user"]["name"] == "Sarah Jenkins"
+
+        token = data["token"]
+        # Verify authenticated session can call /api/auth/me and switch persona to auditor
+        me_resp = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {token}", "X-Apex-Persona": "auditor"}
+        )
+        assert me_resp.status_code == 200
+        me_data = me_resp.json()
+        assert me_data["user"]["name"] == "David Chen"
+        assert me_data["user"]["role"] == "VP Regulatory Compliance"
+        assert me_data["user"]["persona_type"] == "auditor"
+
+
+def test_create_google_session_forbidden_domain():
+    """Verify POST /api/auth/google-session rejects unauthorized domains."""
+    client = TestClient(app)
+    with patch("src.ui.app.ALLOWED_DOMAINS", ["altostrat.com", "google.com"]), \
+         patch("src.ui.app.ALLOWED_USERS", []):
+        resp = client.post("/api/auth/google-session", json={"email": "user@unauthorized.com"})
+        assert resp.status_code == 403
+        assert "not authorized" in resp.json()["detail"]
+
+
+def test_create_google_session_empty_email():
+    """Verify POST /api/auth/google-session rejects empty email."""
+    client = TestClient(app)
+    resp = client.post("/api/auth/google-session", json={"email": "   "})
+    assert resp.status_code == 400
+

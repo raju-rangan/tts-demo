@@ -162,6 +162,11 @@
         <p class="text-xs md:text-sm text-zinc-400 mt-2">
           Signed in as <span id="gateUserEmail" class="font-mono text-zinc-200 font-medium">user@domain.com</span>. Choose an enterprise profile to enter the studio experience:
         </p>
+        <div class="mt-2.5">
+          <button type="button" onclick="handleLogout()" class="text-xs text-zinc-500 hover:text-zinc-300 transition underline underline-offset-4">
+            Sign in with a different account
+          </button>
+        </div>
       </div>
 
       <!-- 2 Profile Selection Cards -->
@@ -1016,12 +1021,20 @@
       return Object.assign(h, extra);
     }
 
-    function selectPersona(personaType) {
+    async function selectPersona(personaType) {
       CURRENT_PERSONA = personaType;
       localStorage.setItem('apex_tts_persona', personaType);
       updatePersonaUI();
       if (AUTH_TOKEN) {
-        verifySession();
+        try {
+          const resp = await fetch('/api/auth/me', { headers: getAuthHeaders() });
+          if (resp.ok) {
+            const data = await resp.json();
+            setUserHeader(data.user);
+          }
+        } catch (e) {
+          console.warn("Could not refresh user after persona change:", e);
+        }
       }
     }
 
@@ -1086,6 +1099,7 @@
                 console.warn("Could not auto-refresh ID token:", te);
               }
             }
+          });
         }
       } catch (err) {
         console.warn("Could not load auth configuration:", err);
@@ -1164,10 +1178,22 @@
       }
     }
 
-    function choosePersona(personaType) {
+    async function choosePersona(personaType) {
       CURRENT_PERSONA = personaType;
       localStorage.setItem('apex_tts_persona', personaType);
+      updatePersonaUI();
       showApp();
+      if (AUTH_TOKEN) {
+        try {
+          const resp = await fetch('/api/auth/me', { headers: getAuthHeaders() });
+          if (resp.ok) {
+            const data = await resp.json();
+            setUserHeader(data.user);
+          }
+        } catch (e) {
+          console.warn("Could not refresh user header:", e);
+        }
+      }
     }
 
     function showApp() {
@@ -1179,31 +1205,81 @@
       loadJobs();
     }
 
-    // Google Sign-In with GCIP
-    async function handleGoogleSignIn() {
-      const errBox = document.getElementById('loginError');
-      errBox.classList.add('hidden');
-
-      if (!AUTH_CONFIG?.api_key || !FIREBASE_APP) {
-        errBox.textContent = "Google Cloud Identity Platform (GCIP) is not yet configured with an API key. Please set GCIP_API_KEY in .env.";
-        errBox.classList.remove('hidden');
-        return;
+    // Google Account Modal Functions
+    function openGoogleAccountModal() {
+      const modal = document.getElementById('googleAccountModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        const errEl = document.getElementById('googleModalError');
+        if (errEl) errEl.classList.add('hidden');
+        lucide.createIcons();
       }
+    }
+
+    function closeGoogleAccountModal() {
+      const modal = document.getElementById('googleAccountModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function selectGoogleAccount(email) {
+      const errEl = document.getElementById('googleModalError');
+      if (errEl) errEl.classList.add('hidden');
 
       try {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: 'select_account' });
-        const result = await firebase.auth().signInWithPopup(provider);
-        const idToken = await result.user.getIdToken();
-        AUTH_TOKEN = idToken;
-        localStorage.setItem('apex_tts_token', idToken);
-        const email = result.user.email || 'Authorized User';
-        showProfileSelect(email);
+        const resp = await fetch('/api/auth/google-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email })
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data.detail || 'Authorization failed for this Google account.');
+        }
+
+        AUTH_TOKEN = data.token;
+        localStorage.setItem('apex_tts_token', data.token);
+        closeGoogleAccountModal();
+        showProfileSelect(data.user.email);
       } catch (err) {
-        console.error("Google sign-in error:", err);
-        errBox.textContent = err.message || "Google authentication failed";
-        errBox.classList.remove('hidden');
+        console.error("Google session error:", err);
+        if (errEl) {
+          errEl.textContent = err.message || "Failed to authenticate account.";
+          errEl.classList.remove('hidden');
+        }
       }
+    }
+
+    async function handleCustomGoogleEmail(event) {
+      event.preventDefault();
+      const input = document.getElementById('customGoogleEmail');
+      if (!input || !input.value.trim()) return;
+      await selectGoogleAccount(input.value.trim());
+    }
+
+    // Google Sign-In with GCIP or Account Chooser Fallback
+    async function handleGoogleSignIn() {
+      const errBox = document.getElementById('loginError');
+      if (errBox) errBox.classList.add('hidden');
+
+      // If Firebase SDK is configured with an active API key, try OAuth popup first
+      if (AUTH_CONFIG?.api_key && FIREBASE_APP) {
+        try {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          provider.setCustomParameters({ prompt: 'select_account' });
+          const result = await firebase.auth().signInWithPopup(provider);
+          const idToken = await result.user.getIdToken();
+          AUTH_TOKEN = idToken;
+          localStorage.setItem('apex_tts_token', idToken);
+          const email = result.user.email || 'Authorized User';
+          showProfileSelect(email);
+          return;
+        } catch (err) {
+          console.warn("Google Firebase popup failed or blocked, falling back to corporate account modal:", err);
+        }
+      }
+
+      // Open Google corporate account selector modal
+      openGoogleAccountModal();
     }
 
     async function verifySession() {
