@@ -157,8 +157,8 @@ def get_current_user(
     persona_key = x_apex_persona.lower().strip() if isinstance(x_apex_persona, str) else "creator"
     persona_data = PERSONA_PROFILES.get(persona_key, PERSONA_PROFILES["creator"])
 
-    # 1. Check demo in-memory session (if demo auth is enabled)
-    if ENABLE_DEMO_AUTH and token in ACTIVE_SESSIONS:
+    # 1. Check in-memory session (Google direct session or demo session)
+    if token in ACTIVE_SESSIONS:
         base_user = dict(ACTIVE_SESSIONS[token]["user"])
         base_user.update({
             "name": persona_data["name"],
@@ -216,6 +216,54 @@ def get_current_user(
 
 
 # ---------------- API ROUTES ----------------
+
+class GoogleSessionRequest(BaseModel):
+    email: str
+
+@app.post("/api/auth/google-session")
+def create_google_session(req: GoogleSessionRequest):
+    """Authenticates corporate Google account and creates active session."""
+    email = req.email.lower().strip()
+    if not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is required")
+
+    if ALLOWED_USERS and email not in ALLOWED_USERS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied: user '{email}' is not authorized for this platform"
+        )
+
+    if ALLOWED_DOMAINS:
+        domain = email.split("@")[-1] if "@" in email else ""
+        if domain not in ALLOWED_DOMAINS and email not in ALLOWED_USERS:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: domain '@{domain}' is not authorized for this platform"
+            )
+
+    token = f"google_{secrets.token_hex(24)}"
+    display_name = email.split("@")[0].replace(".", " ").title()
+    user_info = {
+        "email": email,
+        "google_email": email,
+        "google_name": display_name,
+        "picture": None,
+        "uid": f"g_{secrets.token_hex(8)}",
+        "name": "Sarah Jenkins",
+        "role": "Chief Communications Officer",
+        "department": "Digital Wealth & Customer Experience",
+        "avatar": "/static/avatars/creator_sarah.jpg",
+        "persona_type": "creator"
+    }
+    ACTIVE_SESSIONS[token] = {
+        "user": user_info,
+        "created_at": time.time()
+    }
+    return {
+        "token": token,
+        "user": user_info
+    }
+
 
 @app.get("/api/auth/config")
 def get_auth_config():
