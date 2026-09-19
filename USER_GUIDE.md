@@ -213,7 +213,7 @@ At the bottom of the studio screen is the **Job History Table**:
 ┌─────────────────────────┬─────────────────────────────────────────────────────────────┐
 │ Question                │ Answer / Action                                             │
 ├─────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ How do I run the app?   │ uvicorn src.ui.app:app --host 0.0.0.0 --port 8000 --reload  │
+│ How do I run the app?   │ make ui-dev (or make ui)                                    │
 │ What is the login?      │ admin@apexbank.com / demo1234 (Sarah Jenkins)               │
 │ Where is audio saved?   │ Google Cloud Storage (gs://[BUCKET]/[prefix]/[job_id].mp3)   │
 │ Can I seek in audio?    │ Yes, HTTP byte-range scrubbing is fully supported.          │

@@ -68,11 +68,24 @@ flowchart TD
 
 ---
 
-## 2. Getting the Project Going
+## 2. Getting the Project Going (Makefile Workflow)
+
+The project includes a comprehensive [Makefile](file:///Users/rrangan/Documents/customers/tts-demo/Makefile) powered by [`uv`](https://github.com/astral-sh/uv) to manage the entire lifecycle: environment creation, dependency installation, GCP authentication, cloud bucket provisioning, voice synthesis, web execution, and testing.
+
+To inspect all available targets at any time, run:
+```bash
+make help
+```
+
+---
 
 ### 2.1 Prerequisites
-- **Python**: `3.11`, `3.12`, or `3.13`
-- **System Audio Utility**: [`ffmpeg`](https://ffmpeg.org/) (required for broadcast MP3 transcoding at 320kbps).
+- **Python Package Manager**: [`uv`](https://github.com/astral-sh/uv) (handles fast virtualenv creation and package management):
+  ```bash
+  # macOS / Linux
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  ```
+- **System Audio Utility**: [`ffmpeg`](https://ffmpeg.org/) (required for broadcast MP3 transcoding at 320kbps):
   ```bash
   # macOS (Homebrew)
   brew install ffmpeg
@@ -82,11 +95,13 @@ flowchart TD
   ```
 - **Google Cloud Access**:
   - A Google Cloud Project with the **Vertex AI API** and **Cloud Storage API** enabled.
-  - Authenticated Application Default Credentials (`gcloud auth application-default login`) **OR** a `GEMINI_API_KEY`.
+  - The Google Cloud CLI (`gcloud`) installed and accessible in your `$PATH`.
 
 ---
 
-### 2.2 Installation Steps
+### 2.2 Environment Setup & Installation
+
+Follow these steps using the `Makefile`:
 
 1. **Clone the Repository**:
    ```bash
@@ -94,103 +109,92 @@ flowchart TD
    cd tts-demo
    ```
 
-2. **Create and Activate a Virtual Environment**:
+2. **Create the Virtual Environment**:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
+   make venv
+   ```
+   *Creates an isolated `.venv` using `uv`.*
+
+3. **Install Dependencies & Initialize `.env`**:
+   ```bash
+   make install
+   ```
+   *Installs all dependencies in editable mode (`uv pip install -e .`) and automatically copies `.env.example` to `.env` if not already present.*
+
+---
+
+### 2.3 Google Cloud Authentication & Configuration
+
+1. **Configure Your Project Settings in `.env`**:
+   Open `.env` and set your GCP Project ID and region:
+   ```ini
+   GCP_PROJECT_ID=your-gcp-project-id
+   GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+   GOOGLE_CLOUD_LOCATION=us-central1
+   GCS_BUCKET_NAME=tts-bank-audio-prod
    ```
 
-3. **Install Dependencies**:
+2. **Authenticate with GCP**:
    ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   pip install -e .
+   make auth
+   ```
+   *Sets the active `gcloud` project, launches `gcloud auth application-default login`, and configures the ADC quota project to match `$(GCP_PROJECT_ID)`.*
+
+3. **Verify and Auto-Align Authentication**:
+   ```bash
+   make auth-check   # Strictly verifies ADC and project accessibility against .env
+   make auth-fix     # Automatically re-aligns gcloud and ADC quota project if mismatched
+   ```
+
+4. **Provision Cloud Storage Bucket & Lifecycle Policies**:
+   ```bash
+   make bucket       # Provisions GCS bucket with random 5-char suffix and lifecycle rules (30-day default vs 0)
+   make bucket-info  # Inspects existing bucket configuration, lifecycle rules, and IAM prefix policies
    ```
 
 ---
 
-### 2.3 Environment Configuration (`.env`)
+### 2.4 Running the Application via Makefile
 
-Copy the provided sample configuration:
+#### 🚀 Launch the Web Studio
 ```bash
-cp .env.example .env
+# Production mode (FastAPI on http://127.0.0.1:8000):
+make ui
+
+# Development mode (with auto-reload enabled):
+make ui-dev
 ```
-
-Edit `.env` to configure your credentials and bucket:
-```ini
-# ==========================================
-# Google Cloud Platform & Vertex AI Settings
-# ==========================================
-GOOGLE_CLOUD_PROJECT=your-gcp-project-id
-GOOGLE_CLOUD_LOCATION=us-central1
-
-# Optional: Direct Gemini API key (takes precedence over Vertex AI if set)
-# GEMINI_API_KEY=AIzaSy...
-
-# ==========================================
-# Google Cloud Storage Settings
-# ==========================================
-GCS_BUCKET_NAME=tts-bank-audio-prod
-GCS_BUCKET_BASE_NAME=tts-bank-audio
-GCS_OBJECT_EXPIRATION_DAYS=30
-
-# ==========================================
-# AI Model Selection
-# ==========================================
-GEMINI_VOICE_MODEL=gemini-3.1-flash-tts-preview
-GEMINI_JUDGE_MODEL=gemini-3.8-flash
-JUDGE_LOCATION=global
-
-# ==========================================
-# Audio Generation & DSP Parameters
-# ==========================================
-TTS_CHUNK_WORD_LIMIT=400
-AUDIO_SAMPLE_RATE=24000
-AUDIO_BITRATE=320k
-DEFAULT_PERSONA=Retail Banking Guide
-```
-
----
-
-### 2.4 Running the Application
-
-#### Option A: Start the Single Page Web Studio (Recommended)
-Launch the FastAPI development server:
-```bash
-uvicorn src.ui.app:app --host 0.0.0.0 --port 8000 --reload
-```
-Open your browser at **`http://localhost:8000`**.
+Open your browser at **`http://127.0.0.1:8000`**.
 
 **Pre-configured Banking Credentials**:
 - **Sarah Jenkins** (Chief Communications Officer): `admin@apexbank.com` / `demo1234`
 - **David Chen** (VP Regulatory Compliance): `auditor@apexbank.com` / `demo1234`
 
-#### Option B: Interactive CLI Runner
-Generate speech, store in GCS, and run the multimodal quality audit directly from your terminal:
+#### 🎙️ Voice Synthesis & Quality Judging from CLI
 ```bash
-# Using the default banking sample article:
-python scripts/run_quickstart.py --persona "Retail Banking Guide"
+# Run quickstart end-to-end test on the sample banking article fixture:
+make test-core
 
-# Using a custom article file:
-python scripts/run_quickstart.py --file scripts/samples/sample_article.md --persona "Wealth & Market Advisor" --local-out output.mp3
+# Synthesize custom inline text with a selected persona:
+make synth TEXT="The Annual Percentage Yield (APY) for our 12-month CD is 4.75% FDIC insured." PERSONA="Retail Banking Guide"
 
-# Directly providing text via flag:
-python scripts/run_quickstart.py --text "The Annual Percentage Yield (APY) for our 12-month CD is 4.75% FDIC insured." --persona "Retail Banking Guide"
+# Synthesize directly from a markdown or text file:
+make synth-file FILE=scripts/samples/sample_article.md PERSONA="Wealth & Market Advisor"
+
+# Synthesize audio only (skipping the Multimodal LLM Judge):
+make synth-only FILE=scripts/samples/sample_article.md
 ```
 
-#### Option C: Verification & Setup Utilities
+#### 🧪 Testing, Quality & Maintenance
 ```bash
-# Provision or inspect your GCS bucket with Uniform Bucket-Level Access & Lifecycle Rules:
-python scripts/setup_bucket.py
+# Run unit and integration tests with pytest via uv:
+make test
 
-# Verify GCP Authentication, active gcloud account, and project accessibility:
-python scripts/verify_gcp_auth.py
-```
+# Launch the interactive step-by-step terminal test menu:
+make test-menu
 
-#### Option D: Running the Test Suite
-Execute unit and integration tests across storage, extractor, personas, and web endpoints:
-```bash
-pytest tests/ -v
+# Clean temporary caches, pytest artifacts, and the virtual environment:
+make clean
 ```
 
 ---
@@ -448,6 +452,7 @@ tts-demo/
 ├── PRD.md                        # Product Requirements Document
 ├── README.md                     # Technical architecture and setup guide (this file)
 ├── USER_GUIDE.md                 # End-user visual walkthrough with screenshots
+├── Makefile                         # Unified automation workflow (setup, auth, run, test)
 ├── pyproject.toml                # Project metadata & build configuration
 ├── requirements.txt              # Production Python dependencies
 ├── docs/
