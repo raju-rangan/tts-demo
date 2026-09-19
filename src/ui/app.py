@@ -187,7 +187,7 @@ def get_dashboard_stats(user: Dict[str, Any] = Depends(get_current_user)):
 @app.get("/api/jobs")
 def list_jobs(
     persona: Optional[str] = Query(None),
-    limit: int = Query(50),
+    limit: int = Query(500, ge=1, le=1000),
     user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Lists jobs with optional persona filter."""

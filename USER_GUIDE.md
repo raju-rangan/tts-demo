@@ -201,6 +201,7 @@ For processing multiple regulatory bulletins, news releases, or mortgage rate sh
 At the bottom of the studio screen is the **Job History Table**:
 
 * **Persona Filtering**: Filter past runs by persona to compare voice performance.
+* **Interactive Pagination**: Browse synthesis jobs using configurable page sizes (5, 10, 20, 50 rows per page; default 10) with numeric page navigation and boundary controls.
 * **Score Badges**: Color-coded badges highlight passing scores ($\ge 4.0$) versus assets needing revision.
 * **1-Click Retry**: Click the **🔄 Retry** button on any job to re-synthesize the article with updated director notes or an alternate voice persona.
 * **Delete Job**: Click the **🗑 Delete** icon to permanently remove the database record and purge any local audio cache files.

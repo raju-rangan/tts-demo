@@ -211,7 +211,7 @@
           </div>
 
           <div class="flex items-center space-x-3">
-            <select id="personaFilter" onchange="filterJobs()"
+            <select id="personaFilter" onchange="filterJobs(true)"
               class="px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 transition">
               <option value="All">All Voice Personas</option>
               <option value="Retail Banking Guide">Retail Banking Guide</option>
@@ -253,6 +253,59 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination Footer -->
+        <div id="paginationContainer" class="p-4 border-t border-zinc-800/80 bg-zinc-950/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <!-- Item Count Summary -->
+          <div class="text-xs text-zinc-400 flex items-center space-x-1.5">
+            <span>Showing</span>
+            <span id="paginationRangeStart" class="font-mono font-semibold text-zinc-200">0</span>
+            <span>to</span>
+            <span id="paginationRangeEnd" class="font-mono font-semibold text-zinc-200">0</span>
+            <span>of</span>
+            <span id="paginationTotalItems" class="font-mono font-semibold text-zinc-200">0</span>
+            <span>jobs</span>
+          </div>
+
+          <!-- Page Controls & Size Selector -->
+          <div class="flex flex-wrap items-center gap-4">
+            <!-- Items per Page Dropdown -->
+            <div class="flex items-center space-x-2 text-xs text-zinc-400">
+              <label for="pageSizeSelect" class="text-xs text-zinc-400">Rows per page:</label>
+              <select id="pageSizeSelect" onchange="changePageSize(this.value)"
+                class="px-2.5 py-1 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 transition font-mono">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+
+            <!-- Page Navigation Buttons -->
+            <nav aria-label="Job History Pagination" class="flex items-center space-x-1">
+              <button id="btnFirstPage" onclick="goToPage(1)" title="First Page"
+                class="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:pointer-events-none transition">
+                <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+              </button>
+              <button id="btnPrevPage" onclick="goToPage(CURRENT_PAGE - 1)" title="Previous Page"
+                class="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:pointer-events-none transition">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+              </button>
+
+              <!-- Dynamic Page Numbers Container -->
+              <div id="pageNumberButtons" class="flex items-center space-x-1 font-mono text-xs"></div>
+
+              <button id="btnNextPage" onclick="goToPage(CURRENT_PAGE + 1)" title="Next Page"
+                class="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:pointer-events-none transition">
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+              <button id="btnLastPage" onclick="goToLastPage()" title="Last Page"
+                class="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:pointer-events-none transition">
+                <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </nav>
+          </div>
         </div>
       </div>
     </main>
@@ -770,6 +823,9 @@
   <script>
     let AUTH_TOKEN = localStorage.getItem('apex_tts_token') || null;
     let ALL_JOBS = [];
+    let FILTERED_JOBS = [];
+    let CURRENT_PAGE = 1;
+    let PAGE_SIZE = 10;
     let CURRENT_JOB = null;
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -920,11 +976,11 @@
     async function loadJobs() {
       const tbody = document.getElementById('jobsTableBody');
       try {
-        const resp = await fetch('/api/jobs', {
+        const resp = await fetch('/api/jobs?limit=500', {
           headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
         });
         ALL_JOBS = await resp.json();
-        filterJobs();
+        filterJobs(true);
         checkAndStartPolling();
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" class="px-5 py-6 text-center text-rose-400">Failed to load jobs: ${err.message}</td></tr>`;
@@ -933,12 +989,12 @@
 
     async function loadJobsSilently() {
       try {
-        const resp = await fetch('/api/jobs', {
+        const resp = await fetch('/api/jobs?limit=500', {
           headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
         });
         if (resp.ok) {
           ALL_JOBS = await resp.json();
-          filterJobs();
+          filterJobs(false);
           checkAndStartPolling();
         }
       } catch (err) {
@@ -969,13 +1025,17 @@
       }
     }
 
-    function filterJobs() {
+    function filterJobs(resetPage = true) {
       const persona = document.getElementById('personaFilter').value;
       if (persona === 'All') {
-        renderJobs(ALL_JOBS);
+        FILTERED_JOBS = [...ALL_JOBS];
       } else {
-        renderJobs(ALL_JOBS.filter(j => j.persona === persona));
+        FILTERED_JOBS = ALL_JOBS.filter(j => j.persona === persona);
       }
+      if (resetPage) {
+        CURRENT_PAGE = 1;
+      }
+      updatePaginationAndRender();
     }
 
     function renderJobs(jobs) {
@@ -1091,6 +1151,92 @@
             </td>
           </tr>
         `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Pagination Handlers
+    function changePageSize(newSize) {
+      PAGE_SIZE = parseInt(newSize, 10) || 10;
+      CURRENT_PAGE = 1;
+      updatePaginationAndRender();
+    }
+
+    function goToPage(page) {
+      const totalPages = Math.max(1, Math.ceil(FILTERED_JOBS.length / PAGE_SIZE));
+      if (page < 1) page = 1;
+      if (page > totalPages) page = totalPages;
+      CURRENT_PAGE = page;
+      updatePaginationAndRender();
+    }
+
+    function goToLastPage() {
+      const totalPages = Math.max(1, Math.ceil(FILTERED_JOBS.length / PAGE_SIZE));
+      goToPage(totalPages);
+    }
+
+    function updatePaginationAndRender() {
+      const totalItems = FILTERED_JOBS.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+      if (CURRENT_PAGE > totalPages) CURRENT_PAGE = totalPages;
+      if (CURRENT_PAGE < 1) CURRENT_PAGE = 1;
+
+      const startIdx = totalItems === 0 ? 0 : (CURRENT_PAGE - 1) * PAGE_SIZE;
+      const endIdx = totalItems === 0 ? 0 : Math.min(startIdx + PAGE_SIZE, totalItems);
+      const pagedJobs = totalItems > 0 ? FILTERED_JOBS.slice(startIdx, endIdx) : [];
+
+      renderJobs(pagedJobs);
+      renderPaginationUI(totalItems, totalPages, startIdx, endIdx);
+    }
+
+    function renderPaginationUI(totalItems, totalPages, startIdx, endIdx) {
+      const rangeStartEl = document.getElementById('paginationRangeStart');
+      const rangeEndEl = document.getElementById('paginationRangeEnd');
+      const totalItemsEl = document.getElementById('paginationTotalItems');
+      const btnFirst = document.getElementById('btnFirstPage');
+      const btnPrev = document.getElementById('btnPrevPage');
+      const btnNext = document.getElementById('btnNextPage');
+      const btnLast = document.getElementById('btnLastPage');
+      const pageNumbersContainer = document.getElementById('pageNumberButtons');
+
+      if (rangeStartEl) rangeStartEl.textContent = totalItems === 0 ? '0' : (startIdx + 1);
+      if (rangeEndEl) rangeEndEl.textContent = endIdx;
+      if (totalItemsEl) totalItemsEl.textContent = totalItems;
+
+      const isFirst = CURRENT_PAGE <= 1;
+      const isLast = CURRENT_PAGE >= totalPages || totalItems === 0;
+
+      if (btnFirst) btnFirst.disabled = isFirst;
+      if (btnPrev) btnPrev.disabled = isFirst;
+      if (btnNext) btnNext.disabled = isLast;
+      if (btnLast) btnLast.disabled = isLast;
+
+      if (!pageNumbersContainer) return;
+
+      // Smart page numbering
+      let pages = [];
+      if (totalPages <= 5) {
+        for (let i = 1; i <= totalPages; i++) pages.push(i);
+      } else {
+        if (CURRENT_PAGE <= 3) {
+          pages = [1, 2, 3, 4, '...', totalPages];
+        } else if (CURRENT_PAGE >= totalPages - 2) {
+          pages = [1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+        } else {
+          pages = [1, '...', CURRENT_PAGE - 1, CURRENT_PAGE, CURRENT_PAGE + 1, '...', totalPages];
+        }
+      }
+
+      pageNumbersContainer.innerHTML = pages.map(p => {
+        if (p === '...') {
+          return `<span class="px-1 text-zinc-600 select-none">…</span>`;
+        }
+        const isActive = p === CURRENT_PAGE;
+        if (isActive) {
+          return `<button class="w-7 h-7 rounded-lg bg-emerald-500 text-zinc-950 font-bold font-mono text-xs flex items-center justify-center shadow-sm" aria-current="page">${p}</button>`;
+        }
+        return `<button onclick="goToPage(${p})" class="w-7 h-7 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 font-mono text-xs flex items-center justify-center transition">${p}</button>`;
       }).join('');
 
       lucide.createIcons();
@@ -1369,7 +1515,7 @@
         }
         // Remove from local array
         ALL_JOBS = ALL_JOBS.filter(j => j.job_id !== jobId);
-        filterJobs();
+        filterJobs(false);
         await loadStats();
         if (CURRENT_JOB && CURRENT_JOB.job_id === jobId) {
           closeDetailModal();
@@ -1419,7 +1565,7 @@
         } else {
           ALL_JOBS.unshift(data.job);
         }
-        filterJobs();
+        filterJobs(false);
         await loadStats();
 
         // Refresh detail modal ONLY if user currently has the drawer open for this job
