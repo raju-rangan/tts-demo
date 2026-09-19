@@ -53,7 +53,7 @@ if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Google Identity Services (GIS) & Authentication Configuration
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "716595821548-3bfcfnttu4apmetssb0j6n2na28ftdp3.apps.googleusercontent.com").strip()
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "716595821548-mmgp3ivk20bboapvlsru7kh08dp0n7c7.apps.googleusercontent.com").strip()
 GCIP_API_KEY = os.getenv("GCIP_API_KEY", "").strip()
 GCIP_AUTH_DOMAIN = os.getenv("GCIP_AUTH_DOMAIN", "").strip()
 ENABLE_DEMO_AUTH = os.getenv("ENABLE_DEMO_AUTH", "true").lower() in ("true", "1", "yes")
