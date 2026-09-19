@@ -858,6 +858,225 @@
     </div>
   </div>
 
+  <!-- ================= FINOPS & COMPLIANCE GOVERNANCE DRAWER ================= -->
+  <div id="finOpsDrawer" onclick="if(event.target === this) closeFinOpsDrawer()" class="hidden fixed inset-0 z-50 overflow-hidden bg-zinc-950/80 backdrop-blur-sm flex justify-end">
+    <div class="w-full max-w-3xl bg-zinc-900 border-l border-zinc-800 h-full flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-right duration-200">
+      
+      <!-- Drawer Header -->
+      <div class="p-6 border-b border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-900/95 backdrop-blur-md sticky top-0 z-10">
+        <div class="flex items-center space-x-3">
+          <div class="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shadow-sm">
+            <i data-lucide="sliders" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 class="text-base font-bold text-white tracking-tight">FinOps & Compliance Governance</h3>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">Auditor Console</span>
+            </div>
+            <p class="text-xs text-zinc-400 mt-0.5">Aggregate telemetry, Truth in Lending audits, and Gemini 3.8 Flash quality scorecards</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button onclick="refreshFinOpsData()" title="Refresh Telemetry Metrics"
+            class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded-xl text-xs font-medium transition flex items-center space-x-1.5 shadow-sm">
+            <i data-lucide="rotate-cw" id="foRefreshIcon" class="w-3.5 h-3.5"></i>
+            <span>Refresh</span>
+          </button>
+          <button onclick="closeFinOpsDrawer()" class="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Drawer Body (Scrollable) -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+        <!-- Top-Line KPI Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <!-- Card 1: FinOps Spend -->
+          <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 relative overflow-hidden">
+            <div class="flex items-center justify-between text-zinc-400 text-xs font-medium uppercase tracking-wider">
+              <span>Total FinOps Spend</span>
+              <i data-lucide="badge-dollar-sign" class="w-4 h-4 text-purple-400"></i>
+            </div>
+            <div class="mt-2.5">
+              <div id="foTotalCost" class="text-2xl font-bold font-mono text-purple-300">$0.0000</div>
+              <div id="foTtsCostSplit" class="text-[10px] text-zinc-400 mt-1 font-mono">TTS: $0.00 | Judge: $0.00</div>
+            </div>
+            <p class="text-[10px] text-zinc-500 mt-1.5">Gemini 3.1 Flash + 3.8 Flash Judge</p>
+          </div>
+
+          <!-- Card 2: Tokens Consumed -->
+          <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 relative overflow-hidden">
+            <div class="flex items-center justify-between text-zinc-400 text-xs font-medium uppercase tracking-wider">
+              <span>Token Volume</span>
+              <i data-lucide="cpu" class="w-4 h-4 text-cyan-400"></i>
+            </div>
+            <div class="mt-2.5">
+              <div id="foTotalTokens" class="text-2xl font-bold font-mono text-white">0</div>
+              <div id="foTokenBreakdown" class="text-[10px] text-zinc-400 mt-1 font-mono truncate">Text: 0 | Audio: 0</div>
+            </div>
+            <p class="text-[10px] text-zinc-500 mt-1.5">Context, Audio & Evaluation Tokens</p>
+          </div>
+
+          <!-- Card 3: Compliance Pass Rate -->
+          <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 relative overflow-hidden">
+            <div class="flex items-center justify-between text-zinc-400 text-xs font-medium uppercase tracking-wider">
+              <span>Compliance Gate</span>
+              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+            </div>
+            <div class="mt-2.5">
+              <div id="foPassRate" class="text-2xl font-bold font-mono text-emerald-400">0.0%</div>
+              <div id="foPassCounts" class="text-[10px] text-zinc-400 mt-1">0 Pass / 0 Flagged</div>
+            </div>
+            <p class="text-[10px] text-zinc-500 mt-1.5">Regulatory Quality Score &ge; 4.0</p>
+          </div>
+
+          <!-- Card 4: Audio Runtime Volume -->
+          <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 relative overflow-hidden">
+            <div class="flex items-center justify-between text-zinc-400 text-xs font-medium uppercase tracking-wider">
+              <span>Audited Audio</span>
+              <i data-lucide="headphones" class="w-4 h-4 text-amber-400"></i>
+            </div>
+            <div class="mt-2.5">
+              <div id="foTotalMinutes" class="text-2xl font-bold font-mono text-amber-300">0.0 min</div>
+              <div id="foTotalJobs" class="text-[10px] text-zinc-400 mt-1">Across 0 Total Jobs</div>
+            </div>
+            <p class="text-[10px] text-zinc-500 mt-1.5">Average Quality: <span id="foAvgScore" class="font-bold text-white">--</span></p>
+          </div>
+        </div>
+
+        <!-- Section 1: Multimodal Quality Rubric Dimension Performance (6 Dimensions) -->
+        <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+            <div class="flex items-center space-x-2.5">
+              <div class="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+                <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wide">Multimodal Rubric Dimension Performance</h4>
+                <p class="text-[11px] text-zinc-400">Mean quality scores across all disclosures evaluated by Gemini 3.8 Flash</p>
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">Gate: &ge; 4.0 / 5.0</span>
+          </div>
+
+          <div id="foRubricDimensionList" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <!-- Dynamically populated by renderFinOpsDrawer() -->
+          </div>
+        </div>
+
+        <!-- Section 2: Persona-by-Persona Governance & Spend Matrix -->
+        <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+            <div class="flex items-center space-x-2.5">
+              <div class="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+                <i data-lucide="users" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wide">Persona Governance & Spend Matrix</h4>
+                <p class="text-[11px] text-zinc-400">Compliance pass rates, volume, and cumulative FinOps costs by banking persona</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="text-[10px] uppercase tracking-wider text-zinc-400 border-b border-zinc-800 bg-zinc-900/50">
+                <tr>
+                  <th class="py-2.5 px-3">Banking Persona</th>
+                  <th class="py-2.5 px-3 text-center">Disclosures</th>
+                  <th class="py-2.5 px-3 text-center">Pass Rate</th>
+                  <th class="py-2.5 px-3 text-center">Avg Score</th>
+                  <th class="py-2.5 px-3 text-right">FinOps Cost</th>
+                  <th class="py-2.5 px-3 text-center">Audit Status</th>
+                </tr>
+              </thead>
+              <tbody id="foPersonaTableBody" class="divide-y divide-zinc-800/60 text-zinc-300">
+                <!-- Dynamically populated by renderFinOpsDrawer() -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section 3: Unit Economics & Cloud Infrastructure Compliance -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Unit Economics -->
+          <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-5 space-y-3">
+            <div class="flex items-center space-x-2 text-xs font-bold text-zinc-300 uppercase tracking-wide pb-2 border-b border-zinc-800">
+              <i data-lucide="calculator" class="w-4 h-4 text-emerald-400"></i>
+              <span>Unit Economics & FinOps Efficiency</span>
+            </div>
+            <div class="space-y-2.5 text-xs">
+              <div class="flex items-center justify-between">
+                <span class="text-zinc-400">Cost per Audio Minute:</span>
+                <span id="foCostPerMin" class="font-mono font-bold text-emerald-400">$0.0034 / min</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-zinc-400">Cost per Audited Asset:</span>
+                <span id="foCostPerJob" class="font-mono font-bold text-zinc-200">$0.0182 / asset</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-zinc-400">Auditor Overhead Ratio:</span>
+                <span id="foJudgeCostRatio" class="font-mono text-purple-300">25.0% of total spend</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-zinc-400">TTS Audio Format:</span>
+                <span class="font-mono text-zinc-300">24kHz PCM / 320kbps MP3</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cloud Compliance & Governance -->
+          <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-5 space-y-3">
+            <div class="flex items-center space-x-2 text-xs font-bold text-zinc-300 uppercase tracking-wide pb-2 border-b border-zinc-800">
+              <i data-lucide="server" class="w-4 h-4 text-cyan-400"></i>
+              <span>Cloud Infrastructure & Governance</span>
+            </div>
+            <div class="space-y-2.5 text-xs">
+              <div class="flex items-center justify-between">
+                <span class="text-zinc-400">Persistence Store:</span>
+                <span class="font-mono text-amber-300 flex items-center space-x-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                  <span id="foBackendRepo">Firestore Native (tts-jobs)</span>
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-zinc-400">Audio Storage Bucket:</span>
+                <span id="foBucketName" class="font-mono text-zinc-300 truncate max-w-[180px]">knowledge-to-audio-poc</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-zinc-400">Compliance Retention:</span>
+                <span class="font-mono text-zinc-300">30-Day GCS Lifecycle Purge</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-zinc-400">Audit Trail Security:</span>
+                <span class="text-emerald-400 font-semibold">Immutable Record Logs</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Flagged Disclosures Requiring Review (< 4.0) -->
+        <div class="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-zinc-800">
+            <div class="flex items-center space-x-2 text-xs font-bold text-amber-400 uppercase tracking-wide">
+              <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+              <span>Flagged Disclosures Requiring Attention (&lt; 4.0)</span>
+            </div>
+            <span id="foFlaggedHeaderCount" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium">0 Flagged</span>
+          </div>
+
+          <div id="foFlaggedContainer" class="space-y-2.5">
+            <!-- Dynamically populated by renderFinOpsDrawer() -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- ================= NEW JOB MODAL ================= -->
   <div id="newJobModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm px-4">
     <div class="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative">
@@ -2279,12 +2498,222 @@
       }
     }
 
+    // ================= FINOPS & COMPLIANCE GOVERNANCE DRAWER =================
+    async function openFinOpsDrawer() {
+      const drawer = document.getElementById('finOpsDrawer');
+      if (!drawer) return;
+      drawer.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+      await refreshFinOpsData();
+      lucide.createIcons();
+    }
+
+    function closeFinOpsDrawer() {
+      const drawer = document.getElementById('finOpsDrawer');
+      if (!drawer) return;
+      drawer.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    async function refreshFinOpsData() {
+      const refreshIcon = document.getElementById('foRefreshIcon');
+      if (refreshIcon) refreshIcon.classList.add('animate-spin');
+      try {
+        const resp = await fetch('/api/stats', { headers: getAuthHeaders() });
+        if (!resp.ok) return;
+        const stats = await resp.json();
+        renderFinOpsDrawer(stats);
+      } catch (err) {
+        console.error('Failed to fetch FinOps stats', err);
+      } finally {
+        if (refreshIcon) {
+          setTimeout(() => refreshIcon.classList.remove('animate-spin'), 300);
+        }
+      }
+    }
+
+    function renderFinOpsDrawer(stats) {
+      if (!stats) return;
+
+      // 1. Top-line KPIs
+      const costEl = document.getElementById('foTotalCost');
+      if (costEl) costEl.textContent = `$${(stats.total_cost_usd || 0).toFixed(4)}`;
+
+      const ttsSplitEl = document.getElementById('foTtsCostSplit');
+      if (ttsSplitEl && stats.cost_breakdown) {
+        ttsSplitEl.textContent = `TTS: $${(stats.cost_breakdown.tts_cost_usd || 0).toFixed(4)} | Judge: $${(stats.cost_breakdown.judge_cost_usd || 0).toFixed(4)}`;
+      }
+
+      const tokensEl = document.getElementById('foTotalTokens');
+      if (tokensEl) tokensEl.textContent = (stats.total_tokens || 0).toLocaleString();
+
+      const tokenBreakdownEl = document.getElementById('foTokenBreakdown');
+      if (tokenBreakdownEl && stats.token_breakdown) {
+        const tb = stats.token_breakdown;
+        tokenBreakdownEl.textContent = `Text: ${(tb.input_text_tokens || 0).toLocaleString()} | Audio: ${(tb.audio_output_tokens || 0).toLocaleString()} | Judge: ${((tb.judge_input_tokens || 0) + (tb.judge_output_tokens || 0)).toLocaleString()}`;
+      }
+
+      const passRateEl = document.getElementById('foPassRate');
+      if (passRateEl) passRateEl.textContent = `${stats.pass_rate || 0}%`;
+
+      const passCountsEl = document.getElementById('foPassCounts');
+      if (passCountsEl) passCountsEl.textContent = `${stats.compliant_count || 0} Pass / ${stats.flagged_count || 0} Flagged`;
+
+      const minutesEl = document.getElementById('foTotalMinutes');
+      if (minutesEl) minutesEl.textContent = `${stats.total_audio_minutes || 0} min`;
+
+      const totalJobsEl = document.getElementById('foTotalJobs');
+      if (totalJobsEl) totalJobsEl.textContent = `Across ${stats.total_jobs || 0} Total Disclosures`;
+
+      const avgScoreEl = document.getElementById('foAvgScore');
+      if (avgScoreEl) avgScoreEl.textContent = stats.avg_quality_score ? `${stats.avg_quality_score} / 5.0` : '--';
+
+      // 2. Multimodal Rubric Dimensions
+      const rubricContainer = document.getElementById('foRubricDimensionList');
+      if (rubricContainer && stats.rubric_averages) {
+        rubricContainer.innerHTML = Object.entries(stats.rubric_averages).map(([key, dim]) => {
+          const score = dim.avg_score || 0;
+          const pct = Math.min(Math.max((score / 5.0) * 100, 0), 100);
+          const isCompliant = score >= 4.0;
+          const barColor = isCompliant ? 'from-emerald-500 to-teal-400' : 'from-amber-500 to-rose-500';
+          const badgeClass = isCompliant 
+            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+            : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+
+          return `
+            <div class="p-3 bg-zinc-900 border border-zinc-800/80 rounded-xl space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-zinc-200">${dim.label}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold border ${badgeClass}">
+                  ${score.toFixed(2)} / 5.0
+                </span>
+              </div>
+              <div class="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                <div class="h-1.5 rounded-full bg-gradient-to-r ${barColor}" style="width: ${pct}%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] text-zinc-400">
+                <span>${dim.count} Audited</span>
+                <span class="${isCompliant ? 'text-emerald-400' : 'text-amber-400'} font-medium">
+                  ${isCompliant ? '✓ Compliant' : '⚠ Review Required'}
+                </span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 3. Persona Matrix Table
+      const personaTbody = document.getElementById('foPersonaTableBody');
+      if (personaTbody && stats.persona_matrix) {
+        personaTbody.innerHTML = Object.entries(stats.persona_matrix).map(([name, p]) => {
+          const isCompliant = p.status === 'COMPLIANT';
+          const badgeClass = isCompliant 
+            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+            : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+          const scoreText = p.avg_score ? p.avg_score.toFixed(2) : '--';
+
+          return `
+            <tr class="hover:bg-zinc-800/30 transition">
+              <td class="py-2.5 px-3 font-medium text-white flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full ${isCompliant ? 'bg-emerald-400' : 'bg-amber-400'}"></span>
+                <span>${name}</span>
+              </td>
+              <td class="py-2.5 px-3 text-center font-mono">${p.total_jobs}</td>
+              <td class="py-2.5 px-3 text-center font-mono ${p.pass_rate >= 80 ? 'text-emerald-400' : 'text-amber-400'}">${p.pass_rate}%</td>
+              <td class="py-2.5 px-3 text-center font-mono text-zinc-200">${scoreText}</td>
+              <td class="py-2.5 px-3 text-right font-mono text-purple-300">$${(p.total_cost_usd || 0).toFixed(4)}</td>
+              <td class="py-2.5 px-3 text-center">
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold border ${badgeClass}">
+                  ${isCompliant ? 'Compliant' : 'Needs Attention'}
+                </span>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // 4. Unit Economics
+      const costPerMinEl = document.getElementById('foCostPerMin');
+      if (costPerMinEl && stats.unit_economics) {
+        costPerMinEl.textContent = `$${stats.unit_economics.cost_per_audio_minute.toFixed(4)} / min`;
+      }
+
+      const costPerJobEl = document.getElementById('foCostPerJob');
+      if (costPerJobEl && stats.unit_economics) {
+        costPerJobEl.textContent = `$${stats.unit_economics.cost_per_job.toFixed(4)} / asset`;
+      }
+
+      const judgeRatioEl = document.getElementById('foJudgeCostRatio');
+      if (judgeRatioEl && stats.cost_breakdown) {
+        judgeRatioEl.textContent = `${stats.cost_breakdown.judge_cost_percentage}% of total spend`;
+      }
+
+      const backendRepoEl = document.getElementById('foBackendRepo');
+      if (backendRepoEl && stats.gcp_environment) {
+        backendRepoEl.textContent = stats.gcp_environment.repository_type === 'FirestoreJobRepository' 
+          ? 'Firestore Native (tts-jobs)' 
+          : 'SQLite (Local Test Mode)';
+      }
+
+      const bucketNameEl = document.getElementById('foBucketName');
+      if (bucketNameEl && stats.gcp_environment) {
+        bucketNameEl.textContent = stats.gcp_environment.bucket_name || 'knowledge-to-audio-poc';
+      }
+
+      // 5. Flagged Disclosures List
+      const flaggedCountHeader = document.getElementById('foFlaggedHeaderCount');
+      if (flaggedCountHeader) {
+        const count = stats.flagged_jobs ? stats.flagged_jobs.length : 0;
+        flaggedCountHeader.textContent = `${count} Flagged`;
+        if (count === 0) {
+          flaggedCountHeader.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium';
+        } else {
+          flaggedCountHeader.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium';
+        }
+      }
+
+      const flaggedContainer = document.getElementById('foFlaggedContainer');
+      if (flaggedContainer) {
+        if (!stats.flagged_jobs || stats.flagged_jobs.length === 0) {
+          flaggedContainer.innerHTML = `
+            <div class="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-xl text-center">
+              <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400 mx-auto mb-1"></i>
+              <p class="text-xs text-emerald-300 font-medium">All audio assets meet regulatory quality requirements (&ge; 4.0 / 5.0).</p>
+            </div>
+          `;
+        } else {
+          flaggedContainer.innerHTML = stats.flagged_jobs.map(j => `
+            <div class="p-3 bg-zinc-900 border border-amber-800/40 rounded-xl flex items-center justify-between gap-3 hover:border-amber-700/60 transition">
+              <div class="space-y-1 min-w-0">
+                <div class="flex items-center space-x-2">
+                  <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold font-mono">
+                    ${j.overall_score.toFixed(2)} / 5.0
+                  </span>
+                  <span class="text-xs font-semibold text-white truncate max-w-[280px]">${j.title}</span>
+                  <span class="text-[10px] text-zinc-400 font-medium">${j.persona}</span>
+                </div>
+                <p class="text-[11px] text-zinc-400 line-clamp-1">${j.overall_reasoning}</p>
+              </div>
+              <button onclick="closeFinOpsDrawer(); openJobDetail('${j.job_id}');"
+                class="shrink-0 px-2.5 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-semibold rounded-lg transition flex items-center space-x-1 shadow-sm">
+                <i data-lucide="shield" class="w-3.5 h-3.5 text-purple-300"></i>
+                <span>Audit</span>
+              </button>
+            </div>
+          `).join('');
+        }
+      }
+
+      lucide.createIcons();
+    }
+
     // Escape key closes open modals
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeDetailModal();
         closeNewJobModal();
         closeBulkJobModal();
+        closeFinOpsDrawer();
       }
     });
   </script>

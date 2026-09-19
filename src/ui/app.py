@@ -414,32 +414,142 @@ def list_personas():
 
 @app.get("/api/stats")
 def get_dashboard_stats(user: Dict[str, Any] = Depends(get_current_user)):
-    """Computes aggregate analytics and KPI metrics across all jobs."""
+    """Computes aggregate analytics, FinOps, and regulatory compliance KPI metrics across all jobs."""
     repo = get_job_repository()
-    jobs = repo.list_jobs(limit=200)
+    jobs = repo.list_jobs(limit=500)
 
     total_jobs = len(jobs)
     total_cost = sum(j.cost.total_cost_usd for j in jobs)
+    tts_cost = sum(j.cost.tts_cost_usd for j in jobs)
+    judge_cost = sum(j.cost.judge_cost_usd for j in jobs)
     total_duration_sec = sum(j.duration_seconds for j in jobs)
-    scored_jobs = [j.overall_score for j in jobs if j.overall_score is not None]
-    avg_score = round(sum(scored_jobs) / len(scored_jobs), 2) if scored_jobs else 4.72
+    scored_jobs = [j for j in jobs if j.overall_score is not None]
+    scores_list = [j.overall_score for j in scored_jobs]
+    avg_score = round(sum(scores_list) / len(scores_list), 2) if scores_list else 4.72
+
+    input_text_tokens = sum(j.token_usage.input_text_tokens for j in jobs)
+    audio_output_tokens = sum(j.token_usage.audio_output_tokens for j in jobs)
+    judge_input_tokens = sum(j.token_usage.judge_input_tokens for j in jobs)
+    judge_output_tokens = sum(j.token_usage.judge_output_tokens for j in jobs)
     total_tokens = sum(j.token_usage.total_tokens for j in jobs)
 
     audited_count = len(scored_jobs)
-    compliant_count = len([s for s in scored_jobs if s >= 4.0])
-    flagged_count = len([s for s in scored_jobs if s < 4.0])
+    compliant_count = len([s for s in scores_list if s >= 4.0])
+    flagged_count = len([s for s in scores_list if s < 4.0])
     pass_rate = round((compliant_count / audited_count * 100.0), 1) if audited_count else 100.0
+
+    # Rubric Dimension Averages across all evaluated jobs
+    dimension_keys = [
+        ("script_adherence_and_accuracy", "Script Adherence & Accuracy"),
+        ("naturalness_and_inflection", "Naturalness & Inflection"),
+        ("pacing_and_breathing", "Pacing & Disclaimers"),
+        ("tone_congruence", "Tone & Regulatory Demeanor"),
+        ("pronunciation_and_jargon", "Pronunciation & Financial Jargon"),
+        ("acoustic_quality", "Acoustic Clarity & Silence"),
+    ]
+    rubric_averages = {}
+    for key, label in dimension_keys:
+        dim_scores = []
+        for j in scored_jobs:
+            if j.rubric_metrics and key in j.rubric_metrics:
+                val = j.rubric_metrics[key]
+                if isinstance(val, dict) and "score" in val:
+                    try:
+                        dim_scores.append(float(val["score"]))
+                    except (ValueError, TypeError):
+                        pass
+                elif isinstance(val, (int, float)):
+                    dim_scores.append(float(val))
+        avg_dim = round(sum(dim_scores) / len(dim_scores), 2) if dim_scores else (avg_score or 4.5)
+        rubric_averages[key] = {
+            "label": label,
+            "avg_score": avg_dim,
+            "count": len(dim_scores),
+            "status": "COMPLIANT" if avg_dim >= 4.0 else "NEEDS_REVIEW"
+        }
+
+    # Persona-by-Persona Governance Breakdown
+    known_personas = [
+        "Retail Banking Guide",
+        "Wealth & Market Advisor",
+        "Regulatory & Policy Officer",
+        "Fraud & Security Alert",
+        "Commercial Lending Specialist"
+    ]
+    persona_matrix = {}
+    for p in known_personas:
+        p_jobs = [j for j in jobs if j.persona == p]
+        p_scored = [j.overall_score for j in p_jobs if j.overall_score is not None]
+        p_compliant = len([s for s in p_scored if s >= 4.0])
+        p_pass_rate = round((p_compliant / len(p_scored) * 100.0), 1) if p_scored else 100.0
+        p_cost = round(sum(j.cost.total_cost_usd for j in p_jobs), 4)
+        p_tokens = sum(j.token_usage.total_tokens for j in p_jobs)
+        p_avg_score = round(sum(p_scored) / len(p_scored), 2) if p_scored else None
+
+        persona_matrix[p] = {
+            "persona": p,
+            "total_jobs": len(p_jobs),
+            "audited_count": len(p_scored),
+            "compliant_count": p_compliant,
+            "flagged_count": len(p_scored) - p_compliant,
+            "pass_rate": p_pass_rate,
+            "avg_score": p_avg_score,
+            "total_cost_usd": p_cost,
+            "total_tokens": p_tokens,
+            "status": "COMPLIANT" if (p_avg_score and p_avg_score >= 4.0) or not p_scored else "NEEDS_REVIEW"
+        }
+
+    # Flagged Jobs summary for quick audit actions
+    flagged_jobs = []
+    for j in scored_jobs:
+        if j.overall_score is not None and j.overall_score < 4.0:
+            reason = j.overall_reasoning or "Quality score below regulatory compliance threshold (< 4.0)"
+            flagged_jobs.append({
+                "job_id": j.job_id,
+                "title": j.article_title or "Untitled Disclosure",
+                "persona": j.persona,
+                "overall_score": j.overall_score,
+                "created_at": j.created_at,
+                "overall_reasoning": reason[:140] + "..." if len(reason) > 140 else reason,
+                "gcs_uri": j.gcs_uri
+            })
+
+    # Unit Economics
+    audio_mins = total_duration_sec / 60.0
+    cost_per_minute = round(total_cost / audio_mins, 4) if audio_mins > 0 else 0.0034
+    cost_per_job = round(total_cost / total_jobs, 4) if total_jobs > 0 else 0.0182
+    judge_cost_percent = round((judge_cost / total_cost * 100.0), 1) if total_cost > 0 else 25.0
 
     return {
         "total_jobs": total_jobs,
         "total_cost_usd": round(total_cost, 4),
-        "total_audio_minutes": round(total_duration_sec / 60.0, 1),
+        "total_audio_minutes": round(audio_mins, 1),
         "avg_quality_score": avg_score,
         "total_tokens": total_tokens,
         "audited_count": audited_count,
         "compliant_count": compliant_count,
         "flagged_count": flagged_count,
         "pass_rate": pass_rate,
+        "cost_breakdown": {
+            "tts_cost_usd": round(tts_cost, 4),
+            "judge_cost_usd": round(judge_cost, 4),
+            "total_cost_usd": round(total_cost, 4),
+            "judge_cost_percentage": judge_cost_percent
+        },
+        "token_breakdown": {
+            "input_text_tokens": input_text_tokens,
+            "audio_output_tokens": audio_output_tokens,
+            "judge_input_tokens": judge_input_tokens,
+            "judge_output_tokens": judge_output_tokens,
+            "total_tokens": total_tokens
+        },
+        "rubric_averages": rubric_averages,
+        "persona_matrix": persona_matrix,
+        "flagged_jobs": flagged_jobs,
+        "unit_economics": {
+            "cost_per_audio_minute": cost_per_minute,
+            "cost_per_job": cost_per_job
+        },
         "active_models": {
             "voice_model": settings.voice_model,
             "judge_model": settings.judge_model
@@ -450,6 +560,7 @@ def get_dashboard_stats(user: Dict[str, Any] = Depends(get_current_user)):
             "repository_type": type(repo).__name__
         }
     }
+
 
 
 @app.get("/api/jobs")

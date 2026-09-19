@@ -78,6 +78,17 @@ def test_authenticated_jobs_and_stats(client):
     assert "audited_count" in stats
     assert "compliant_count" in stats
     assert "flagged_count" in stats
+    assert "cost_breakdown" in stats
+    assert "tts_cost_usd" in stats["cost_breakdown"]
+    assert "judge_cost_usd" in stats["cost_breakdown"]
+    assert "token_breakdown" in stats
+    assert "input_text_tokens" in stats["token_breakdown"]
+    assert "rubric_averages" in stats
+    assert "script_adherence_and_accuracy" in stats["rubric_averages"]
+    assert "persona_matrix" in stats
+    assert "Retail Banking Guide" in stats["persona_matrix"]
+    assert "unit_economics" in stats
+    assert "flagged_jobs" in stats
 
 def test_stream_audio_isolation(client):
     """Verify failed/running/unknown jobs do not leak or cross-contaminate audio."""
@@ -450,4 +461,48 @@ def test_home_hub_and_auditor_view(client):
     # Compliance Filter Tabs
     assert 'id="complianceFilterTabs"' in html
     assert 'setComplianceFilter(' in html
+
+def test_finops_and_compliance_drawer_elements(client):
+    """Verify FinOps & Compliance Governance drawer structure and interactive controls."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # 1. Drawer Container & Header
+    assert 'id="finOpsDrawer"' in html
+    assert "FinOps & Compliance Governance" in html
+    assert "Auditor Console" in html
+    assert 'onclick="closeFinOpsDrawer()"' in html
+    assert 'onclick="refreshFinOpsData()"' in html
+
+    # 2. Top-Line KPI Cards
+    assert 'id="foTotalCost"' in html
+    assert 'id="foTtsCostSplit"' in html
+    assert 'id="foTotalTokens"' in html
+    assert 'id="foTokenBreakdown"' in html
+    assert 'id="foPassRate"' in html
+    assert 'id="foPassCounts"' in html
+    assert 'id="foTotalMinutes"' in html
+
+    # 3. Rubric & Persona Containers
+    assert 'id="foRubricDimensionList"' in html
+    assert 'id="foPersonaTableBody"' in html
+
+    # 4. Unit Economics & Infrastructure
+    assert 'id="foCostPerMin"' in html
+    assert 'id="foCostPerJob"' in html
+    assert 'id="foJudgeCostRatio"' in html
+    assert 'id="foBackendRepo"' in html
+    assert 'id="foBucketName"' in html
+
+    # 5. Flagged Disclosures Container
+    assert 'id="foFlaggedContainer"' in html
+    assert 'id="foFlaggedHeaderCount"' in html
+
+    # 6. JavaScript functions wired
+    assert "function openFinOpsDrawer()" in html
+    assert "function closeFinOpsDrawer()" in html
+    assert "function refreshFinOpsData()" in html
+    assert "function renderFinOpsDrawer(" in html
+
 
