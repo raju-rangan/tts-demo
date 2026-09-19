@@ -246,9 +246,17 @@ class SQLiteJobRepository(BaseJobRepository):
 class FirestoreJobRepository(BaseJobRepository):
     """Google Cloud Firestore (Firebase Native Mode) repository."""
 
-    def __init__(self, project_id: str, collection_name: str = "tts_jobs"):
+    def __init__(
+        self,
+        project_id: str,
+        collection_name: str = "tts_jobs",
+        database_name: str = "tts-jobs"
+    ):
         from google.cloud import firestore
-        self.client = firestore.Client(project=project_id)
+        self.project_id = project_id
+        self.collection_name = collection_name
+        self.database_name = database_name
+        self.client = firestore.Client(project=project_id, database=database_name)
         self.collection = self.client.collection(collection_name)
 
     def save_job(self, job: JobRecord) -> None:
@@ -262,11 +270,20 @@ class FirestoreJobRepository(BaseJobRepository):
         return JobRecord.model_validate(doc.to_dict())
 
     def list_jobs(self, limit: int = 50, persona: Optional[str] = None) -> List[JobRecord]:
-        query = self.collection
-        if persona and persona != "All":
-            query = query.where("persona", "==", persona)
-        query = query.order_by("created_at", direction="DESCENDING").limit(limit)
-        return [JobRecord.model_validate(d.to_dict()) for d in query.stream()]
+        try:
+            query = self.collection
+            if persona and persona != "All":
+                query = query.where("persona", "==", persona)
+            query = query.order_by("created_at", direction="DESCENDING").limit(limit)
+            return [JobRecord.model_validate(d.to_dict()) for d in query.stream()]
+        except Exception as qe:
+            logger.warning(f"Indexed Firestore query fallback ({qe}): using in-memory persona filter.")
+            fetch_limit = limit * 3 if persona and persona != "All" else limit
+            query = self.collection.order_by("created_at", direction="DESCENDING").limit(fetch_limit)
+            records = [JobRecord.model_validate(d.to_dict()) for d in query.stream()]
+            if persona and persona != "All":
+                records = [r for r in records if r.persona == persona][:limit]
+            return records
 
     def delete_job(self, job_id: str) -> bool:
         doc_ref = self.collection.document(job_id)
@@ -294,6 +311,34 @@ class FirestoreJobRepository(BaseJobRepository):
 
 _active_repo: Optional[BaseJobRepository] = None
 
+def reset_job_repository():
+    """Resets the active singleton repository (used for testing/switching backends)."""
+    global _active_repo
+    _active_repo = None
+
+def sync_sqlite_to_firestore_if_empty(fs_repo: FirestoreJobRepository, sqlite_db_path: str = "data/tts_jobs.db"):
+    """
+    Checks if Firestore collection is empty. If empty and local SQLite records exist,
+    automatically migrates them into Firestore.
+    """
+    try:
+        existing = fs_repo.list_jobs(limit=1)
+        if existing:
+            return  # Already populated in Cloud Firestore
+
+        if os.path.exists(sqlite_db_path):
+            logger.info(f"Firestore collection '{fs_repo.collection_name}' is empty. Auto-migrating records from local SQLite...")
+            sqlite_repo = SQLiteJobRepository(db_path=sqlite_db_path)
+            local_jobs = sqlite_repo.list_jobs(limit=1000)
+            for job in local_jobs:
+                fs_repo.save_job(job)
+            logger.info(f"✓ Auto-migrated {len(local_jobs)} historical jobs from SQLite to Cloud Firestore.")
+        else:
+            _seed_initial_jobs_if_empty(fs_repo)
+    except Exception as me:
+        logger.warning(f"Could not auto-migrate SQLite to Firestore: {me}")
+        _seed_initial_jobs_if_empty(fs_repo)
+
 def get_job_repository() -> BaseJobRepository:
     """
     Factory returning Cloud Firestore repository if enabled, falling back seamlessly to SQLite.
@@ -302,13 +347,20 @@ def get_job_repository() -> BaseJobRepository:
     if _active_repo is not None:
         return _active_repo
 
-    # Check if Firestore is explicitly enabled
-    use_firestore = os.getenv("USE_FIRESTORE", "false").lower()
-    if use_firestore in ["true", "1"]:
+    # Check if Firestore is enabled in configuration
+    if settings.use_firestore:
         try:
             from google.cloud import firestore
-            fs_repo = FirestoreJobRepository(project_id=settings.project_id)
-            logger.info(f"✓ Cloud Firestore repository connected for project '{settings.project_id}'")
+            fs_repo = FirestoreJobRepository(
+                project_id=settings.project_id,
+                collection_name=settings.firestore_collection,
+                database_name=settings.firestore_database
+            )
+            sync_sqlite_to_firestore_if_empty(fs_repo)
+            logger.info(
+                f"✓ Cloud Firestore repository connected for project '{settings.project_id}', "
+                f"database '{settings.firestore_database}', collection '{settings.firestore_collection}'"
+            )
             _active_repo = fs_repo
             return _active_repo
         except Exception as e:

@@ -25,5 +25,8 @@ class Settings:
     sample_rate: int = _parse_int(os.getenv("AUDIO_SAMPLE_RATE", "24000"), 24000)
     bitrate: str = os.getenv("AUDIO_BITRATE", "320k")
     tts_chunk_word_limit: int = _parse_int(os.getenv("TTS_CHUNK_WORD_LIMIT", "400"), 400)
+    use_firestore: bool = os.getenv("USE_FIRESTORE", "true").lower() in ["true", "1"]
+    firestore_database: str = os.getenv("FIRESTORE_DATABASE", "tts-jobs")
+    firestore_collection: str = os.getenv("FIRESTORE_COLLECTION", "tts_jobs")
 
 settings = Settings()
