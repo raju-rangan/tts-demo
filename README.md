@@ -131,11 +131,12 @@ Follow these steps using the `Makefile`:
    ```bash
    make auth
    ```
-   *Performs complete authentication: logs in your user account for `gcloud` CLI commands (`gcloud auth login`), sets the active project, and configures Application Default Credentials (`gcloud auth application-default login`) for Vertex AI Python SDK access.*
+   *Smart authentication: automatically checks if `gcloud` CLI and Application Default Credentials (ADC) are already active and skips browser logins if already verified. If credentials or quota projects are missing, it prompts only for the required layer.*
 
-   *Alternatively, authenticate individual credential layers:*
-   - `make auth-cli`: Authenticates only the `gcloud` CLI account.
-   - `make auth-adc`: Authenticates only Application Default Credentials for the Python SDK.
+   *Additional authentication controls:*
+   - `make auth-force`: Forces a complete interactive browser re-login for both CLI and ADC.
+   - `make auth-cli`: Authenticates only the `gcloud` CLI account (with auto-bypass).
+   - `make auth-adc`: Authenticates only Application Default Credentials for the Python SDK (with auto-bypass).
 
 3. **Verify and Auto-Align Authentication**:
    ```bash
