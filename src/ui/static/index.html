@@ -82,14 +82,85 @@
       </button>
 
       <div id="loginError" class="hidden mt-4 text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 p-3 rounded-xl"></div>
+    </div>
+  </div>
 
-      <!-- Offline Demo Bypass (only shown in local development / evaluation) -->
-      <div id="demoLoginContainer" class="mt-6 pt-4 border-t border-zinc-800/80">
-        <button type="button" onclick="bypassForDemo()" class="w-full py-2 bg-zinc-800/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-medium rounded-xl transition flex items-center justify-center space-x-2 border border-zinc-700/40">
-          <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
-          <span>Offline Evaluation Bypass (Local Dev)</span>
+  <!-- ================= IN-BETWEEN SCREEN: PERSONA SELECTION ================= -->
+  <div id="profileSelectSection" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950 px-4 py-8 overflow-y-auto">
+    <div class="w-full max-w-3xl bg-zinc-900 border border-zinc-800 rounded-3xl p-8 md:p-10 shadow-2xl relative overflow-hidden my-auto">
+      <div class="absolute -top-32 -right-32 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-32 -left-32 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Header & Authenticated Identity -->
+      <div class="text-center max-w-xl mx-auto mb-8">
+        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-3">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Google Identity Verified</span>
+        </div>
+        <h2 class="text-2xl md:text-3xl font-bold text-white tracking-tight">Select Workspace Persona</h2>
+        <p class="text-xs md:text-sm text-zinc-400 mt-2">
+          Signed in as <span id="gateUserEmail" class="font-mono text-zinc-200 font-medium">user@domain.com</span>. Choose an enterprise profile to enter the studio experience:
+        </p>
+      </div>
+
+      <!-- 2 Profile Selection Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Profile 1: Content Creator (Sarah Jenkins) -->
+        <div onclick="choosePersona('creator')" class="group relative bg-zinc-950/70 hover:bg-zinc-950 border-2 border-emerald-500/30 hover:border-emerald-500/80 rounded-2xl p-6 transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-xl hover:shadow-emerald-500/10">
+          <div>
+            <div class="flex items-center space-x-4 mb-4">
+              <img src="/static/avatars/creator_sarah.jpg" alt="Sarah Jenkins" class="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-500/40 shadow-md group-hover:scale-105 transition-transform duration-200">
+              <div>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Creator View</span>
+                <h3 class="text-base font-bold text-white mt-1 group-hover:text-emerald-300 transition">Sarah Jenkins</h3>
+                <p class="text-xs text-zinc-400">Chief Communications Officer</p>
+                <p class="text-[10px] text-zinc-500">Digital Wealth & Customer Exp.</p>
+              </div>
+            </div>
+            <p class="text-xs text-zinc-300 leading-relaxed mb-4">
+              Access the voice synthesis production studio, multi-turn conversational script tools, and bulk batch URL processing.
+            </p>
+          </div>
+          <button type="button" class="w-full py-2.5 bg-emerald-500/20 group-hover:bg-emerald-500 text-emerald-300 group-hover:text-zinc-950 font-semibold text-xs rounded-xl transition flex items-center justify-center space-x-2 border border-emerald-500/30">
+            <span>Enter as Content Creator</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Profile 2: Compliance Auditor (David Chen) -->
+        <div onclick="choosePersona('auditor')" class="group relative bg-zinc-950/70 hover:bg-zinc-950 border-2 border-purple-500/30 hover:border-purple-500/80 rounded-2xl p-6 transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-xl hover:shadow-purple-500/10">
+          <div>
+            <div class="flex items-center space-x-4 mb-4">
+              <img src="/static/avatars/auditor_david.jpg" alt="David Chen" class="w-16 h-16 rounded-2xl object-cover border-2 border-purple-500/40 shadow-md group-hover:scale-105 transition-transform duration-200">
+              <div>
+                <span class="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-[10px] text-purple-400 font-bold uppercase tracking-wider">Auditor View</span>
+                <h3 class="text-base font-bold text-white mt-1 group-hover:text-purple-300 transition">David Chen</h3>
+                <p class="text-xs text-zinc-400">VP Regulatory Compliance</p>
+                <p class="text-[10px] text-zinc-500">Bank Secrecy & AML Oversight</p>
+              </div>
+            </div>
+            <p class="text-xs text-zinc-300 leading-relaxed mb-4">
+              Review multimodal quality audit scorecards (Gemini 3.8 Flash), regulatory disclosures, and FinOps token usage governance.
+            </p>
+          </div>
+          <button type="button" class="w-full py-2.5 bg-purple-500/20 group-hover:bg-purple-500 text-purple-300 group-hover:text-zinc-950 font-semibold text-xs rounded-xl transition flex items-center justify-center space-x-2 border border-purple-500/30">
+            <span>Enter as Compliance Auditor</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Sign Out / Switch Account Option -->
+      <div class="mt-8 pt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500">
+        <span>Need a different account?</span>
+        <button onclick="handleLogout()" class="text-zinc-400 hover:text-rose-400 transition flex items-center space-x-1">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+          <span>Sign Out of Google</span>
         </button>
       </div>
+
     </div>
   </div>
 
@@ -134,6 +205,12 @@
             title="Switch to Compliance Auditor View (David Chen)">
             <img src="/static/avatars/auditor_david.jpg" class="w-5 h-5 rounded-full object-cover border border-zinc-600 shadow-sm" alt="David Chen">
             <span>Auditor View</span>
+          </button>
+
+          <button onclick="showProfileSelect()"
+            class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition"
+            title="Open Persona Selection Screen">
+            <i data-lucide="users" class="w-3.5 h-3.5"></i>
           </button>
         </div>
 
@@ -948,12 +1025,6 @@
                 console.warn("Could not auto-refresh ID token:", te);
               }
             }
-          });
-        }
-
-        // Toggle demo sign-in visibility based on server configuration
-        if (!AUTH_CONFIG.enable_demo_auth) {
-          document.getElementById('demoLoginContainer')?.classList.add('hidden');
         }
       } catch (err) {
         console.warn("Could not load auth configuration:", err);
@@ -1013,14 +1084,34 @@
       }
     });
 
-    // Authentication Handlers
+    // Screen Navigation Handlers
     function showLogin() {
       document.getElementById('loginSection').classList.remove('hidden');
+      document.getElementById('profileSelectSection')?.classList.add('hidden');
       document.getElementById('appSection').classList.add('hidden');
+    }
+
+    function showProfileSelect(email) {
+      document.getElementById('loginSection').classList.add('hidden');
+      document.getElementById('appSection').classList.add('hidden');
+      const gateEmailEl = document.getElementById('gateUserEmail');
+      if (gateEmailEl && email) gateEmailEl.textContent = email;
+      const selectSection = document.getElementById('profileSelectSection');
+      if (selectSection) {
+        selectSection.classList.remove('hidden');
+        lucide.createIcons();
+      }
+    }
+
+    function choosePersona(personaType) {
+      CURRENT_PERSONA = personaType;
+      localStorage.setItem('apex_tts_persona', personaType);
+      showApp();
     }
 
     function showApp() {
       document.getElementById('loginSection').classList.add('hidden');
+      document.getElementById('profileSelectSection')?.classList.add('hidden');
       document.getElementById('appSection').classList.remove('hidden');
       updatePersonaUI();
       loadStats();
@@ -1033,7 +1124,7 @@
       errBox.classList.add('hidden');
 
       if (!AUTH_CONFIG?.api_key || !FIREBASE_APP) {
-        errBox.textContent = "Google Cloud Identity Platform (GCIP) is not yet configured with an API key. Please set GCIP_API_KEY in .env, or use the Offline Evaluation Bypass below.";
+        errBox.textContent = "Google Cloud Identity Platform (GCIP) is not yet configured with an API key. Please set GCIP_API_KEY in .env.";
         errBox.classList.remove('hidden');
         return;
       }
@@ -1045,35 +1136,12 @@
         const idToken = await result.user.getIdToken();
         AUTH_TOKEN = idToken;
         localStorage.setItem('apex_tts_token', idToken);
-        await verifySession();
+        const email = result.user.email || 'Authorized User';
+        showProfileSelect(email);
       } catch (err) {
         console.error("Google sign-in error:", err);
         errBox.textContent = err.message || "Google authentication failed";
         errBox.classList.remove('hidden');
-      }
-    }
-
-    // Offline Evaluation Bypass for Local Development
-    async function bypassForDemo() {
-      const errBox = document.getElementById('loginError');
-      if (errBox) errBox.classList.add('hidden');
-      try {
-        const resp = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'admin@apexbank.com', password: 'demo1234' })
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || 'Evaluation login failed');
-
-        AUTH_TOKEN = data.token;
-        localStorage.setItem('apex_tts_token', AUTH_TOKEN);
-        await verifySession();
-      } catch (err) {
-        if (errBox) {
-          errBox.textContent = err.message || 'Offline evaluation bypass failed';
-          errBox.classList.remove('hidden');
-        }
       }
     }
 
@@ -1089,11 +1157,17 @@
         }
         const data = await resp.json();
         setUserHeader(data.user);
-        updatePersonaUI();
-        showApp();
+        
+        const storedPersona = localStorage.getItem('apex_tts_persona');
+        if (storedPersona) {
+          showApp();
+        } else {
+          showProfileSelect(data.user.google_email || data.user.email);
+        }
       } catch (err) {
         AUTH_TOKEN = null;
         localStorage.removeItem('apex_tts_token');
+        localStorage.removeItem('apex_tts_persona');
         if (errBox && err.message && err.message !== 'Session expired') {
           errBox.textContent = err.message;
           errBox.classList.remove('hidden');
@@ -1133,6 +1207,7 @@
       }
       AUTH_TOKEN = null;
       localStorage.removeItem('apex_tts_token');
+      localStorage.removeItem('apex_tts_persona');
       showLogin();
     }
 
