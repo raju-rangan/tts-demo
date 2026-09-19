@@ -103,3 +103,56 @@ def test_delete_job(temp_repo):
 
     # Deleting non-existent job returns False
     assert temp_repo.delete_job("job_to_delete") is False
+
+def test_firestore_repository_mock_operations(monkeypatch):
+    """Test FirestoreJobRepository CRUD operations with a mocked Firestore Client."""
+    from unittest.mock import MagicMock
+    from src.db.repository import FirestoreJobRepository
+    import sys
+
+    # Mock google.cloud.firestore
+    mock_firestore = MagicMock()
+    mock_client = MagicMock()
+    mock_firestore.Client.return_value = mock_client
+    monkeypatch.setitem(sys.modules, "google.cloud.firestore", mock_firestore)
+
+    mock_collection = MagicMock()
+    mock_client.collection.return_value = mock_collection
+
+    mock_doc_ref = MagicMock()
+    mock_collection.document.return_value = mock_doc_ref
+
+    repo = FirestoreJobRepository(project_id="test-proj", collection_name="tts_jobs", database_name="tts-jobs")
+    mock_firestore.Client.assert_called_with(project="test-proj", database="tts-jobs")
+
+    job = JobRecord(
+        job_id="fs_test_1",
+        persona="Retail Banking Guide",
+        audience="External Customers",
+        voice_name="Sulafat",
+        transcript="FS test transcript",
+        word_count=3,
+        char_count=18,
+        gcs_uri="gs://test-bucket/external/audio/fs_test_1.mp3"
+    )
+
+    # Test save
+    repo.save_job(job)
+    mock_collection.document.assert_called_with("fs_test_1")
+    mock_doc_ref.set.assert_called_once()
+
+    # Test get existing
+    mock_snapshot = MagicMock()
+    mock_snapshot.exists = True
+    mock_snapshot.to_dict.return_value = job.model_dump()
+    mock_doc_ref.get.return_value = mock_snapshot
+
+    retrieved = repo.get_job("fs_test_1")
+    assert retrieved is not None
+    assert retrieved.job_id == "fs_test_1"
+
+    # Test delete
+    deleted = repo.delete_job("fs_test_1")
+    assert deleted is True
+    mock_doc_ref.delete.assert_called_once()
+
