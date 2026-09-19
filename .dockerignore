@@ -1,0 +1,13 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+docs/
+graphify-out/
+logs/
+data/tts_jobs.db
+.env
+.DS_Store

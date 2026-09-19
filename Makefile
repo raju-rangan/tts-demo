@@ -127,3 +127,45 @@ ui-dev: ## Launch the Web UI Studio in auto-reload development mode
 clean: ## Remove caches, build artifacts, and virtual environment
 	@rm -rf .venv .pytest_cache .coverage __pycache__ src/**/__pycache__ tests/__pycache__
 	@echo "✓ Cleaned temporary caches and virtual environment."
+
+# ------------------------------------------------------------------------------
+# 5. Cloud Run Deployment & Containerization (Python 3.13)
+# ------------------------------------------------------------------------------
+
+SERVICE_NAME ?= tts-studio
+GCP_LOCATION ?= us-central1
+
+.PHONY: docker-build
+docker-build: ## Build local Docker container image with Python 3.13
+	@echo "🐳 Building Docker image $(SERVICE_NAME):latest using Python 3.13..."
+	@docker build -t $(SERVICE_NAME):latest .
+
+.PHONY: docker-run
+docker-run: ## Run Docker container locally on http://localhost:8080
+	@echo "🐳 Running $(SERVICE_NAME) on http://localhost:8080..."
+	@docker run -p 8080:8080 --env-file .env $(SERVICE_NAME):latest
+
+.PHONY: deploy
+deploy: ## Deploy application directly to Google Cloud Run via Cloud Build
+	@if [ -z "$(GCP_PROJECT_ID)" ] || [ "$(GCP_PROJECT_ID)" = "your-gcp-project-id" ]; then \
+		echo "⚠️ Error: GCP_PROJECT_ID is not set in .env. Please configure .env first."; \
+		exit 1; \
+	fi
+	@echo "🚀 Deploying $(SERVICE_NAME) to Google Cloud Run..."
+	@echo "   Project:  $(GCP_PROJECT_ID)"
+	@echo "   Region:   $(GCP_LOCATION)"
+	@echo "   Service:  $(SERVICE_NAME)"
+	gcloud run deploy $(SERVICE_NAME) \
+		--project $(GCP_PROJECT_ID) \
+		--region $(GCP_LOCATION) \
+		--source . \
+		--allow-unauthenticated \
+		--set-env-vars "GCP_PROJECT_ID=$(GCP_PROJECT_ID),GCP_LOCATION=$(GCP_LOCATION),GCS_BUCKET_NAME=$(GCS_BUCKET_NAME),GEMINI_VOICE_MODEL=$(GEMINI_VOICE_MODEL),GEMINI_JUDGE_MODEL=$(GEMINI_JUDGE_MODEL),DEFAULT_VOICE_PERSONA=$(DEFAULT_VOICE_PERSONA),AUDIO_BITRATE=$(AUDIO_BITRATE)"
+
+.PHONY: cloud-run-logs
+cloud-run-logs: ## Stream live logs from the deployed Cloud Run service
+	@gcloud run services logs tail $(SERVICE_NAME) --project $(GCP_PROJECT_ID) --region $(GCP_LOCATION)
+
+.PHONY: cloud-run-url
+cloud-run-url: ## Print the live HTTPS URL of the deployed Cloud Run service
+	@gcloud run services describe $(SERVICE_NAME) --project $(GCP_PROJECT_ID) --region $(GCP_LOCATION) --format 'value(status.url)'

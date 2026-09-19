@@ -190,6 +190,24 @@ make test-menu
 make clean
 ```
 
+#### ☁️ Google Cloud Run Deployment (Python 3.13)
+The platform is fully containerized with Python 3.13 and ready for 1-command deployment to Google Cloud Run via Google Cloud Build (no local Docker daemon required):
+
+```bash
+# Deploy directly to Google Cloud Run (automatically injects .env settings):
+make deploy
+
+# Retrieve the live HTTPS public URL:
+make cloud-run-url
+
+# Stream live container logs:
+make cloud-run-logs
+
+# Optional: Build and test the container locally on http://localhost:8080:
+make docker-build
+make docker-run
+```
+
 ---
 
 ## 3. Step-by-Step Technical Deep Dive with Code Snippets
