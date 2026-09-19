@@ -360,7 +360,8 @@ def test_execute_bulk_url_processing_worker():
             run_judge=False,
             title=mock_article.title,
             voice_customization=None,
-            source_url="https://apexbank.com/test-article"
+            source_url="https://apexbank.com/test-article",
+            created_by=None
         )
         repo.delete_job(jid)
 

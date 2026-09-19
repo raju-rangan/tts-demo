@@ -15,6 +15,9 @@ from pydantic import BaseModel, Field
 
 from urllib.parse import urlparse
 
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
+
 from src.config import settings
 from src.utils.logger import setup_logging, get_recent_logs
 from src.db.models import JobRecord, TokenUsageDetails, CostBreakdown
@@ -49,8 +52,14 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-# Secure In-Memory Session Store for demo
-# In production, backed by Firebase Auth / Cloud IAM Identity-Aware Proxy
+# Google Cloud Identity Platform (GCIP) Configuration
+GCIP_API_KEY = os.getenv("GCIP_API_KEY", "").strip()
+GCIP_AUTH_DOMAIN = os.getenv("GCIP_AUTH_DOMAIN", "").strip()
+ENABLE_DEMO_AUTH = os.getenv("ENABLE_DEMO_AUTH", "true").lower() in ("true", "1", "yes")
+ALLOWED_DOMAINS = [d.strip().lower() for d in os.getenv("ALLOWED_DOMAINS", "").split(",") if d.strip()]
+ALLOWED_USERS = [u.strip().lower() for u in os.getenv("ALLOWED_USERS", "").split(",") if u.strip()]
+
+# In-Memory Session Store for demo / evaluation testing
 ACTIVE_SESSIONS: Dict[str, Dict[str, Any]] = {}
 DEMO_USERS = {
     "admin@apexbank.com": {
@@ -88,8 +97,25 @@ class BulkJobRequest(BaseModel):
     run_judge: bool = Field(default=True)
     voice_customization: Optional[str] = Field(default=None, description="Custom director notes or vocal delivery directives")
 
+def verify_gcip_token(token: str) -> Optional[Dict[str, Any]]:
+    """Verifies a Google Cloud Identity Platform (Firebase) ID token against Google's public certs."""
+    project_id = os.getenv("GCP_PROJECT_ID", "").strip()
+    if not project_id:
+        return None
+    try:
+        request = google_requests.Request()
+        claims = google_id_token.verify_firebase_token(
+            token,
+            request,
+            audience=project_id
+        )
+        return claims
+    except Exception as e:
+        logger.debug(f"GCIP token verification failed: {e}")
+        return None
+
 def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
-    """Validates session token for protected routes."""
+    """Validates session token for protected routes via GCIP or Demo Session."""
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -97,20 +123,80 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, A
         )
     
     token = authorization.replace("Bearer ", "").strip()
-    session = ACTIVE_SESSIONS.get(token)
-    if not session:
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired session token"
+            detail="Invalid authorization token"
         )
-    return session["user"]
+
+    # 1. Check demo in-memory session (if demo auth is enabled)
+    if ENABLE_DEMO_AUTH and token in ACTIVE_SESSIONS:
+        return ACTIVE_SESSIONS[token]["user"]
+
+    # 2. Cryptographic GCIP / Firebase ID token validation
+    claims = verify_gcip_token(token)
+    if not claims:
+        detail = "Invalid or expired Google Identity token"
+        if ENABLE_DEMO_AUTH:
+            detail = "Invalid or expired session / Google Identity token"
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail
+        )
+
+    email = (claims.get("email") or "").lower().strip()
+
+    # 3. Authorization checks (allowed users / domains)
+    if ALLOWED_USERS and email not in ALLOWED_USERS:
+        logger.warning(f"User {email} denied: not in ALLOWED_USERS")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied: user '{email}' is not authorized for this platform"
+        )
+
+    if ALLOWED_DOMAINS:
+        domain = email.split("@")[-1] if "@" in email else ""
+        if domain not in ALLOWED_DOMAINS and email not in ALLOWED_USERS:
+            logger.warning(f"User {email} denied: domain @{domain} not in ALLOWED_DOMAINS")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: domain '@{domain}' is not authorized for this platform"
+            )
+
+    user_info = {
+        "email": email,
+        "name": claims.get("name") or (email.split("@")[0].capitalize() if email else "Authorized User"),
+        "picture": claims.get("picture"),
+        "uid": claims.get("sub") or claims.get("user_id"),
+        "role": "Authorized Banking Specialist",
+        "department": "Retail & Commercial Banking"
+    }
+    return user_info
 
 
 # ---------------- API ROUTES ----------------
 
+@app.get("/api/auth/config")
+def get_auth_config():
+    """Returns public client configuration for GCIP / Firebase Auth."""
+    project_id = os.getenv("GCP_PROJECT_ID", "").strip()
+    auth_domain = GCIP_AUTH_DOMAIN or (f"{project_id}.firebaseapp.com" if project_id else "")
+    return {
+        "project_id": project_id,
+        "api_key": GCIP_API_KEY,
+        "auth_domain": auth_domain,
+        "enable_demo_auth": ENABLE_DEMO_AUTH,
+        "has_gcip": bool(GCIP_API_KEY)
+    }
+
 @app.post("/api/auth/login", response_model=LoginResponse)
 def login(req: LoginRequest):
-    """Authenticates user with banking credentials."""
+    """Authenticates user with demo credentials (only when ENABLE_DEMO_AUTH is true)."""
+    if not ENABLE_DEMO_AUTH:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Demo evaluation login is disabled. Please authenticate using Google Cloud Identity Platform."
+        )
     user = DEMO_USERS.get(req.email.lower().strip())
     if not user or user["password"] != req.password:
         raise HTTPException(
@@ -123,7 +209,9 @@ def login(req: LoginRequest):
         "email": req.email.lower().strip(),
         "name": user["name"],
         "role": user["role"],
-        "department": user["department"]
+        "department": user["department"],
+        "picture": None,
+        "uid": f"demo_{secrets.token_hex(4)}"
     }
     ACTIVE_SESSIONS[token] = {
         "user": user_info,
@@ -316,7 +404,8 @@ def _execute_async_synthesis(
     run_judge: bool,
     title: str,
     voice_customization: Optional[str] = None,
-    source_url: Optional[str] = None
+    source_url: Optional[str] = None,
+    created_by: Optional[str] = None
 ):
     """Background worker that runs TTS synthesis, GCS upload, and Multimodal Judge."""
     repo = get_job_repository()
@@ -440,7 +529,8 @@ def _execute_async_synthesis(
             voice_customization=voice_customization,
             progress_stage="COMPLETED",
             progress_message="Pipeline execution completed successfully",
-            source_url=source_url
+            source_url=source_url,
+            created_by=created_by
         )
         repo.save_job(record)
         logger.info(f"✓ [{job_id}] Async job completed successfully | Total Cost: ${cost.total_cost_usd:.4f} | Total Tokens: {token_usage.total_tokens}")
@@ -464,7 +554,8 @@ def _execute_async_synthesis(
             voice_customization=voice_customization,
             progress_stage="FAILED",
             progress_message=str(e),
-            source_url=source_url
+            source_url=source_url,
+            created_by=created_by
         )
         try:
             repo.save_job(failed_record)
@@ -500,7 +591,8 @@ def create_job(
         status="RUNNING",
         voice_customization=req.voice_customization,
         progress_stage="CHUNKING",
-        progress_message="Partitioning text into natural conversational turns..."
+        progress_message="Partitioning text into natural conversational turns...",
+        created_by=user.get("email")
     )
     repo.save_job(initial_job)
 
@@ -512,7 +604,8 @@ def create_job(
         persona_name=req.persona,
         run_judge=req.run_judge,
         title=req.title,
-        voice_customization=req.voice_customization
+        voice_customization=req.voice_customization,
+        created_by=user.get("email")
     )
 
     return {
@@ -553,7 +646,8 @@ def retry_job(
         voice_customization=job.voice_customization,
         progress_stage="CHUNKING",
         progress_message="Partitioning text for synthesis retry...",
-        source_url=job.source_url
+        source_url=job.source_url,
+        created_by=user.get("email") or job.created_by
     )
     repo.save_job(updated_job)
 
@@ -568,7 +662,8 @@ def retry_job(
         run_judge=True,
         title=job.article_title,
         voice_customization=job.voice_customization,
-        source_url=job.source_url
+        source_url=job.source_url,
+        created_by=user.get("email") or job.created_by
     )
 
     return {
@@ -583,7 +678,8 @@ def _execute_bulk_url_processing(
     job_items: List[Dict[str, str]],
     persona_name: str,
     run_judge: bool,
-    voice_customization: Optional[str] = None
+    voice_customization: Optional[str] = None,
+    created_by: Optional[str] = None
 ):
     """Background worker that sequentially extracts content from URLs and executes speech synthesis jobs one by one."""
     repo = get_job_repository()
@@ -629,7 +725,8 @@ def _execute_bulk_url_processing(
                 run_judge=run_judge,
                 title=extracted.title,
                 voice_customization=voice_customization,
-                source_url=url
+                source_url=url,
+                created_by=created_by
             )
         except Exception as e:
             logger.error(f"✗ [{job_id}] Bulk processing extraction failed for {url}: {e}", exc_info=True)
@@ -641,8 +738,8 @@ def _execute_bulk_url_processing(
                     persona=persona_name,
                     audience=persona_obj.audience,
                     voice_name=persona_obj.voice_name,
-                    article_title=url,
-                    transcript=f"Failed to extract content from {url}",
+                    article_title="Failed Bulk Extraction",
+                    transcript=f"Source URL: {url}\nExtraction failed: {e}",
                     word_count=0,
                     char_count=0,
                     gcs_uri="N/A",
@@ -650,8 +747,9 @@ def _execute_bulk_url_processing(
                     error_message=str(e),
                     voice_customization=voice_customization,
                     progress_stage="FAILED",
-                    progress_message=f"Extraction error: {str(e)}",
-                    source_url=url
+                    progress_message=f"Extraction failed: {e}",
+                    source_url=url,
+                    created_by=created_by
                 )
             else:
                 failed_job.status = "FAILED"
@@ -720,7 +818,8 @@ def create_bulk_jobs(
             voice_customization=req.voice_customization,
             progress_stage="QUEUED",
             progress_message="Queued for sequential bulk extraction and synthesis...",
-            source_url=url
+            source_url=url,
+            created_by=user.get("email")
         )
         repo.save_job(initial_job)
         created_jobs.append(initial_job)
@@ -730,7 +829,8 @@ def create_bulk_jobs(
         job_items=job_items,
         persona_name=req.persona,
         run_judge=req.run_judge,
-        voice_customization=req.voice_customization
+        voice_customization=req.voice_customization,
+        created_by=user.get("email")
     )
 
     return {
