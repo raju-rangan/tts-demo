@@ -133,7 +133,16 @@ clean: ## Remove caches, build artifacts, and virtual environment
 # ------------------------------------------------------------------------------
 
 SERVICE_NAME ?= tts-studio
-GCP_LOCATION ?= us-central1
+
+# Strip quotes and sanitize env variables for gcloud CLI
+CLEAN_PROJECT_ID := $(subst ",,$(GCP_PROJECT_ID))
+CLEAN_LOCATION := $(or $(subst ",,$(GCP_LOCATION)),us-central1)
+CLEAN_BUCKET := $(subst ",,$(GCS_BUCKET_NAME))
+CLEAN_VOICE_MODEL := $(or $(subst ",,$(GEMINI_VOICE_MODEL)),gemini-3.1-flash-tts-preview)
+CLEAN_JUDGE_MODEL := $(or $(subst ",,$(GEMINI_JUDGE_MODEL)),gemini-3.8-flash)
+CLEAN_JUDGE_LOCATION := $(or $(subst ",,$(GEMINI_JUDGE_LOCATION)),global)
+CLEAN_PERSONA := $(or $(subst ",,$(DEFAULT_VOICE_PERSONA)),Retail Banking Guide)
+CLEAN_BITRATE := $(or $(subst ",,$(AUDIO_BITRATE)),320k)
 
 .PHONY: docker-build
 docker-build: ## Build local Docker container image with Python 3.13
@@ -147,25 +156,25 @@ docker-run: ## Run Docker container locally on http://localhost:8080
 
 .PHONY: deploy
 deploy: ## Deploy application directly to Google Cloud Run via Cloud Build
-	@if [ -z "$(GCP_PROJECT_ID)" ] || [ "$(GCP_PROJECT_ID)" = "your-gcp-project-id" ]; then \
+	@if [ -z "$(CLEAN_PROJECT_ID)" ] || [ "$(CLEAN_PROJECT_ID)" = "your-gcp-project-id" ]; then \
 		echo "⚠️ Error: GCP_PROJECT_ID is not set in .env. Please configure .env first."; \
 		exit 1; \
 	fi
 	@echo "🚀 Deploying $(SERVICE_NAME) to Google Cloud Run..."
-	@echo "   Project:  $(GCP_PROJECT_ID)"
-	@echo "   Region:   $(GCP_LOCATION)"
+	@echo "   Project:  $(CLEAN_PROJECT_ID)"
+	@echo "   Region:   $(CLEAN_LOCATION)"
 	@echo "   Service:  $(SERVICE_NAME)"
 	gcloud run deploy $(SERVICE_NAME) \
-		--project $(GCP_PROJECT_ID) \
-		--region $(GCP_LOCATION) \
+		--project $(CLEAN_PROJECT_ID) \
+		--region $(CLEAN_LOCATION) \
 		--source . \
 		--allow-unauthenticated \
-		--set-env-vars "GCP_PROJECT_ID=$(GCP_PROJECT_ID),GCP_LOCATION=$(GCP_LOCATION),GCS_BUCKET_NAME=$(GCS_BUCKET_NAME),GEMINI_VOICE_MODEL=$(GEMINI_VOICE_MODEL),GEMINI_JUDGE_MODEL=$(GEMINI_JUDGE_MODEL),DEFAULT_VOICE_PERSONA=$(DEFAULT_VOICE_PERSONA),AUDIO_BITRATE=$(AUDIO_BITRATE)"
+		--set-env-vars '^##^GCP_PROJECT_ID=$(CLEAN_PROJECT_ID)##GCP_LOCATION=$(CLEAN_LOCATION)##GCS_BUCKET_NAME=$(CLEAN_BUCKET)##GEMINI_VOICE_MODEL=$(CLEAN_VOICE_MODEL)##GEMINI_JUDGE_MODEL=$(CLEAN_JUDGE_MODEL)##GEMINI_JUDGE_LOCATION=$(CLEAN_JUDGE_LOCATION)##DEFAULT_VOICE_PERSONA=$(CLEAN_PERSONA)##AUDIO_BITRATE=$(CLEAN_BITRATE)'
 
 .PHONY: cloud-run-logs
 cloud-run-logs: ## Stream live logs from the deployed Cloud Run service
-	@gcloud run services logs tail $(SERVICE_NAME) --project $(GCP_PROJECT_ID) --region $(GCP_LOCATION)
+	@gcloud run services logs tail $(SERVICE_NAME) --project $(CLEAN_PROJECT_ID) --region $(CLEAN_LOCATION)
 
 .PHONY: cloud-run-url
 cloud-run-url: ## Print the live HTTPS URL of the deployed Cloud Run service
-	@gcloud run services describe $(SERVICE_NAME) --project $(GCP_PROJECT_ID) --region $(GCP_LOCATION) --format 'value(status.url)'
+	@gcloud run services describe $(SERVICE_NAME) --project $(CLEAN_PROJECT_ID) --region $(CLEAN_LOCATION) --format 'value(status.url)'
