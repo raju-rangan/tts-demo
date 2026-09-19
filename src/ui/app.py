@@ -52,7 +52,8 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-# Google Cloud Identity Platform (GCIP) Configuration
+# Google Identity Services (GIS) & Authentication Configuration
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "716595821548-3bfcfnttu4apmetssb0j6n2na28ftdp3.apps.googleusercontent.com").strip()
 GCIP_API_KEY = os.getenv("GCIP_API_KEY", "").strip()
 GCIP_AUTH_DOMAIN = os.getenv("GCIP_AUTH_DOMAIN", "").strip()
 ENABLE_DEMO_AUTH = os.getenv("ENABLE_DEMO_AUTH", "true").lower() in ("true", "1", "yes")
@@ -267,13 +268,92 @@ def create_google_session(req: GoogleSessionRequest):
     }
 
 
+class GoogleLoginRequest(BaseModel):
+    credential: str
+
+@app.post("/api/auth/google-login")
+def google_login(req: GoogleLoginRequest):
+    """Verifies official Google Identity Services credential token and establishes session."""
+    if not req.credential:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Credential token is required")
+
+    try:
+        # Cryptographically verify the Google ID token against Google's public certs
+        idinfo = google_id_token.verify_oauth2_token(
+            req.credential,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID or None
+        )
+        if idinfo.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token issuer")
+
+        email = (idinfo.get("email") or "").lower().strip()
+        if not email:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google account has no associated email")
+
+        # Check domain restrictions only if specified
+        if ALLOWED_USERS and email not in ALLOWED_USERS:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: user '{email}' is not authorized for this platform"
+            )
+
+        if ALLOWED_DOMAINS:
+            domain = email.split("@")[-1] if "@" in email else ""
+            domain_match = any(domain == d or domain.endswith("." + d) for d in ALLOWED_DOMAINS)
+            if not domain_match and email not in ALLOWED_USERS:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Access denied: domain '@{domain}' is not authorized for this platform"
+                )
+
+        token = f"google_{secrets.token_hex(24)}"
+        display_name = idinfo.get("name") or email.split("@")[0].replace(".", " ").title()
+        user_info = {
+            "email": email,
+            "google_email": email,
+            "google_name": display_name,
+            "google_picture": idinfo.get("picture"),
+            "picture": idinfo.get("picture"),
+            "uid": idinfo.get("sub") or f"g_{secrets.token_hex(8)}",
+            "name": "Sarah Jenkins",
+            "role": "Chief Communications Officer",
+            "department": "Digital Wealth & Customer Experience",
+            "avatar": "/static/avatars/creator_sarah.jpg",
+            "persona_type": "creator"
+        }
+        ACTIVE_SESSIONS[token] = {
+            "user": user_info,
+            "created_at": time.time()
+        }
+        return {
+            "token": token,
+            "user": user_info
+        }
+    except ValueError as ve:
+        logger.error(f"Google ID token verification failed: {ve}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Google authentication failed: {str(ve)}"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during Google login: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Authentication service error: {str(e)}"
+        )
+
+
 @app.get("/api/auth/config")
 def get_auth_config():
-    """Returns public client configuration for GCIP / Firebase Auth."""
+    """Returns public client configuration for Google Identity Services / Auth."""
     project_id = os.getenv("GCP_PROJECT_ID", "").strip()
     auth_domain = GCIP_AUTH_DOMAIN or (f"{project_id}.firebaseapp.com" if project_id else "")
     return {
         "project_id": project_id,
+        "google_client_id": GOOGLE_CLIENT_ID,
         "api_key": GCIP_API_KEY,
         "auth_domain": auth_domain,
         "enable_demo_auth": ENABLE_DEMO_AUTH,

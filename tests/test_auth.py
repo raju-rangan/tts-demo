@@ -201,3 +201,52 @@ def test_create_google_session_empty_email():
     resp = client.post("/api/auth/google-session", json={"email": "   "})
     assert resp.status_code == 400
 
+
+def test_google_login_gis_success():
+    """Verify POST /api/auth/google-login validates genuine Google ID token and returns session."""
+    client = TestClient(app)
+    mock_idinfo = {
+        "iss": "accounts.google.com",
+        "email": "external.developer@gmail.com",
+        "name": "Alex Mercer",
+        "picture": "https://lh3.googleusercontent.com/avatar.jpg",
+        "sub": "google_uid_10928301"
+    }
+    with patch("src.ui.app.google_id_token.verify_oauth2_token", return_value=mock_idinfo), \
+         patch("src.ui.app.ALLOWED_DOMAINS", []), \
+         patch("src.ui.app.ALLOWED_USERS", []):
+        resp = client.post("/api/auth/google-login", json={"credential": "mock_google_signed_jwt"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "token" in data
+        assert data["token"].startswith("google_")
+        assert data["user"]["email"] == "external.developer@gmail.com"
+        assert data["user"]["google_name"] == "Alex Mercer"
+        assert data["user"]["name"] == "Sarah Jenkins"
+
+        # Test switching persona to David Chen with the Google session token
+        me_resp = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {data['token']}", "X-Apex-Persona": "auditor"}
+        )
+        assert me_resp.status_code == 200
+        assert me_resp.json()["user"]["name"] == "David Chen"
+        assert me_resp.json()["user"]["persona_type"] == "auditor"
+
+
+def test_google_login_gis_invalid_token():
+    """Verify POST /api/auth/google-login rejects invalid or expired tokens."""
+    client = TestClient(app)
+    with patch("src.ui.app.google_id_token.verify_oauth2_token", side_effect=ValueError("Token expired")):
+        resp = client.post("/api/auth/google-login", json={"credential": "expired_jwt"})
+        assert resp.status_code == 401
+        assert "Token expired" in resp.json()["detail"]
+
+
+def test_google_login_gis_empty_credential():
+    """Verify POST /api/auth/google-login rejects empty credential."""
+    client = TestClient(app)
+    resp = client.post("/api/auth/google-login", json={"credential": ""})
+    assert resp.status_code == 400
+
+
