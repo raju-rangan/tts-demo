@@ -772,8 +772,49 @@
     let ALL_JOBS = [];
     let CURRENT_JOB = null;
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       lucide.createIcons();
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get('view');
+      if (view) {
+        try {
+          const resp = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'admin@apexbank.com', password: 'demo1234' })
+          });
+          const data = await resp.json();
+          AUTH_TOKEN = data.token;
+          localStorage.setItem('apex_tts_token', AUTH_TOKEN);
+          setUserHeader(data.user);
+          showApp();
+
+          if (view === 'new_job') {
+            openNewJobModal();
+            loadSampleText();
+          } else if (view === 'bulk') {
+            openBulkJobModal();
+            loadSampleUrls();
+          } else if (view === 'job_detail' || view === 'scorecard' || view === 'finops') {
+            await loadJobs();
+            if (ALL_JOBS.length > 0) {
+              const targetJob = ALL_JOBS.find(j => j.status === 'COMPLETED' && j.overall_score) || ALL_JOBS[0];
+              await openJobDetail(targetJob.job_id);
+              if (view === 'scorecard') {
+                const scrollable = document.querySelector('#jobDetailModal .overflow-y-auto');
+                if (scrollable) scrollable.scrollTop = 580;
+              } else if (view === 'finops') {
+                const scrollable = document.querySelector('#jobDetailModal .overflow-y-auto');
+                if (scrollable) scrollable.scrollTop = 140;
+              }
+            }
+          }
+          return;
+        } catch (e) {
+          console.error('Deep link initialization failed', e);
+        }
+      }
+
       if (AUTH_TOKEN) {
         verifySession();
       } else {
