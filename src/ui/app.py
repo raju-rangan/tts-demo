@@ -61,18 +61,39 @@ ALLOWED_USERS = [u.strip().lower() for u in os.getenv("ALLOWED_USERS", "").split
 
 # In-Memory Session Store for demo / evaluation testing
 ACTIVE_SESSIONS: Dict[str, Dict[str, Any]] = {}
+PERSONA_PROFILES: Dict[str, Dict[str, str]] = {
+    "creator": {
+        "name": "Sarah Jenkins",
+        "role": "Chief Communications Officer",
+        "department": "Digital Wealth & Customer Experience",
+        "avatar": "/static/avatars/creator_sarah.jpg",
+        "persona_type": "creator"
+    },
+    "auditor": {
+        "name": "David Chen",
+        "role": "VP Regulatory Compliance",
+        "department": "Bank Secrecy & AML Oversight",
+        "avatar": "/static/avatars/auditor_david.jpg",
+        "persona_type": "auditor"
+    }
+}
+
 DEMO_USERS = {
     "admin@apexbank.com": {
         "password": "demo1234",
         "name": "Sarah Jenkins",
         "role": "Chief Communications Officer",
-        "department": "Digital Wealth & Customer Experience"
+        "department": "Digital Wealth & Customer Experience",
+        "avatar": "/static/avatars/creator_sarah.jpg",
+        "persona_type": "creator"
     },
     "auditor@apexbank.com": {
         "password": "demo1234",
         "name": "David Chen",
         "role": "VP Regulatory Compliance",
-        "department": "Bank Secrecy & AML Oversight"
+        "department": "Bank Secrecy & AML Oversight",
+        "avatar": "/static/avatars/auditor_david.jpg",
+        "persona_type": "auditor"
     }
 }
 
@@ -114,8 +135,11 @@ def verify_gcip_token(token: str) -> Optional[Dict[str, Any]]:
         logger.debug(f"GCIP token verification failed: {e}")
         return None
 
-def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
-    """Validates session token for protected routes via GCIP or Demo Session."""
+def get_current_user(
+    authorization: Optional[str] = Header(None),
+    x_apex_persona: Optional[str] = Header(None)
+) -> Dict[str, Any]:
+    """Validates session token for protected routes via GCIP or Demo Session, attaching active persona profile."""
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -129,9 +153,21 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, A
             detail="Invalid authorization token"
         )
 
+    # Determine persona context (defaults to creator)
+    persona_key = x_apex_persona.lower().strip() if isinstance(x_apex_persona, str) else "creator"
+    persona_data = PERSONA_PROFILES.get(persona_key, PERSONA_PROFILES["creator"])
+
     # 1. Check demo in-memory session (if demo auth is enabled)
     if ENABLE_DEMO_AUTH and token in ACTIVE_SESSIONS:
-        return ACTIVE_SESSIONS[token]["user"]
+        base_user = dict(ACTIVE_SESSIONS[token]["user"])
+        base_user.update({
+            "name": persona_data["name"],
+            "role": persona_data["role"],
+            "department": persona_data["department"],
+            "avatar": persona_data["avatar"],
+            "persona_type": persona_data["persona_type"]
+        })
+        return base_user
 
     # 2. Cryptographic GCIP / Firebase ID token validation
     claims = verify_gcip_token(token)
@@ -165,11 +201,16 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, A
 
     user_info = {
         "email": email,
-        "name": claims.get("name") or (email.split("@")[0].capitalize() if email else "Authorized User"),
-        "picture": claims.get("picture"),
-        "uid": claims.get("sub") or claims.get("user_id"),
-        "role": "Authorized Banking Specialist",
-        "department": "Retail & Commercial Banking"
+        "google_email": email,
+        "google_name": claims.get("name") or email,
+        "google_picture": claims.get("picture"),
+        "name": persona_data["name"],
+        "role": persona_data["role"],
+        "department": persona_data["department"],
+        "avatar": persona_data["avatar"],
+        "persona_type": persona_data["persona_type"],
+        "picture": persona_data["avatar"],
+        "uid": claims.get("sub") or claims.get("user_id")
     }
     return user_info
 

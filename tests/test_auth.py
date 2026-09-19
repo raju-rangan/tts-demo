@@ -86,7 +86,7 @@ def test_verify_gcip_token_invalid():
         assert claims is None
 
 def test_get_current_user_with_valid_gcip_token():
-    """Verify get_current_user authenticates valid GCIP token."""
+    """Verify get_current_user authenticates valid GCIP token and attaches default creator persona."""
     mock_claims = {
         "email": "admin@altostrat.com",
         "name": "Admin Specialist",
@@ -98,8 +98,29 @@ def test_get_current_user_with_valid_gcip_token():
          patch("src.ui.app.ALLOWED_USERS", []):
         user = get_current_user(authorization="Bearer valid-token-123")
         assert user["email"] == "admin@altostrat.com"
-        assert user["name"] == "Admin Specialist"
-        assert user["picture"] == "https://example.com/avatar.png"
+        assert user["google_name"] == "Admin Specialist"
+        assert user["name"] == "Sarah Jenkins"
+        assert user["role"] == "Chief Communications Officer"
+        assert user["avatar"] == "/static/avatars/creator_sarah.jpg"
+        assert user["persona_type"] == "creator"
+
+def test_get_current_user_with_auditor_persona():
+    """Verify get_current_user switches to auditor persona when requested."""
+    mock_claims = {
+        "email": "admin@altostrat.com",
+        "name": "Admin Specialist",
+        "sub": "uid_999",
+        "picture": "https://example.com/avatar.png"
+    }
+    with patch("src.ui.app.verify_gcip_token", return_value=mock_claims), \
+         patch("src.ui.app.ALLOWED_DOMAINS", ["altostrat.com"]), \
+         patch("src.ui.app.ALLOWED_USERS", []):
+        user = get_current_user(authorization="Bearer valid-token-123", x_apex_persona="auditor")
+        assert user["email"] == "admin@altostrat.com"
+        assert user["name"] == "David Chen"
+        assert user["role"] == "VP Regulatory Compliance"
+        assert user["avatar"] == "/static/avatars/auditor_david.jpg"
+        assert user["persona_type"] == "auditor"
 
 def test_get_current_user_domain_restriction_blocked():
     """Verify get_current_user rejects email from unauthorized domain."""
@@ -132,6 +153,7 @@ def test_get_current_user_demo_auth_success():
     }
     with patch.dict("src.ui.app.ACTIVE_SESSIONS", {fake_token: fake_session}), \
          patch("src.ui.app.ENABLE_DEMO_AUTH", True):
-        user = get_current_user(authorization=f"Bearer {fake_token}")
+        user = get_current_user(authorization=f"Bearer {fake_token}", x_apex_persona="creator")
         assert user["email"] == "admin@apexbank.com"
         assert user["name"] == "Sarah Jenkins"
+        assert user["persona_type"] == "creator"

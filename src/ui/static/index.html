@@ -46,7 +46,7 @@
 </head>
 <body class="h-full flex flex-col antialiased selection:bg-emerald-500 selection:text-white">
 
-  <!-- ================= AUTHENTICATION MODAL / SCREEN ================= -->
+  <!-- ================= AUTHENTICATION PERIMETER GATE ================= -->
   <div id="loginSection" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950 px-4">
     <div class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
       <div class="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl"></div>
@@ -56,18 +56,22 @@
         </div>
         <div>
           <h2 class="text-xl font-bold text-white tracking-tight">Apex Global Bank</h2>
-          <p class="text-xs text-zinc-400">Knowledge-to-Speech Studio</p>
+          <p class="text-xs text-zinc-400">Enterprise Knowledge-to-Speech Platform</p>
         </div>
       </div>
 
       <div class="mb-6">
-        <h3 class="text-lg font-semibold text-zinc-200">Sign in to Enterprise Studio</h3>
-        <p class="text-sm text-zinc-400 mt-1">Authenticate with Google Cloud Identity Platform or corporate credentials.</p>
+        <div class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-3">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Access Security Perimeter</span>
+        </div>
+        <h3 class="text-lg font-semibold text-zinc-100">Sign In to Enterprise Studio</h3>
+        <p class="text-sm text-zinc-400 mt-1">Authenticate with your authorized corporate Google Cloud account (@altostrat.com, @google.com) to access the platform.</p>
       </div>
 
       <!-- Google Sign-In (GCIP) -->
       <button type="button" id="googleSignInBtn" onclick="handleGoogleSignIn()"
-        class="w-full py-2.5 bg-white hover:bg-zinc-100 text-zinc-800 font-semibold rounded-xl text-sm transition shadow-md flex items-center justify-center space-x-2.5 mb-4 border border-zinc-200">
+        class="w-full py-3 bg-white hover:bg-zinc-100 text-zinc-900 font-semibold rounded-xl text-sm transition shadow-lg flex items-center justify-center space-x-3 border border-zinc-200">
         <svg class="w-4 h-4" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
           <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -77,39 +81,15 @@
         <span>Sign in with Google</span>
       </button>
 
-      <div class="relative flex py-2 items-center mb-4">
-        <div class="flex-grow border-t border-zinc-800"></div>
-        <span class="flex-shrink mx-3 text-zinc-500 text-xs uppercase tracking-wider">or sign in with password</span>
-        <div class="flex-grow border-t border-zinc-800"></div>
-      </div>
+      <div id="loginError" class="hidden mt-4 text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 p-3 rounded-xl"></div>
 
-      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
-        <div>
-          <label class="block text-xs font-medium text-zinc-300 uppercase tracking-wider mb-1">Corporate Email</label>
-          <input type="email" id="loginEmail" value="admin@apexbank.com" required
-            class="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-700 rounded-xl text-zinc-100 text-sm focus:outline-none focus:border-emerald-500 transition">
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-zinc-300 uppercase tracking-wider mb-1">Security Password</label>
-          <input type="password" id="loginPassword" value="demo1234" required
-            class="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-700 rounded-xl text-zinc-100 text-sm focus:outline-none focus:border-emerald-500 transition">
-        </div>
-
-        <div id="loginError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 p-2.5 rounded-lg"></div>
-
-        <button type="submit" id="loginBtn"
-          class="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 font-semibold rounded-xl text-sm transition shadow-lg shadow-emerald-500/10 flex items-center justify-center space-x-2">
-          <span>Authenticate Session</span>
-          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      <!-- Offline Demo Bypass (only shown in local development / evaluation) -->
+      <div id="demoLoginContainer" class="mt-6 pt-4 border-t border-zinc-800/80">
+        <button type="button" onclick="bypassForDemo()" class="w-full py-2 bg-zinc-800/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-medium rounded-xl transition flex items-center justify-center space-x-2 border border-zinc-700/40">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span>Offline Evaluation Bypass (Local Dev)</span>
         </button>
-
-        <div id="demoLoginContainer" class="pt-2">
-          <button type="button" onclick="quickLogin()" class="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-xl transition flex items-center justify-center space-x-2">
-            <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
-            <span>One-Click Demo Evaluation Sign In</span>
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   </div>
 
@@ -140,6 +120,23 @@
       </div>
 
       <div class="flex items-center space-x-3">
+        <!-- Interactive Persona Selector Switcher -->
+        <div class="flex items-center bg-zinc-950 p-1 rounded-xl border border-zinc-800 space-x-1 shadow-inner" id="personaSwitcher">
+          <button id="btnPersonaCreator" onclick="selectPersona('creator')"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 transition bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm"
+            title="Switch to Content Creator View (Sarah Jenkins)">
+            <img src="/static/avatars/creator_sarah.jpg" class="w-5 h-5 rounded-full object-cover border border-emerald-400/60 shadow-sm" alt="Sarah Jenkins">
+            <span>Creator View</span>
+          </button>
+          
+          <button id="btnPersonaAuditor" onclick="selectPersona('auditor')"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-2 transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border border-transparent"
+            title="Switch to Compliance Auditor View (David Chen)">
+            <img src="/static/avatars/auditor_david.jpg" class="w-5 h-5 rounded-full object-cover border border-zinc-600 shadow-sm" alt="David Chen">
+            <span>Auditor View</span>
+          </button>
+        </div>
+
         <button onclick="openBulkJobModal()"
           class="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 border border-zinc-700 shadow-sm hover:border-zinc-600">
           <i data-lucide="layers" class="w-4 h-4 text-teal-400"></i>
@@ -152,15 +149,16 @@
           <span>New Voice Synthesis</span>
         </button>
 
-        <div class="flex items-center space-x-2 pl-3 border-l border-zinc-800">
-          <div class="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-semibold text-zinc-300 overflow-hidden" id="userAvatar">
-            SJ
+        <div class="flex items-center space-x-2.5 pl-3 border-l border-zinc-800">
+          <div class="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-semibold text-zinc-300 overflow-hidden shadow-sm" id="userAvatar">
+            <img src="/static/avatars/creator_sarah.jpg" alt="Sarah Jenkins" class="w-full h-full object-cover">
           </div>
           <div class="hidden md:block text-left">
-            <div id="userName" class="text-xs font-medium text-zinc-200">Sarah Jenkins</div>
+            <div id="userName" class="text-xs font-bold text-zinc-200">Sarah Jenkins</div>
             <div id="userRole" class="text-[10px] text-zinc-400">Chief Communications Officer</div>
+            <div id="userGoogleEmail" class="text-[9px] text-zinc-500 font-mono hidden truncate max-w-[140px]"></div>
           </div>
-          <button onclick="handleLogout()" title="Sign Out" class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition ml-1">
+          <button onclick="handleLogout()" title="Sign Out from Platform" class="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-zinc-800 rounded-lg transition ml-1">
             <i data-lucide="log-out" class="w-4 h-4"></i>
           </button>
         </div>
@@ -169,6 +167,26 @@
 
     <!-- Main Content Area -->
     <main class="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+
+      <!-- Auditor Mode Banner (Active when Auditor View is selected) -->
+      <div id="auditorModeBanner" class="hidden bg-gradient-to-r from-purple-950/50 via-indigo-950/30 to-purple-950/50 border border-purple-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-purple-950/20">
+        <div class="flex items-center space-x-3.5">
+          <img src="/static/avatars/auditor_david.jpg" class="w-11 h-11 rounded-xl object-cover border border-purple-400/50 shadow-md">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="text-xs font-bold text-purple-200 uppercase tracking-wide">Compliance & Regulatory Auditor Console</span>
+              <span class="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-[10px] text-purple-300 font-medium">Auditor Mode Active</span>
+            </div>
+            <p class="text-xs text-zinc-400 mt-0.5">Operating as <strong>David Chen</strong> (VP Regulatory Compliance). Auditing Gemini 3.8 Flash Multimodal Quality Scorecards, Disclosures & FinOps.</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2 shrink-0">
+          <button onclick="openFinOpsDrawer()" class="px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 text-purple-100 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+            <i data-lucide="sliders" class="w-3.5 h-3.5 text-purple-300"></i>
+            <span>Inspect FinOps & Compliance</span>
+          </button>
+        </div>
+      </div>
 
       <!-- KPI Summary Analytics Cards -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -843,6 +861,7 @@
   <!-- ================= JAVASCRIPT APPLICATION LOGIC ================= -->
   <script>
     let AUTH_TOKEN = localStorage.getItem('apex_tts_token') || null;
+    let CURRENT_PERSONA = localStorage.getItem('apex_tts_persona') || 'creator';
     let ALL_JOBS = [];
     let FILTERED_JOBS = [];
     let CURRENT_PAGE = 1;
@@ -850,6 +869,51 @@
     let CURRENT_JOB = null;
     let AUTH_CONFIG = null;
     let FIREBASE_APP = null;
+
+    function getAuthHeaders(extra = {}) {
+      const h = {
+        'Authorization': `Bearer ${AUTH_TOKEN}`,
+        'X-Apex-Persona': CURRENT_PERSONA
+      };
+      return Object.assign(h, extra);
+    }
+
+    function selectPersona(personaType) {
+      CURRENT_PERSONA = personaType;
+      localStorage.setItem('apex_tts_persona', personaType);
+      updatePersonaUI();
+      if (AUTH_TOKEN) {
+        verifySession();
+      }
+    }
+
+    function updatePersonaUI() {
+      const btnCreator = document.getElementById('btnPersonaCreator');
+      const btnAuditor = document.getElementById('btnPersonaAuditor');
+      const auditorBanner = document.getElementById('auditorModeBanner');
+
+      if (CURRENT_PERSONA === 'auditor') {
+        if (btnAuditor) {
+          btnAuditor.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 transition bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm";
+        }
+        if (btnCreator) {
+          btnCreator.className = "px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-2 transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border border-transparent";
+        }
+        if (auditorBanner) {
+          auditorBanner.classList.remove('hidden');
+        }
+      } else {
+        if (btnCreator) {
+          btnCreator.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 transition bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm";
+        }
+        if (btnAuditor) {
+          btnAuditor.className = "px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-2 transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border border-transparent";
+        }
+        if (auditorBanner) {
+          auditorBanner.classList.add('hidden');
+        }
+      }
+    }
 
     // Initialize GCIP Authentication
     async function initAuthSystem() {
@@ -898,6 +962,7 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
       lucide.createIcons();
+      updatePersonaUI();
       await initAuthSystem();
 
       const params = new URLSearchParams(window.location.search);
@@ -957,6 +1022,7 @@
     function showApp() {
       document.getElementById('loginSection').classList.add('hidden');
       document.getElementById('appSection').classList.remove('hidden');
+      updatePersonaUI();
       loadStats();
       loadJobs();
     }
@@ -967,7 +1033,7 @@
       errBox.classList.add('hidden');
 
       if (!AUTH_CONFIG?.api_key || !FIREBASE_APP) {
-        errBox.textContent = "Google Cloud Identity Platform (GCIP) is not yet configured with an API key. Please set GCIP_API_KEY in .env, or use the Demo Sign-In below.";
+        errBox.textContent = "Google Cloud Identity Platform (GCIP) is not yet configured with an API key. Please set GCIP_API_KEY in .env, or use the Offline Evaluation Bypass below.";
         errBox.classList.remove('hidden');
         return;
       }
@@ -987,60 +1053,27 @@
       }
     }
 
-    async function quickLogin() {
-      document.getElementById('loginEmail').value = 'admin@apexbank.com';
-      document.getElementById('loginPassword').value = 'demo1234';
-      document.getElementById('loginBtn').click();
-    }
-
-    async function handleLogin(e) {
-      if (e) e.preventDefault();
-      const email = document.getElementById('loginEmail').value.trim();
-      const password = document.getElementById('loginPassword').value;
+    // Offline Evaluation Bypass for Local Development
+    async function bypassForDemo() {
       const errBox = document.getElementById('loginError');
-      errBox.classList.add('hidden');
+      if (errBox) errBox.classList.add('hidden');
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@apexbank.com', password: 'demo1234' })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Evaluation login failed');
 
-      // 1. Try GCIP Email/Password sign-in if configured
-      if (AUTH_CONFIG?.api_key && FIREBASE_APP) {
-        try {
-          const userCred = await firebase.auth().signInWithEmailAndPassword(email, password);
-          const idToken = await userCred.user.getIdToken();
-          AUTH_TOKEN = idToken;
-          localStorage.setItem('apex_tts_token', idToken);
-          await verifySession();
-          return;
-        } catch (gcipErr) {
-          if (!AUTH_CONFIG.enable_demo_auth) {
-            errBox.textContent = gcipErr.message || "Authentication failed";
-            errBox.classList.remove('hidden');
-            return;
-          }
-          // If demo auth is enabled, fall through to check demo credentials
-        }
-      }
-
-      // 2. Demo Evaluation Sign-In fallback
-      if (AUTH_CONFIG?.enable_demo_auth !== false) {
-        try {
-          const resp = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-          });
-          const data = await resp.json();
-          if (!resp.ok) throw new Error(data.detail || 'Login failed');
-
-          AUTH_TOKEN = data.token;
-          localStorage.setItem('apex_tts_token', AUTH_TOKEN);
-          setUserHeader(data.user);
-          showApp();
-        } catch (err) {
-          errBox.textContent = err.message;
+        AUTH_TOKEN = data.token;
+        localStorage.setItem('apex_tts_token', AUTH_TOKEN);
+        await verifySession();
+      } catch (err) {
+        if (errBox) {
+          errBox.textContent = err.message || 'Offline evaluation bypass failed';
           errBox.classList.remove('hidden');
         }
-      } else {
-        errBox.textContent = "Demo evaluation login is disabled. Please sign in with Google or your configured Identity Platform credentials.";
-        errBox.classList.remove('hidden');
       }
     }
 
@@ -1048,7 +1081,7 @@
       const errBox = document.getElementById('loginError');
       try {
         const resp = await fetch('/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+          headers: getAuthHeaders()
         });
         if (!resp.ok) {
           const errData = await resp.json().catch(() => ({}));
@@ -1056,6 +1089,7 @@
         }
         const data = await resp.json();
         setUserHeader(data.user);
+        updatePersonaUI();
         showApp();
       } catch (err) {
         AUTH_TOKEN = null;
@@ -1069,15 +1103,24 @@
     }
 
     function setUserHeader(user) {
-      document.getElementById('userName').textContent = user.name || user.email || 'User';
-      document.getElementById('userRole').textContent = user.role || 'Authorized Specialist';
-      const avatarEl = document.getElementById('userAvatar');
-      if (user.picture) {
-        avatarEl.innerHTML = `<img src="${user.picture}" alt="${user.name}" class="w-full h-full object-cover rounded-full" referrerpolicy="no-referrer">`;
-      } else {
-        const initials = (user.name || user.email || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-        avatarEl.textContent = initials;
+      document.getElementById('userName').textContent = user.name || 'Sarah Jenkins';
+      document.getElementById('userRole').textContent = user.role || 'Chief Communications Officer';
+      
+      const emailEl = document.getElementById('userGoogleEmail');
+      const googleEmail = user.google_email || (user.email && !user.email.includes('apexbank.com') ? user.email : null);
+      if (emailEl) {
+        if (googleEmail) {
+          emailEl.textContent = googleEmail;
+          emailEl.classList.remove('hidden');
+          emailEl.title = `Authenticated Google Account: ${googleEmail}`;
+        } else {
+          emailEl.classList.add('hidden');
+        }
       }
+
+      const avatarEl = document.getElementById('userAvatar');
+      const avatarSrc = user.avatar || (user.persona_type === 'auditor' ? '/static/avatars/auditor_david.jpg' : '/static/avatars/creator_sarah.jpg');
+      avatarEl.innerHTML = `<img src="${avatarSrc}" alt="${user.name}" class="w-full h-full object-cover rounded-full shadow-sm">`;
     }
 
     async function handleLogout() {
@@ -1097,7 +1140,7 @@
     async function loadStats() {
       try {
         const resp = await fetch('/api/stats', {
-          headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+          headers: getAuthHeaders()
         });
         const data = await resp.json();
         document.getElementById('kpiTotalJobs').textContent = data.total_jobs;
@@ -1118,7 +1161,7 @@
       const tbody = document.getElementById('jobsTableBody');
       try {
         const resp = await fetch('/api/jobs?limit=500', {
-          headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+          headers: getAuthHeaders()
         });
         ALL_JOBS = await resp.json();
         filterJobs(true);
@@ -1131,7 +1174,7 @@
     async function loadJobsSilently() {
       try {
         const resp = await fetch('/api/jobs?limit=500', {
-          headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+          headers: getAuthHeaders()
         });
         if (resp.ok) {
           ALL_JOBS = await resp.json();
@@ -1647,7 +1690,7 @@
       try {
         const resp = await fetch(`/api/jobs/${jobId}`, {
           method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+          headers: getAuthHeaders()
         });
         if (!resp.ok) {
           const errData = await resp.json().catch(() => ({}));
@@ -1686,10 +1729,7 @@
       try {
         const resp = await fetch(`/api/jobs/${jobId}/retry`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${AUTH_TOKEN}`,
-            'Content-Type': 'application/json'
-          }
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' })
         });
 
         if (!resp.ok) {
@@ -1797,10 +1837,7 @@
       try {
         const resp = await fetch('/api/jobs', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${AUTH_TOKEN}`
-          },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ text, persona, run_judge, voice_customization })
         });
         const data = await resp.json();
@@ -1910,10 +1947,7 @@
       try {
         const resp = await fetch('/api/jobs/bulk', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${AUTH_TOKEN}`
-          },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ urls: lines, persona, voice_customization, run_judge })
         });
         const data = await resp.json();
