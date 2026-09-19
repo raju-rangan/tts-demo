@@ -11,21 +11,6 @@ ifneq (,$(wildcard ./.env))
     export $(shell sed 's/=.*//' .env)
 endif
 
-# Service & GCP Runtime Configurations
-SERVICE_NAME ?= tts-studio
-
-# Strip quotes and sanitize env variables; fallback to active gcloud project if unset
-ACTIVE_GCLOUD_PROJECT := $(shell gcloud config get-value project 2>/dev/null)
-CLEAN_PROJECT_ID := $(or $(filter-out "your-gcp-project-id" your-gcp-project-id,$(subst ",,$(GCP_PROJECT_ID))),$(ACTIVE_GCLOUD_PROJECT))
-CLEAN_LOCATION := $(or $(subst ",,$(GCP_LOCATION)),us-central1)
-CLEAN_BUCKET := $(subst ",,$(GCS_BUCKET_NAME))
-CLEAN_VOICE_MODEL := $(or $(subst ",,$(GEMINI_VOICE_MODEL)),gemini-3.1-flash-tts-preview)
-CLEAN_JUDGE_MODEL := $(or $(subst ",,$(GEMINI_JUDGE_MODEL)),gemini-3.8-flash)
-CLEAN_JUDGE_LOCATION := $(or $(subst ",,$(GEMINI_JUDGE_LOCATION)),global)
-CLEAN_PERSONA := $(or $(subst ",,$(DEFAULT_VOICE_PERSONA)),Retail Banking Guide)
-CLEAN_BITRATE := $(or $(subst ",,$(AUDIO_BITRATE)),320k)
-
-
 .DEFAULT_GOAL := help
 
 .PHONY: help
@@ -218,6 +203,18 @@ clean: ## Remove caches, build artifacts, and virtual environment
 # 5. Cloud Run Deployment & Containerization (Python 3.13)
 # ------------------------------------------------------------------------------
 
+SERVICE_NAME ?= tts-studio
+
+# Strip quotes and sanitize env variables for gcloud CLI
+CLEAN_PROJECT_ID := $(subst ",,$(GCP_PROJECT_ID))
+CLEAN_LOCATION := $(or $(subst ",,$(GCP_LOCATION)),us-central1)
+CLEAN_BUCKET := $(subst ",,$(GCS_BUCKET_NAME))
+CLEAN_VOICE_MODEL := $(or $(subst ",,$(GEMINI_VOICE_MODEL)),gemini-3.1-flash-tts-preview)
+CLEAN_JUDGE_MODEL := $(or $(subst ",,$(GEMINI_JUDGE_MODEL)),gemini-3.8-flash)
+CLEAN_JUDGE_LOCATION := $(or $(subst ",,$(GEMINI_JUDGE_LOCATION)),global)
+CLEAN_PERSONA := $(or $(subst ",,$(DEFAULT_VOICE_PERSONA)),Retail Banking Guide)
+CLEAN_BITRATE := $(or $(subst ",,$(AUDIO_BITRATE)),320k)
+
 .PHONY: docker-build
 docker-build: ## Build local Docker container image with Python 3.13
 	@echo "🐳 Building Docker image $(SERVICE_NAME):latest using Python 3.13..."
@@ -252,27 +249,3 @@ cloud-run-logs: ## Stream live logs from the deployed Cloud Run service
 .PHONY: cloud-run-url
 cloud-run-url: ## Print the live HTTPS URL of the deployed Cloud Run service
 	@gcloud run services describe $(SERVICE_NAME) --project $(CLEAN_PROJECT_ID) --region $(CLEAN_LOCATION) --format 'value(status.url)'
-
-.PHONY: cloud-run-proxy
-cloud-run-proxy: ## Run authenticated local proxy to live Cloud Run service on http://localhost:8080
-	@echo "🔗 Starting authenticated proxy to $(SERVICE_NAME) in $(CLEAN_LOCATION)..."
-	@echo "   Forwarding http://localhost:8080 -> https://$(SERVICE_NAME)..."
-	gcloud run services proxy $(SERVICE_NAME) --project $(CLEAN_PROJECT_ID) --region $(CLEAN_LOCATION) --port 8080
-
-.PHONY: cloud-run-browse
-cloud-run-browse: ## Open live Cloud Run service in default browser via authenticated proxy
-	@echo "🌐 Launching authenticated browser session for $(SERVICE_NAME)..."
-	@(sleep 2 && open http://localhost:8080 2>/dev/null || xdg-open http://localhost:8080 2>/dev/null || true) &
-	@$(MAKE) cloud-run-proxy
-
-.PHONY: share
-share: ## Create a temporary public HTTPS share link to local UI on port 8000 (Ctrl+C to stop)
-	@echo "🌐 Creating secure public tunnel to http://localhost:8000 (Ctrl+C to terminate)..."
-	@echo "   Share the generated https://*.lhr.life URL with stakeholders."
-	@ssh -R 80:localhost:8000 nokey@localhost.run
-
-.PHONY: share-cloud-run
-share-cloud-run: ## Create a temporary public HTTPS share link to Cloud Run proxy on port 8080
-	@echo "🌐 Creating secure public tunnel to Cloud Run proxy on port 8080 (Ctrl+C to terminate)..."
-	@ssh -R 80:localhost:8080 nokey@localhost.run
-
