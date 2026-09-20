@@ -156,3 +156,64 @@ def test_firestore_repository_mock_operations(monkeypatch):
     assert deleted is True
     mock_doc_ref.delete.assert_called_once()
 
+
+def test_sqlite_user_tour_status_lifecycle(temp_repo):
+    """Verify SQLite tracking of user onboarding tour completion & dismissal."""
+    email = "sarah.jenkins@apexbank.com"
+    # 1. New user has not seen tour
+    assert temp_repo.get_user_tour_status(email) is False
+
+    # 2. Mark tour as completed/dismissed
+    temp_repo.set_user_tour_dismissed(email, dismissed=True)
+    assert temp_repo.get_user_tour_status(email) is True
+
+    # 3. Mark tour as reset/unseen
+    temp_repo.set_user_tour_dismissed(email, dismissed=False)
+    assert temp_repo.get_user_tour_status(email) is False
+
+    # 4. Independent tracking across distinct users
+    other_user = "david.chen@apexbank.com"
+    assert temp_repo.get_user_tour_status(other_user) is False
+    temp_repo.set_user_tour_dismissed(other_user, dismissed=True)
+    assert temp_repo.get_user_tour_status(other_user) is True
+    assert temp_repo.get_user_tour_status(email) is False
+
+
+def test_firestore_user_tour_status_lifecycle(monkeypatch):
+    """Verify Firestore repository tracking of user preferences document."""
+    from unittest.mock import MagicMock
+    from src.db.repository import FirestoreJobRepository
+    import sys
+
+    mock_firestore = MagicMock()
+    mock_client = MagicMock()
+    mock_firestore.Client.return_value = mock_client
+    monkeypatch.setitem(sys.modules, "google.cloud.firestore", mock_firestore)
+
+    mock_collection = MagicMock()
+    mock_client.collection.return_value = mock_collection
+
+    mock_doc_ref = MagicMock()
+    mock_collection.document.return_value = mock_doc_ref
+
+    repo = FirestoreJobRepository(project_id="test-proj", collection_name="tts_jobs", database_name="tts-jobs")
+
+    # 1. Mock get when doc does not exist
+    mock_snap_empty = MagicMock()
+    mock_snap_empty.exists = False
+    mock_doc_ref.get.return_value = mock_snap_empty
+    assert repo.get_user_tour_status("auditor@apexbank.com") is False
+
+    # 2. Mock set dismissal
+    repo.set_user_tour_dismissed("auditor@apexbank.com", dismissed=True)
+    mock_collection.document.assert_called_with("auditor@apexbank.com")
+    mock_doc_ref.set.assert_called_once()
+
+    # 3. Mock get when doc exists with has_seen_tour = True
+    mock_snap_seen = MagicMock()
+    mock_snap_seen.exists = True
+    mock_snap_seen.to_dict.return_value = {"has_seen_tour": True}
+    mock_doc_ref.get.return_value = mock_snap_seen
+    assert repo.get_user_tour_status("auditor@apexbank.com") is True
+
+

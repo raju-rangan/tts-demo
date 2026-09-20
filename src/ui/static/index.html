@@ -10,6 +10,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Driver.js Onboarding Engine -->
+  <script src="/static/vendor/driver.js"></script>
   <!-- Google Identity Services (GIS) Official Web SDK -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- Firebase / Google Cloud Identity Platform (GCIP) SDK -->
@@ -37,6 +39,7 @@
       }
     }
   </script>
+  <link rel="stylesheet" href="/static/vendor/driver.css">
   <style>
     body { font-family: 'DM Sans', sans-serif; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
@@ -45,6 +48,88 @@
     ::-webkit-scrollbar-track { background: #09090b; }
     ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    /* Driver.js Dark Theme Popovers */
+    .driver-popover.driverjs-theme {
+      background-color: #18181b;
+      color: #f4f4f5;
+      border: 1px solid #3f3f46;
+      border-radius: 1rem;
+      padding: 16px 18px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+      max-width: 360px;
+    }
+    .driver-popover.driverjs-theme .driver-popover-title {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .driver-popover.driverjs-theme .driver-popover-description {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: #a1a1aa;
+      margin-bottom: 12px;
+    }
+    .driver-popover.driverjs-theme .driver-popover-progress-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #71717a;
+    }
+    .driver-popover.driverjs-theme .driver-popover-close-btn {
+      color: #71717a;
+      font-size: 18px;
+      top: 10px;
+      right: 12px;
+      transition: color 0.15s ease;
+    }
+    .driver-popover.driverjs-theme .driver-popover-close-btn:hover {
+      color: #f43f5e;
+    }
+    .driver-popover.driverjs-theme button {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 0.5rem;
+      padding: 6px 12px;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+    .driver-popover.driverjs-theme .driver-popover-prev-btn {
+      background-color: #27272a;
+      color: #d4d4d8;
+      border: 1px solid #3f3f46;
+    }
+    .driver-popover.driverjs-theme .driver-popover-prev-btn:hover {
+      background-color: #3f3f46;
+      color: #ffffff;
+    }
+    .driver-popover.driverjs-theme .driver-popover-next-btn {
+      background: linear-gradient(to right, #10b981, #14b8a6);
+      color: #09090b;
+      border: none;
+      font-weight: 700;
+      text-shadow: none;
+    }
+    .driver-popover.driverjs-theme .driver-popover-next-btn:hover {
+      background: linear-gradient(to right, #059669, #0d9488);
+      color: #000000;
+    }
+    .driver-popover.driverjs-theme .driver-popover-arrow-side-top {
+      border-bottom-color: #18181b;
+    }
+    .driver-popover.driverjs-theme .driver-popover-arrow-side-bottom {
+      border-top-color: #18181b;
+    }
+    .driver-popover.driverjs-theme .driver-popover-arrow-side-left {
+      border-right-color: #18181b;
+    }
+    .driver-popover.driverjs-theme .driver-popover-arrow-side-right {
+      border-left-color: #18181b;
+    }
   </style>
 </head>
 <body class="h-full flex flex-col antialiased selection:bg-emerald-500 selection:text-white">
@@ -214,11 +299,19 @@
 
       <div class="flex items-center space-x-3">
         <!-- Switch Persona / Home Hub Button -->
-        <button type="button" onclick="showProfileSelect()"
+        <button type="button" id="btnSwitchPersona" onclick="showProfileSelect()"
           class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white text-xs font-semibold rounded-xl transition flex items-center space-x-2 border border-zinc-700 shadow-sm group"
           title="Return to Persona Selection Screen (Home)">
           <i data-lucide="layout-grid" class="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform"></i>
           <span>Switch Persona</span>
+        </button>
+
+        <!-- Guided Onboarding Tour Button -->
+        <button id="btnGuidedTour" type="button" onclick="startGuidedTour(true)"
+          class="px-3 py-1.5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 border border-zinc-700 shadow-sm group"
+          title="Interactive Getting Started Walkthrough">
+          <i data-lucide="compass" class="w-4 h-4 text-cyan-400 group-hover:rotate-45 transition-transform"></i>
+          <span>Guided Tour</span>
         </button>
 
         <!-- Creator Actions (Only visible in Creator View) -->
@@ -1848,6 +1941,7 @@
       updatePersonaUI();
       loadStats();
       loadJobs();
+      checkAndPromptTour();
     }
 
     // Google Identity Services (GIS) Official Client Initialization
@@ -3775,6 +3869,205 @@
         closeFinOpsDrawer();
       }
     });
+
+    // ================= INTERACTIVE ONBOARDING TOUR ENGINE =================
+    let TOUR_DRIVER_INSTANCE = null;
+
+    async function checkAndPromptTour() {
+      if (!AUTH_TOKEN) return;
+      try {
+        const resp = await fetch('/api/user/tour-status', {
+          headers: getAuthHeaders()
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          // If user has not yet completed or dismissed the tour, auto-launch
+          if (data && data.has_seen_tour === false) {
+            setTimeout(() => {
+              startGuidedTour(false);
+            }, 800);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not check onboarding tour status:", err);
+      }
+    }
+
+    async function recordTourDismissal() {
+      if (!AUTH_TOKEN) return;
+      try {
+        await fetch('/api/user/tour-dismiss', {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
+        console.log("✓ Tour dismissal recorded in database");
+      } catch (err) {
+        console.warn("Failed to record tour dismissal:", err);
+      }
+    }
+
+    async function resetTourStatus() {
+      if (!AUTH_TOKEN) return;
+      try {
+        await fetch('/api/user/tour-reset', {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
+        console.log("✓ Tour status reset in database");
+        startGuidedTour(true);
+      } catch (err) {
+        console.warn("Failed to reset tour status:", err);
+      }
+    }
+
+    function startGuidedTour(force = false) {
+      if (!window.driver || !window.driver.js || !window.driver.js.driver) {
+        console.warn("Driver.js library not loaded yet.");
+        return;
+      }
+
+      // Check active persona to display tailored walkthrough
+      const isAuditor = CURRENT_PERSONA === 'auditor';
+
+      const creatorSteps = [
+        {
+          element: '#btnSwitchPersona',
+          popover: {
+            title: '1. Workspace Persona Hub',
+            description: 'Switch seamlessly between <strong>Sarah Jenkins</strong> (Creator Mode: voice generation & bulk ingestion) and <strong>David Chen</strong> (Auditor Mode: multimodal quality gates & FinOps governance).',
+            side: 'bottom',
+            align: 'start'
+          }
+        },
+        {
+          element: '#btnNavNewJob',
+          popover: {
+            title: '2. Voice Synthesis Engine',
+            description: 'Generate studio-grade spoken disclosures powered by <strong>Gemini 3.1 Flash TTS preview</strong>. Configure natural speaking rates, emotional inflections, and pronunciation overrides.',
+            side: 'bottom',
+            align: 'end'
+          }
+        },
+        {
+          element: '#btnNavBulk',
+          popover: {
+            title: '3. Bulk Article Extraction',
+            description: 'Synthesize multiple press releases or regulatory articles in batch. Gemini extracts clean text and schedules sequential audio production.',
+            side: 'bottom',
+            align: 'end'
+          }
+        },
+        {
+          element: '#creatorStudioSection',
+          popover: {
+            title: '4. Enterprise Audio Studio',
+            description: 'Monitor overall throughput: total audio generated, average multimodal quality score, and real-time FinOps cost tracking across all runs.',
+            side: 'bottom',
+            align: 'center'
+          }
+        },
+        {
+          element: '#jobDirectorySection',
+          popover: {
+            title: '5. Audio Registry & Playback',
+            description: 'Inspect generated jobs. Stream 24kHz audio, review transcripts, examine token breakdowns, and inspect <strong>Gemini 3.8 Flash Multimodal Quality Scorecards</strong>.',
+            side: 'top',
+            align: 'center'
+          }
+        },
+        {
+          element: '#btnGuidedTour',
+          popover: {
+            title: '6. Tour Always Accessible',
+            description: 'You are all set! Click this <strong>Guided Tour</strong> compass button anytime to replay this interactive walkthrough.',
+            side: 'bottom',
+            align: 'end'
+          }
+        }
+      ];
+
+      const auditorSteps = [
+        {
+          element: '#btnSwitchPersona',
+          popover: {
+            title: '1. Workspace Persona Hub',
+            description: 'Switch between <strong>David Chen</strong> (VP Regulatory Compliance) and <strong>Sarah Jenkins</strong> (Chief Communications Officer).',
+            side: 'bottom',
+            align: 'start'
+          }
+        },
+        {
+          element: '#auditorSubNav',
+          popover: {
+            title: '2. Executive Dashboard vs. Registry',
+            description: 'Toggle between the high-level <strong>Executive Governance Dashboard</strong> and the granular <strong>Disclosure Audio Registry</strong>.',
+            side: 'bottom',
+            align: 'start'
+          }
+        },
+        {
+          element: '#btnNavFinOps',
+          popover: {
+            title: '3. FinOps & Governance Drawer',
+            description: 'Inspect live unit economics, Gemini TTS vs. Judge cost breakdowns, BigQuery / Firestore sync status, and SLA compliance metrics.',
+            side: 'bottom',
+            align: 'end'
+          }
+        },
+        {
+          element: '#auditorFullDashboard',
+          popover: {
+            title: '4. Multimodal AI Quality Gates',
+            description: 'Audit compliance scores across 5 financial personas, evaluate rubric adherence (Truth in Lending, script adherence), and review flagged disclosures.',
+            side: 'top',
+            align: 'center'
+          }
+        },
+        {
+          element: '#btnGuidedTour',
+          popover: {
+            title: '5. Replay Tour Anytime',
+            description: 'Need a refresher? Click <strong>Guided Tour</strong> anytime to walk through these compliance and governance controls.',
+            side: 'bottom',
+            align: 'end'
+          }
+        }
+      ];
+
+      const steps = isAuditor ? auditorSteps : creatorSteps;
+
+      // Filter out any elements not currently in the DOM or hidden
+      const validSteps = steps.filter(s => {
+        const el = document.querySelector(s.element);
+        return el && !el.classList.contains('hidden') && el.offsetParent !== null;
+      });
+
+      const driverConstructor = window.driver.js.driver;
+      TOUR_DRIVER_INSTANCE = driverConstructor({
+        animate: true,
+        allowClose: true,
+        overlayOpacity: 0.75,
+        stagePadding: 6,
+        stageRadius: 8,
+        popoverClass: 'driverjs-theme',
+        nextBtnText: 'Next &rarr;',
+        prevBtnText: '&larr; Back',
+        doneBtnText: 'Got It!',
+        showProgress: true,
+        progressText: 'Step {{current}} of {{total}}',
+        steps: validSteps.length > 0 ? validSteps : steps,
+        onDestroyed: () => {
+          recordTourDismissal();
+        }
+      });
+
+      TOUR_DRIVER_INSTANCE.drive();
+    }
+
+    // Expose for testing & console interaction
+    window.startGuidedTour = startGuidedTour;
+    window.resetTourStatus = resetTourStatus;
+    window.checkAndPromptTour = checkAndPromptTour;
   </script>
 </body>
 </html>

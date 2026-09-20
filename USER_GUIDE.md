@@ -47,8 +47,21 @@ The platform is designed around two core banking stakeholders:
 
 #### Instant Workspace Switching
 You can switch between **Sarah Jenkins** (Creator) and **David Chen** (Auditor) at any time without logging out or losing work:
-- Click the **"Switch Workspace"** button in the top navigation bar.
+- Click the **"Switch Persona"** button in the top navigation bar.
 - The platform immediately transitions the view, loading the appropriate workspace console while maintaining your active session.
+
+---
+
+### Interactive Guided Onboarding Tour
+New users are greeted with a step-by-step interactive onboarding tour that highlights the platform's core workflows:
+1. **Workspace Persona Hub**: Seamless switching between Sarah Jenkins (Creator) and David Chen (Auditor).
+2. **Voice Synthesis Engine**: Crafting studio disclosures with Gemini 3.1 Flash TTS preview.
+3. **Bulk Article Extraction**: Batch URL scraping and sequential audio generation.
+4. **Enterprise Audio Studio**: Throughput metrics, quality tracking, and FinOps telemetry.
+5. **Audio Registry & Playback**: Auditing 24kHz streams and Gemini 3.8 Flash Multimodal Quality Scorecards.
+6. **Replay on Demand**: Persistent database tracking ensures the tour auto-prompts only once upon first login, while remaining relaunchable on demand via the **Guided Tour** button in the navigation bar.
+
+![Guided Onboarding Tour](docs/images/09_guided_tour_onboarding.png)
 
 ---
 

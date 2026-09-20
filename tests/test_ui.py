@@ -598,6 +598,75 @@ def test_job_creation_and_modal_progress_resilience(client):
     assert "High-Yield" in html
 
 
+def test_user_tour_endpoints_lifecycle(client):
+    """Verify tour status check, dismissal, and reset lifecycle via API."""
+    # 1. Unauthenticated requests must fail with 401
+    assert client.get("/api/user/tour-status").status_code == 401
+    assert client.post("/api/user/tour-dismiss").status_code == 401
+    assert client.post("/api/user/tour-reset").status_code == 401
+
+    # 2. Login as Sarah Jenkins
+    login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
+    assert login_resp.status_code == 200
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 3. Reset tour status to ensure fresh state
+    reset_resp = client.post("/api/user/tour-reset", headers=headers)
+    assert reset_resp.status_code == 200
+    assert reset_resp.json()["has_seen_tour"] is False
+
+    # 4. Check tour status returns false
+    status_resp1 = client.get("/api/user/tour-status", headers=headers)
+    assert status_resp1.status_code == 200
+    assert status_resp1.json()["has_seen_tour"] is False
+    assert status_resp1.json()["user_email"] == "admin@apexbank.com"
+
+    # 5. Dismiss tour
+    dismiss_resp = client.post("/api/user/tour-dismiss", headers=headers)
+    assert dismiss_resp.status_code == 200
+    assert dismiss_resp.json()["has_seen_tour"] is True
+
+    # 6. Check tour status now returns true
+    status_resp2 = client.get("/api/user/tour-status", headers=headers)
+    assert status_resp2.status_code == 200
+    assert status_resp2.json()["has_seen_tour"] is True
+
+    # 7. Reset again
+    reset_resp2 = client.post("/api/user/tour-reset", headers=headers)
+    assert reset_resp2.status_code == 200
+    assert reset_resp2.json()["has_seen_tour"] is False
+
+    status_resp3 = client.get("/api/user/tour-status", headers=headers)
+    assert status_resp3.status_code == 200
+    assert status_resp3.json()["has_seen_tour"] is False
+
+
+def test_html_guided_tour_assets_and_elements(client):
+    """Verify the single-page HTML contains Driver.js assets, button, and engine functions."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # Vendor assets
+    assert 'href="/static/vendor/driver.css"' in html
+    assert 'src="/static/vendor/driver.js"' in html
+
+    # DOM elements
+    assert 'id="btnGuidedTour"' in html
+    assert 'id="btnSwitchPersona"' in html
+    assert 'driverjs-theme' in html
+
+    # Engine JavaScript functions
+    assert "startGuidedTour" in html
+    assert "checkAndPromptTour" in html
+    assert "recordTourDismissal" in html
+    assert "resetTourStatus" in html
+    assert "/api/user/tour-status" in html
+    assert "/api/user/tour-dismiss" in html
+
+
+
 
 
 
