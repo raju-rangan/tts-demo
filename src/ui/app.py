@@ -159,7 +159,7 @@ def get_current_user(
     persona_key = x_apex_persona.lower().strip() if isinstance(x_apex_persona, str) else "creator"
     persona_data = PERSONA_PROFILES.get(persona_key, PERSONA_PROFILES["creator"])
 
-    token = authorization.replace("Bearer ", "").strip() if authorization else ""
+    token = authorization.replace("Bearer ", "").strip() if isinstance(authorization, str) else ""
 
     # 1. Check in-memory session (Google direct session or demo session)
     if token and token in ACTIVE_SESSIONS:
