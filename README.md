@@ -521,7 +521,7 @@ class FirestoreJobRepository(BaseJobRepository):
 ---
 
 ### Step 10: Executive Auditor Dashboard & Interactive Chart.js Telemetry
-**File**: [`src/ui/static/index.html`](file:///Users/rrangan/Documents/customers/tts-demo/src/ui/static/index.html)
+**File**: [`src/ui/templates/index.html`](file:///Users/rrangan/Documents/customers/tts-demo/src/ui/templates/index.html)
 
 For compliance officers and Senior Regulatory Compliance Analyst (**David Chen**), the platform provides a dedicated full-page **Executive Governance Dashboard** powered by Chart.js:
 
@@ -607,12 +607,14 @@ tts-demo/
 │   │   └── gcs_client.py         # GCS Client with audience prefix routing & signed URLs
 │   ├── ui/
 │   │   ├── app.py                # FastAPI REST API, auth engine, & background task runner
-│   │   └── static/
-│   │       └── index.html        # Single Page Application Studio UI (Tailwind + Lucide + Chart.js)
+│   │   ├── static/               # Static web assets
+│   │   └── templates/            # Modular Jinja2 SPA templates & JavaScript modules
+│   │       ├── index.html        # Root application layout shell
+│   │       └── partials/         # Auth, views, drawers, modals, and JS modules
 │   └── utils/
 │       ├── extractor.py          # Main article content extractor & HTML parser
 │       └── logger.py             # Cloud Logging & local rotating file handler
-└── tests/                        # 75 comprehensive automated unit and integration tests
+└── tests/                        # 90 comprehensive automated unit and integration tests
 ```
 
 ---
