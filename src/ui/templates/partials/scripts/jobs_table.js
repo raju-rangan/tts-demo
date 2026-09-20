@@ -203,7 +203,7 @@
               <div class="text-[11px] text-zinc-500">${timeStr}</div>
             </td>
             <td class="px-5 py-4">
-              <div class="font-medium text-zinc-200 max-w-xs truncate flex items-center space-x-1.5">
+              <div class="font-medium text-zinc-200 max-w-md lg:max-w-xl truncate flex items-center space-x-1.5">
                 ${j.source_url ? `<i data-lucide="globe" class="w-3.5 h-3.5 text-teal-400 shrink-0" title="Source: ${j.source_url}"></i>` : ''}
                 <span class="truncate">${j.article_title || 'Financial Article'}</span>
               </div>

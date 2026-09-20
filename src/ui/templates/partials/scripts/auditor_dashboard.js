@@ -254,7 +254,7 @@
                   <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold font-mono">
                     ${j.overall_score.toFixed(2)} / 5.0
                   </span>
-                  <span class="text-xs font-semibold text-white truncate max-w-[320px]">${j.title}</span>
+                  <span class="text-xs font-semibold text-white truncate max-w-md lg:max-w-xl">${j.title}</span>
                   <span class="text-[10px] text-zinc-400 font-medium">${j.persona}</span>
                 </div>
                 <p class="text-[11px] text-zinc-400 line-clamp-1">${j.overall_reasoning}</p>
