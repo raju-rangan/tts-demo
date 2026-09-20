@@ -566,5 +566,31 @@ def test_localhost_auth_bypass_ui_elements(client):
     assert "'local-dev-token'" in html
 
 
+def test_job_creation_and_modal_progress_resilience(client):
+    """Verify frontend HTML has resilient openJobDetail fallback, immediate unshift, and sample text tuning."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # 1. Resilient openJobDetail with direct fetch fallback
+    assert "async function openJobDetail(jobId, fallbackJob = null)" in html
+    assert "fetch(`/api/jobs/${jobId}`" in html
+    assert "ALL_JOBS.unshift(job)" in html
+
+    # 2. Immediate state updates in submitNewJob and submitBulkJobs
+    assert "ALL_JOBS.unshift(data.job)" in html
+    assert "openJobDetail(data.job_id, data.job)" in html
+    assert "openJobDetail(data.jobs[0].job_id, data.jobs[0])" in html
+
+    # 3. Clean error formatting
+    assert "Array.isArray(data.detail)" in html
+    assert "statusBox.className = 'p-3 rounded-xl bg-rose-950/40" in html
+
+    # 4. Sample text director note tuning
+    assert "inputVoiceCustomization" in html
+    assert "High-Yield" in html
+
+
+
 
 

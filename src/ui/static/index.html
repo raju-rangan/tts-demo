@@ -2305,8 +2305,25 @@
     }
 
     // Job Detail Modal Handlers
-    function openJobDetail(jobId) {
-      const job = ALL_JOBS.find(j => j.job_id === jobId);
+    async function openJobDetail(jobId, fallbackJob = null) {
+      let job = ALL_JOBS.find(j => j.job_id === jobId) || fallbackJob;
+      if (!job) {
+        try {
+          const resp = await fetch(`/api/jobs/${jobId}`, { headers: getAuthHeaders() });
+          if (resp.ok) {
+            job = await resp.json();
+            const existingIdx = ALL_JOBS.findIndex(j => j.job_id === jobId);
+            if (existingIdx !== -1) {
+              ALL_JOBS[existingIdx] = job;
+            } else {
+              ALL_JOBS.unshift(job);
+            }
+            filterJobs(false);
+          }
+        } catch (e) {
+          console.error("Could not fetch job detail for " + jobId, e);
+        }
+      }
       if (!job) return;
       CURRENT_JOB = job;
 
@@ -2682,13 +2699,23 @@
 
     // New Job Modal
     function openNewJobModal() {
+      const statusBox = document.getElementById('newJobStatus');
+      if (statusBox) {
+        statusBox.className = 'hidden p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex items-center space-x-2';
+        statusBox.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-emerald-400"></i><span id="newJobStatusText" class="text-zinc-300">Enqueuing speech generation in background...</span>';
+      }
       document.getElementById('newJobModal').classList.remove('hidden');
       updateInputStats();
+      lucide.createIcons();
     }
 
     function closeNewJobModal() {
       document.getElementById('newJobModal').classList.add('hidden');
-      document.getElementById('newJobStatus').classList.add('hidden');
+      const statusBox = document.getElementById('newJobStatus');
+      if (statusBox) {
+        statusBox.className = 'hidden p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex items-center space-x-2';
+        statusBox.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-emerald-400"></i><span id="newJobStatusText" class="text-zinc-300">Enqueuing speech generation in background...</span>';
+      }
       const voiceInput = document.getElementById('inputVoiceCustomization');
       if (voiceInput) voiceInput.value = '';
     }
@@ -2712,6 +2739,10 @@
 
     function loadSampleText() {
       document.getElementById('inputText').value = `High-Yield Savings Accounts vs. Certificates of Deposit (CDs): A Financial Guide for Retail Banking Customers.\n\nWhen planning your short-to-medium-term savings strategy, two of the most secure instruments available are High-Yield Savings Accounts (HYSA) and Certificates of Deposit (CDs). Both products are FDIC-insured up to $250,000 per depositor, per institution, offering principal protection alongside competitive yields.\n\n1. High-Yield Savings Accounts: Flexibility & Liquidity. A high-yield savings account is an interest-bearing deposit account that typically offers an Annual Percentage Yield (APY) significantly higher than traditional brick-and-mortar savings accounts. The defining advantage is liquidity: funds can be deposited or withdrawn at any time via electronic funds transfers (EFT) or Automated Clearing House (ACH) withdrawals, subject to standard federal and bank transaction limits. These accounts are ideal for emergency funds or near-term expenses.\n\n2. Certificates of Deposit: Guaranteed Rate Certainty. A CD is a time-deposit account where you commit a lump sum for a fixed term—ranging from 3 months to 5 years—in exchange for a guaranteed APY that remains locked regardless of Federal Reserve interest rate fluctuations. However, withdrawing funds prior to the maturity date triggers an early withdrawal penalty, typically calculated as several months of interest.\n\n3. Regulatory & Compliance Safeguards. Both HYSAs and CDs require standard Customer Identification Programs (CIP) and Know Your Customer (KYC) verification in accordance with the Bank Secrecy Act (BSA) and anti-money laundering (AML) regulations.`;
+      const voiceCust = document.getElementById('inputVoiceCustomization');
+      if (voiceCust) {
+        voiceCust.value = "Speak with an articulate, reassuring retail banking demeanor. Enunciate 'High-Yield' and acronyms FDIC, APY, CD with precision.";
+      }
       updateInputStats();
     }
 
@@ -2723,11 +2754,11 @@
       const run_judge = document.getElementById('inputRunJudge').checked;
       
       const statusBox = document.getElementById('newJobStatus');
-      const statusText = document.getElementById('newJobStatusText');
       const submitBtn = document.getElementById('submitJobBtn');
 
-      statusBox.classList.remove('hidden');
-      statusText.textContent = 'Enqueuing speech generation in background...';
+      statusBox.className = 'p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex items-center space-x-2 text-zinc-300';
+      statusBox.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-emerald-400 shrink-0"></i><span>Enqueuing speech generation in background...</span>';
+      lucide.createIcons();
       submitBtn.disabled = true;
 
       try {
@@ -2737,26 +2768,50 @@
           body: JSON.stringify({ text, persona, run_judge, voice_customization })
         });
         const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || 'Job creation failed');
+        if (!resp.ok) {
+          let errMsg = 'Job creation failed';
+          if (Array.isArray(data.detail)) {
+            errMsg = data.detail.map(d => `${d.loc ? d.loc.slice(1).join('.') + ': ' : ''}${d.msg}`).join(', ');
+          } else if (typeof data.detail === 'string') {
+            errMsg = data.detail;
+          } else if (data.message) {
+            errMsg = data.message;
+          }
+          throw new Error(errMsg);
+        }
 
-        statusText.textContent = `Job ${data.job_id} launched! Tracking progress...`;
-        
-        setTimeout(async () => {
-          closeNewJobModal();
-          submitBtn.disabled = false;
-          loadStats();
-          await loadJobs();
-          openJobDetail(data.job_id);
-        }, 800);
+        // Immediately update in-memory job directory and trigger polling
+        if (data.job) {
+          const existingIdx = ALL_JOBS.findIndex(j => j.job_id === data.job.job_id);
+          if (existingIdx !== -1) {
+            ALL_JOBS[existingIdx] = data.job;
+          } else {
+            ALL_JOBS.unshift(data.job);
+          }
+          filterJobs(false);
+          checkAndStartPolling();
+        }
+
+        closeNewJobModal();
+        submitBtn.disabled = false;
+        loadStats();
+        await openJobDetail(data.job_id, data.job);
 
       } catch (err) {
-        statusText.textContent = `Error: ${err.message}`;
+        statusBox.className = 'p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs flex items-center space-x-2 text-rose-300';
+        statusBox.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i><span>Error: ${err.message}</span>`;
+        lucide.createIcons();
         submitBtn.disabled = false;
       }
     }
 
     // Bulk Process Modal Handlers
     function openBulkJobModal() {
+      const statusBox = document.getElementById('bulkJobStatus');
+      if (statusBox) {
+        statusBox.className = 'hidden p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex items-center space-x-2';
+        statusBox.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-teal-400"></i><span id="bulkJobStatusText" class="text-zinc-300">Validating & enqueuing URLs...</span>';
+      }
       document.getElementById('bulkJobModal').classList.remove('hidden');
       updateBulkUrlStats();
       lucide.createIcons();
@@ -2764,7 +2819,11 @@
 
     function closeBulkJobModal() {
       document.getElementById('bulkJobModal').classList.add('hidden');
-      document.getElementById('bulkJobStatus').classList.add('hidden');
+      const statusBox = document.getElementById('bulkJobStatus');
+      if (statusBox) {
+        statusBox.className = 'hidden p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex items-center space-x-2';
+        statusBox.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-teal-400"></i><span id="bulkJobStatusText" class="text-zinc-300">Validating & enqueuing URLs...</span>';
+      }
       const textEl = document.getElementById('inputBulkUrls');
       if (textEl) textEl.value = '';
       const voiceInput = document.getElementById('inputBulkVoiceCustomization');
@@ -2828,7 +2887,6 @@
       const run_judge = document.getElementById('inputBulkRunJudge').checked;
 
       const statusBox = document.getElementById('bulkJobStatus');
-      const statusText = document.getElementById('bulkJobStatusText');
       const submitBtn = document.getElementById('submitBulkJobBtn');
 
       if (lines.length === 0) {
@@ -2836,8 +2894,9 @@
         return;
       }
 
-      statusBox.classList.remove('hidden');
-      statusText.textContent = `Validating & enqueuing ${lines.length} URLs for sequential processing...`;
+      statusBox.className = 'p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex items-center space-x-2 text-zinc-300';
+      statusBox.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-teal-400 shrink-0"></i><span>Validating & enqueuing ${lines.length} URLs for sequential processing...</span>`;
+      lucide.createIcons();
       submitBtn.disabled = true;
 
       try {
@@ -2847,22 +2906,44 @@
           body: JSON.stringify({ urls: lines, persona, voice_customization, run_judge })
         });
         const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || 'Bulk processing failed to enqueue');
-
-        statusText.textContent = `Enqueued ${data.total_enqueued} jobs! Processing sequentially in background...`;
-
-        setTimeout(async () => {
-          closeBulkJobModal();
-          submitBtn.disabled = false;
-          loadStats();
-          await loadJobs();
-          if (data.jobs && data.jobs.length > 0) {
-            openJobDetail(data.jobs[0].job_id);
+        if (!resp.ok) {
+          let errMsg = 'Bulk processing failed to enqueue';
+          if (Array.isArray(data.detail)) {
+            errMsg = data.detail.map(d => `${d.loc ? d.loc.slice(1).join('.') + ': ' : ''}${d.msg}`).join(', ');
+          } else if (typeof data.detail === 'string') {
+            errMsg = data.detail;
+          } else if (data.message) {
+            errMsg = data.message;
           }
-        }, 1000);
+          throw new Error(errMsg);
+        }
+
+        // Immediately update in-memory job directory and trigger polling
+        if (data.jobs && data.jobs.length > 0) {
+          for (let i = data.jobs.length - 1; i >= 0; i--) {
+            const jb = data.jobs[i];
+            const existingIdx = ALL_JOBS.findIndex(j => j.job_id === jb.job_id);
+            if (existingIdx !== -1) {
+              ALL_JOBS[existingIdx] = jb;
+            } else {
+              ALL_JOBS.unshift(jb);
+            }
+          }
+          filterJobs(false);
+          checkAndStartPolling();
+        }
+
+        closeBulkJobModal();
+        submitBtn.disabled = false;
+        loadStats();
+        if (data.jobs && data.jobs.length > 0) {
+          await openJobDetail(data.jobs[0].job_id, data.jobs[0]);
+        }
 
       } catch (err) {
-        statusText.textContent = `Error: ${err.message}`;
+        statusBox.className = 'p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs flex items-center space-x-2 text-rose-300';
+        statusBox.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i><span>Error: ${err.message}</span>`;
+        lucide.createIcons();
         submitBtn.disabled = false;
       }
     }
