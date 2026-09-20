@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks, st
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from urllib.parse import urlparse
@@ -51,6 +52,9 @@ app.add_middleware(
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+templates_dir = os.path.join(os.path.dirname(__file__), "templates")
+templates = Jinja2Templates(directory=templates_dir) if os.path.exists(templates_dir) else None
 
 # Google Identity Services (GIS) & Authentication Configuration
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "716595821548-mmgp3ivk20bboapvlsru7kh08dp0n7c7.apps.googleusercontent.com").strip()
@@ -1495,8 +1499,10 @@ def create_bulk_jobs(
 # ---------------- FRONTEND HTML SINGLE PAGE APPLICATION ----------------
 
 @app.get("/", response_class=HTMLResponse)
-def index():
-    """Serves the Single Page Application UI."""
+def index(request: Request):
+    """Serves the Single Page Application UI compiled from modular Jinja2 components."""
+    if templates and os.path.exists(os.path.join(templates_dir, "index.html")):
+        return templates.TemplateResponse(request=request, name="index.html")
     html_file = os.path.join(os.path.dirname(__file__), "static", "index.html")
     if os.path.exists(html_file):
         with open(html_file, "r", encoding="utf-8") as f:
