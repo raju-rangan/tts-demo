@@ -1516,9 +1516,12 @@
     let AUDITOR_SUB_VIEW = 'dashboard';
     let chartInstances = {};
 
+    const IS_LOCALHOST = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname) || window.location.hostname.endsWith('.local');
+
     function getAuthHeaders(extra = {}) {
+      const token = AUTH_TOKEN || (IS_LOCALHOST ? 'local-dev-token' : '');
       const h = {
-        'Authorization': `Bearer ${AUTH_TOKEN}`,
+        'Authorization': `Bearer ${token}`,
         'X-Apex-Persona': CURRENT_PERSONA
       };
       return Object.assign(h, extra);
@@ -1642,6 +1645,45 @@
       updatePersonaUI();
       await initAuthSystem();
 
+      // Automatic Localhost Bypass
+      if (IS_LOCALHOST) {
+        const badge = document.getElementById('navLocalDevBadge');
+        if (badge) {
+          badge.classList.remove('hidden');
+          badge.classList.add('inline-flex');
+        }
+        const bypassCard = document.getElementById('localBypassCard');
+        if (bypassCard) {
+          bypassCard.classList.remove('hidden');
+        }
+
+        if (!AUTH_TOKEN || AUTH_TOKEN === 'null' || AUTH_TOKEN === 'undefined') {
+          AUTH_TOKEN = 'local-dev-token';
+          localStorage.setItem('apex_tts_token', AUTH_TOKEN);
+        }
+
+        const storedPersona = localStorage.getItem('apex_tts_persona');
+        const activePersona = storedPersona || CURRENT_PERSONA || 'creator';
+        const defaultUser = {
+          email: 'local-dev@apexbank.com',
+          google_email: 'local-dev@apexbank.com',
+          name: activePersona === 'auditor' ? 'David Chen' : 'Sarah Jenkins',
+          role: activePersona === 'auditor' ? 'VP Regulatory Compliance' : 'Chief Communications Officer',
+          department: activePersona === 'auditor' ? 'Bank Secrecy & AML Oversight' : 'Digital Wealth & Customer Experience',
+          persona_type: activePersona,
+          avatar: activePersona === 'auditor' ? '/static/avatars/auditor_david.jpg' : '/static/avatars/creator_sarah.jpg'
+        };
+        setUserHeader(defaultUser);
+
+        if (storedPersona) {
+          CURRENT_PERSONA = storedPersona;
+          showApp();
+        } else {
+          showProfileSelect('local-dev@apexbank.com');
+        }
+        return;
+      }
+
       const params = new URLSearchParams(window.location.search);
       const view = params.get('view');
       if (view && AUTH_CONFIG?.enable_demo_auth) {
@@ -1692,9 +1734,35 @@
 
     // Screen Navigation Handlers
     function showLogin() {
+      if (IS_LOCALHOST) {
+        const bypassCard = document.getElementById('localBypassCard');
+        if (bypassCard) bypassCard.classList.remove('hidden');
+      }
       document.getElementById('loginSection').classList.remove('hidden');
       document.getElementById('profileSelectSection')?.classList.add('hidden');
       document.getElementById('appSection').classList.add('hidden');
+    }
+
+    function bypassAuthLocal() {
+      AUTH_TOKEN = 'local-dev-token';
+      localStorage.setItem('apex_tts_token', AUTH_TOKEN);
+      const storedPersona = localStorage.getItem('apex_tts_persona');
+      const activePersona = storedPersona || CURRENT_PERSONA || 'creator';
+      const defaultUser = {
+        email: 'local-dev@apexbank.com',
+        google_email: 'local-dev@apexbank.com',
+        name: activePersona === 'auditor' ? 'David Chen' : 'Sarah Jenkins',
+        role: activePersona === 'auditor' ? 'VP Regulatory Compliance' : 'Chief Communications Officer',
+        department: activePersona === 'auditor' ? 'Bank Secrecy & AML Oversight' : 'Digital Wealth & Customer Experience',
+        persona_type: activePersona,
+        avatar: activePersona === 'auditor' ? '/static/avatars/auditor_david.jpg' : '/static/avatars/creator_sarah.jpg'
+      };
+      setUserHeader(defaultUser);
+      if (storedPersona) {
+        showApp();
+      } else {
+        showProfileSelect('local-dev@apexbank.com');
+      }
     }
 
     function showProfileSelect(email) {
@@ -1739,6 +1807,9 @@
 
     // Google Identity Services (GIS) Official Client Initialization
     function setupGoogleIdentityServices() {
+      if (IS_LOCALHOST) {
+        return; // Skip GIS client on localhost to avoid OAuth origin mismatch
+      }
       const clientId = AUTH_CONFIG?.google_client_id;
       if (!clientId) {
         console.warn("Google Client ID not configured in auth config.");
@@ -1813,6 +1884,27 @@
 
     async function verifySession() {
       const errBox = document.getElementById('loginError');
+      if (IS_LOCALHOST) {
+        try {
+          const resp = await fetch('/api/auth/me', {
+            headers: getAuthHeaders()
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            setUserHeader(data.user);
+          }
+        } catch (e) {
+          console.warn("Localhost session check error:", e);
+        }
+        const storedPersona = localStorage.getItem('apex_tts_persona');
+        if (storedPersona) {
+          showApp();
+        } else {
+          showProfileSelect('local-dev@apexbank.com');
+        }
+        return;
+      }
+
       try {
         const resp = await fetch('/api/auth/me', {
           headers: getAuthHeaders()
@@ -1874,7 +1966,11 @@
       AUTH_TOKEN = null;
       localStorage.removeItem('apex_tts_token');
       localStorage.removeItem('apex_tts_persona');
-      showLogin();
+      if (IS_LOCALHOST) {
+        showProfileSelect('local-dev@apexbank.com');
+      } else {
+        showLogin();
+      }
     }
 
     // Analytics Stats
