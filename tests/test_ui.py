@@ -506,3 +506,51 @@ def test_finops_and_compliance_drawer_elements(client):
     assert "function renderFinOpsDrawer(" in html
 
 
+def test_auditor_full_page_dashboard_and_charts(client):
+    """Verify full-page Auditor Governance Dashboard, Chart.js canvases, sub-nav, and analytics widgets."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # 1. Chart.js CDN script inclusion
+    assert "cdn.jsdelivr.net/npm/chart.js" in html
+
+    # 2. Auditor Sub-Navigation
+    assert 'id="auditorSubNav"' in html
+    assert 'id="btnAuditorSubDashboard"' in html
+    assert 'id="btnAuditorSubRegistry"' in html
+    assert "switchAuditorSubView('dashboard')" in html
+    assert "switchAuditorSubView('registry')" in html
+
+    # 3. Full-Page Auditor Dashboard Container
+    assert 'id="auditorFullDashboard"' in html
+    assert 'id="jobDirectorySection"' in html
+
+    # 4. Canvas elements for Chart.js
+    assert 'id="chartRubricRadar"' in html
+    assert 'id="chartFinopsSplit"' in html
+    assert 'id="chartPersonaBars"' in html
+    assert 'id="chartTokenStack"' in html
+
+    # 5. Full Dashboard KPI elements
+    assert 'id="fullFoTotalCost"' in html
+    assert 'id="fullFoPassRate"' in html
+    assert 'id="fullFoTotalTokens"' in html
+    assert 'id="fullFoTotalMinutes"' in html
+
+    # 6. Persona matrix, unit economics, and action center
+    assert 'id="fullFoPersonaTableBody"' in html
+    assert 'id="fullFoCostPerMin"' in html
+    assert 'id="fullFoCostPerJob"' in html
+    assert 'id="fullFoJudgeCostRatio"' in html
+    assert 'id="fullFoFlaggedContainer"' in html
+    assert 'id="fullFoFlaggedHeaderCount"' in html
+
+    # 7. JavaScript controller & chart rendering logic
+    assert "function switchAuditorSubView(" in html
+    assert "function refreshAuditorDashboard(" in html
+    assert "function renderAuditorDashboard(" in html
+    assert "function renderAuditorCharts(" in html
+
+
+
