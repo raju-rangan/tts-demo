@@ -553,4 +553,18 @@ def test_auditor_full_page_dashboard_and_charts(client):
     assert "function renderAuditorCharts(" in html
 
 
+def test_localhost_auth_bypass_ui_elements(client):
+    """Verify localhost auth bypass elements, badges, and fallback scripts exist in frontend HTML."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert 'id="localBypassCard"' in html
+    assert 'id="navLocalDevBadge"' in html
+    assert "IS_LOCALHOST" in html
+    assert "function bypassAuthLocal()" in html
+    assert "'local-dev-token'" in html
+
+
+
 
