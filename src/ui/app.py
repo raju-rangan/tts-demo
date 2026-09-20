@@ -406,6 +406,7 @@ def login(req: LoginRequest):
     token = secrets.token_hex(24)
     user_info = {
         "email": req.email.lower().strip(),
+        "google_email": req.email.lower().strip(),
         "name": user["name"],
         "role": user["role"],
         "department": user["department"],
@@ -425,43 +426,66 @@ def get_me(user: Dict[str, Any] = Depends(get_current_user)):
     return {"user": user}
 
 
+def _extract_google_identity(user: Dict[str, Any]) -> str:
+    """Extracts the authenticated Google identity email, distinct from any persona identity."""
+    email = (
+        user.get("google_email")
+        or user.get("email")
+        or user.get("uid")
+        or ""
+    ).lower().strip()
+    return email
+
+
 @app.get("/api/user/tour-status")
 def get_user_tour_status_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
-    """Returns whether the authenticated user has already completed or dismissed the onboarding tour."""
+    """Returns whether the authenticated Google user identity has already completed or dismissed the onboarding tour.
+    Tracking is strictly keyed by Google identity, NOT by workspace persona.
+    """
     repo = get_job_repository()
-    email = user.get("email", "")
-    has_seen = repo.get_user_tour_status(email)
+    google_identity = _extract_google_identity(user)
+    has_seen = repo.get_user_tour_status(google_identity)
     return {
-        "user_email": email,
-        "has_seen_tour": has_seen
+        "google_email": google_identity,
+        "user_email": google_identity,
+        "has_seen_tour": has_seen,
+        "tracked_by": "google_identity"
     }
 
 
 @app.post("/api/user/tour-dismiss")
 def dismiss_user_tour_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
-    """Records that the user has seen, completed, or dismissed the onboarding tour."""
+    """Records that the Google user identity has seen, completed, or dismissed the onboarding tour.
+    Tracking is strictly keyed by Google identity, NOT by workspace persona.
+    """
     repo = get_job_repository()
-    email = user.get("email", "")
-    repo.set_user_tour_dismissed(email, dismissed=True)
-    logger.info(f"✓ Onboarding tour marked as dismissed for user '{email}'")
+    google_identity = _extract_google_identity(user)
+    repo.set_user_tour_dismissed(google_identity, dismissed=True)
+    logger.info(f"✓ Onboarding tour marked as dismissed for Google identity '{google_identity}'")
     return {
-        "user_email": email,
+        "google_email": google_identity,
+        "user_email": google_identity,
         "has_seen_tour": True,
-        "status": "dismissed"
+        "status": "dismissed",
+        "tracked_by": "google_identity"
     }
 
 
 @app.post("/api/user/tour-reset")
 def reset_user_tour_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
-    """Resets the onboarding tour status so the user can experience the auto-prompt tour again."""
+    """Resets the onboarding tour status for the Google user identity.
+    Tracking is strictly keyed by Google identity, NOT by workspace persona.
+    """
     repo = get_job_repository()
-    email = user.get("email", "")
-    repo.set_user_tour_dismissed(email, dismissed=False)
-    logger.info(f"✓ Onboarding tour reset for user '{email}'")
+    google_identity = _extract_google_identity(user)
+    repo.set_user_tour_dismissed(google_identity, dismissed=False)
+    logger.info(f"✓ Onboarding tour reset for Google identity '{google_identity}'")
     return {
-        "user_email": email,
+        "google_email": google_identity,
+        "user_email": google_identity,
         "has_seen_tour": False,
-        "status": "reset"
+        "status": "reset",
+        "tracked_by": "google_identity"
     }
 
 

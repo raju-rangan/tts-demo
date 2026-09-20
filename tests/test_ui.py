@@ -599,13 +599,13 @@ def test_job_creation_and_modal_progress_resilience(client):
 
 
 def test_user_tour_endpoints_lifecycle(client):
-    """Verify tour status check, dismissal, and reset lifecycle via API."""
+    """Verify tour status check, dismissal, and reset lifecycle via API keyed by Google identity."""
     # 1. Unauthenticated requests must fail with 401
     assert client.get("/api/user/tour-status").status_code == 401
     assert client.post("/api/user/tour-dismiss").status_code == 401
     assert client.post("/api/user/tour-reset").status_code == 401
 
-    # 2. Login as Sarah Jenkins
+    # 2. Authenticate session
     login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
     assert login_resp.status_code == 200
     token = login_resp.json()["token"]
@@ -615,17 +615,21 @@ def test_user_tour_endpoints_lifecycle(client):
     reset_resp = client.post("/api/user/tour-reset", headers=headers)
     assert reset_resp.status_code == 200
     assert reset_resp.json()["has_seen_tour"] is False
+    assert reset_resp.json()["tracked_by"] == "google_identity"
 
     # 4. Check tour status returns false
     status_resp1 = client.get("/api/user/tour-status", headers=headers)
     assert status_resp1.status_code == 200
     assert status_resp1.json()["has_seen_tour"] is False
-    assert status_resp1.json()["user_email"] == "admin@apexbank.com"
+    assert status_resp1.json()["google_email"] == "admin@apexbank.com"
+    assert status_resp1.json()["tracked_by"] == "google_identity"
 
     # 5. Dismiss tour
     dismiss_resp = client.post("/api/user/tour-dismiss", headers=headers)
     assert dismiss_resp.status_code == 200
     assert dismiss_resp.json()["has_seen_tour"] is True
+    assert dismiss_resp.json()["google_email"] == "admin@apexbank.com"
+    assert dismiss_resp.json()["tracked_by"] == "google_identity"
 
     # 6. Check tour status now returns true
     status_resp2 = client.get("/api/user/tour-status", headers=headers)
@@ -640,6 +644,53 @@ def test_user_tour_endpoints_lifecycle(client):
     status_resp3 = client.get("/api/user/tour-status", headers=headers)
     assert status_resp3.status_code == 200
     assert status_resp3.json()["has_seen_tour"] is False
+
+
+def test_tour_tracking_bound_to_google_identity_across_personas(client):
+    """Verify tour dismissal is bound strictly to Google account identity and persists across persona switching."""
+    # 1. Establish Google authenticated session
+    google_email = "alex.morgan@apexbank.com"
+    session_resp = client.post("/api/auth/google-session", json={"email": google_email})
+    assert session_resp.status_code == 200
+    token = session_resp.json()["token"]
+
+    creator_headers = {"Authorization": f"Bearer {token}", "X-Apex-Persona": "creator"}
+    auditor_headers = {"Authorization": f"Bearer {token}", "X-Apex-Persona": "auditor"}
+
+    # 2. Reset tour for clean test baseline
+    client.post("/api/user/tour-reset", headers=creator_headers)
+
+    # 3. Check status as Creator persona: has_seen_tour is False
+    st_creator_before = client.get("/api/user/tour-status", headers=creator_headers).json()
+    assert st_creator_before["has_seen_tour"] is False
+    assert st_creator_before["google_email"] == google_email
+
+    # 4. Check status as Auditor persona: has_seen_tour is also False for the same Google user
+    st_auditor_before = client.get("/api/user/tour-status", headers=auditor_headers).json()
+    assert st_auditor_before["has_seen_tour"] is False
+    assert st_auditor_before["google_email"] == google_email
+
+    # 5. Dismiss tour while in Creator persona
+    dismiss_resp = client.post("/api/user/tour-dismiss", headers=creator_headers).json()
+    assert dismiss_resp["has_seen_tour"] is True
+    assert dismiss_resp["google_email"] == google_email
+    assert dismiss_resp["tracked_by"] == "google_identity"
+
+    # 6. Switch to Auditor persona and query tour status:
+    # MUST be True because the Google account Alex Morgan has already dismissed the tour!
+    st_auditor_after = client.get("/api/user/tour-status", headers=auditor_headers).json()
+    assert st_auditor_after["has_seen_tour"] is True
+    assert st_auditor_after["google_email"] == google_email
+    assert st_auditor_after["tracked_by"] == "google_identity"
+
+    # 7. Verify a different Google identity remains unseen
+    session2_resp = client.post("/api/auth/google-session", json={"email": "rachel.lee@apexbank.com"})
+    token2 = session2_resp.json()["token"]
+    headers2 = {"Authorization": f"Bearer {token2}", "X-Apex-Persona": "creator"}
+
+    st_user2 = client.get("/api/user/tour-status", headers=headers2).json()
+    assert st_user2["has_seen_tour"] is False
+    assert st_user2["google_email"] == "rachel.lee@apexbank.com"
 
 
 def test_html_guided_tour_assets_and_elements(client):

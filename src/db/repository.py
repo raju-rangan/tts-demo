@@ -48,13 +48,17 @@ class BaseJobRepository(ABC):
         pass
 
     @abstractmethod
-    def get_user_tour_status(self, user_email: str) -> bool:
-        """Returns True if the user has completed or dismissed the onboarding tour, False otherwise."""
+    def get_user_tour_status(self, google_email: str) -> bool:
+        """Returns True if the authenticated Google user identity has completed or dismissed the onboarding tour, False otherwise.
+        Note: Tour tracking is strictly keyed by the user's authenticated Google Identity, NOT by workspace persona.
+        """
         pass
 
     @abstractmethod
-    def set_user_tour_dismissed(self, user_email: str, dismissed: bool = True) -> None:
-        """Persists user onboarding tour completion / dismissal state."""
+    def set_user_tour_dismissed(self, google_email: str, dismissed: bool = True) -> None:
+        """Persists onboarding tour completion / dismissal state for the authenticated Google identity.
+        Note: Tour tracking is strictly keyed by the user's authenticated Google Identity, NOT by workspace persona.
+        """
         pass
 
 
@@ -259,8 +263,8 @@ class SQLiteJobRepository(BaseJobRepository):
             source_url=source_url
         )
 
-    def get_user_tour_status(self, user_email: str) -> bool:
-        clean_email = user_email.lower().strip()
+    def get_user_tour_status(self, google_email: str) -> bool:
+        clean_email = google_email.lower().strip()
         with self._get_conn() as conn:
             row = conn.execute(
                 "SELECT has_seen_tour FROM user_preferences WHERE user_email = ?",
@@ -270,8 +274,8 @@ class SQLiteJobRepository(BaseJobRepository):
                 return bool(row["has_seen_tour"])
         return False
 
-    def set_user_tour_dismissed(self, user_email: str, dismissed: bool = True) -> None:
-        clean_email = user_email.lower().strip()
+    def set_user_tour_dismissed(self, google_email: str, dismissed: bool = True) -> None:
+        clean_email = google_email.lower().strip()
         now_iso = datetime.now(timezone.utc).isoformat() if dismissed else None
         has_seen = 1 if dismissed else 0
         with self._get_conn() as conn:
@@ -350,8 +354,8 @@ class FirestoreJobRepository(BaseJobRepository):
             "total_turns": total_turns,
         })
 
-    def get_user_tour_status(self, user_email: str) -> bool:
-        clean_email = user_email.lower().strip()
+    def get_user_tour_status(self, google_email: str) -> bool:
+        clean_email = google_email.lower().strip()
         try:
             doc_ref = self.client.collection("user_preferences").document(clean_email)
             doc = doc_ref.get()
@@ -362,12 +366,13 @@ class FirestoreJobRepository(BaseJobRepository):
             logger.warning(f"Failed to fetch user tour status from Firestore: {e}")
         return False
 
-    def set_user_tour_dismissed(self, user_email: str, dismissed: bool = True) -> None:
-        clean_email = user_email.lower().strip()
+    def set_user_tour_dismissed(self, google_email: str, dismissed: bool = True) -> None:
+        clean_email = google_email.lower().strip()
         now_iso = datetime.now(timezone.utc).isoformat() if dismissed else None
         try:
             doc_ref = self.client.collection("user_preferences").document(clean_email)
             doc_ref.set({
+                "google_email": clean_email,
                 "user_email": clean_email,
                 "has_seen_tour": dismissed,
                 "tour_dismissed_at": now_iso,
