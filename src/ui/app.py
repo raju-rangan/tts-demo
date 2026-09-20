@@ -7,7 +7,7 @@ import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks, status, Query
+from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks, status, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -136,30 +136,33 @@ def verify_gcip_token(token: str) -> Optional[Dict[str, Any]]:
         logger.debug(f"GCIP token verification failed: {e}")
         return None
 
+def is_localhost_request(request: Optional[Request]) -> bool:
+    """Returns True if the request originates from localhost or 127.0.0.1 development environments."""
+    if not request:
+        return False
+    host = (request.headers.get("host") or "").split(":")[0].lower()
+    client_host = (request.client.host if request.client else "").lower()
+    server_host = (request.url.hostname or "").lower()
+    return (
+        host in ("localhost", "127.0.0.1", "0.0.0.0")
+        or client_host in ("127.0.0.1", "::1", "localhost")
+        or server_host in ("localhost", "127.0.0.1", "0.0.0.0")
+    )
+
 def get_current_user(
+    request: Optional[Request] = None,
     authorization: Optional[str] = Header(None),
     x_apex_persona: Optional[str] = Header(None)
 ) -> Dict[str, Any]:
-    """Validates session token for protected routes via GCIP or Demo Session, attaching active persona profile."""
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication credentials required"
-        )
-    
-    token = authorization.replace("Bearer ", "").strip()
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization token"
-        )
-
+    """Validates session token for protected routes via GCIP, Demo Session, or Localhost Bypass, attaching active persona profile."""
     # Determine persona context (defaults to creator)
     persona_key = x_apex_persona.lower().strip() if isinstance(x_apex_persona, str) else "creator"
     persona_data = PERSONA_PROFILES.get(persona_key, PERSONA_PROFILES["creator"])
 
+    token = authorization.replace("Bearer ", "").strip() if authorization else ""
+
     # 1. Check in-memory session (Google direct session or demo session)
-    if token in ACTIVE_SESSIONS:
+    if token and token in ACTIVE_SESSIONS:
         base_user = dict(ACTIVE_SESSIONS[token]["user"])
         base_user.update({
             "name": persona_data["name"],
@@ -170,7 +173,31 @@ def get_current_user(
         })
         return base_user
 
-    # 2. Cryptographic GCIP / Firebase ID token validation
+    # 2. Localhost Bypass (automatically bypasses auth if accessed via localhost/127.0.0.1 or explicit dev token)
+    is_local = is_localhost_request(request)
+    if is_local or token in ("local-dev-token", "local-dev", "bypass-token"):
+        return {
+            "email": "local-dev@apexbank.com",
+            "google_email": "local-dev@apexbank.com",
+            "google_name": "Local Developer",
+            "google_picture": None,
+            "name": persona_data["name"],
+            "role": persona_data["role"],
+            "department": persona_data["department"],
+            "avatar": persona_data["avatar"],
+            "persona_type": persona_data["persona_type"],
+            "picture": persona_data["avatar"],
+            "uid": "local_dev_user",
+            "is_localhost": True
+        }
+
+    if not authorization or not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication credentials required"
+        )
+
+    # 3. Cryptographic GCIP / Firebase ID token validation
     claims = verify_gcip_token(token)
     if not claims:
         detail = "Invalid or expired Google Identity token"
@@ -347,7 +374,7 @@ def google_login(req: GoogleLoginRequest):
 
 
 @app.get("/api/auth/config")
-def get_auth_config():
+def get_auth_config(request: Request):
     """Returns public client configuration for Google Identity Services / Auth."""
     project_id = os.getenv("GCP_PROJECT_ID", "").strip()
     auth_domain = GCIP_AUTH_DOMAIN or (f"{project_id}.firebaseapp.com" if project_id else "")
@@ -357,7 +384,8 @@ def get_auth_config():
         "api_key": GCIP_API_KEY,
         "auth_domain": auth_domain,
         "enable_demo_auth": ENABLE_DEMO_AUTH,
-        "has_gcip": bool(GCIP_API_KEY)
+        "has_gcip": bool(GCIP_API_KEY),
+        "is_localhost": is_localhost_request(request)
     }
 
 @app.post("/api/auth/login", response_model=LoginResponse)
