@@ -136,7 +136,7 @@ def verify_gcip_token(token: str) -> Optional[Dict[str, Any]]:
         logger.debug(f"GCIP token verification failed: {e}")
         return None
 
-def is_localhost_request(request: Optional[Request]) -> bool:
+def is_localhost_request(request: Request = None) -> bool:
     """Returns True if the request originates from localhost or 127.0.0.1 development environments."""
     if not request:
         return False
@@ -150,7 +150,7 @@ def is_localhost_request(request: Optional[Request]) -> bool:
     )
 
 def get_current_user(
-    request: Optional[Request] = None,
+    request: Request = None,
     authorization: Optional[str] = Header(None),
     x_apex_persona: Optional[str] = Header(None)
 ) -> Dict[str, Any]:
