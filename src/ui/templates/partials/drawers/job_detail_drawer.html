@@ -1,0 +1,368 @@
+  <!-- ================= JOB DETAIL DRAWER / MODAL ================= -->
+  <div id="jobDetailModal" onclick="if(event.target === this) closeDetailModal()" class="hidden fixed inset-0 z-50 overflow-hidden bg-zinc-950/80 backdrop-blur-sm flex justify-end">
+    <div class="w-full max-w-2xl bg-zinc-900 border-l border-zinc-800 h-full flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-right duration-200">
+      
+      <!-- Drawer Header -->
+      <div class="p-6 border-b border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-900">
+        <div class="flex items-center space-x-3">
+          <div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <i data-lucide="file-audio" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span id="detailJobId" class="font-mono text-sm font-bold text-white">job_xxxx</span>
+              <span id="detailStatusBadge" class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">COMPLETED</span>
+              <span id="detailRetryBadge" class="hidden px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">Take 2</span>
+            </div>
+            <p id="detailTimestamp" class="text-xs text-zinc-400 mt-0.5">--</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button id="modalRetryBtn" onclick="openRetryModal(CURRENT_JOB ? CURRENT_JOB.job_id : null, event)" title="Retry Voice Synthesis with Auditor Feedback"
+            class="px-2.5 py-1.5 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/50 border border-cyan-800/40 rounded-xl transition flex items-center space-x-1.5 text-xs font-medium">
+            <i data-lucide="rotate-cw" id="modalRetryIcon" class="w-3.5 h-3.5"></i>
+            <span id="modalRetryText">Retry</span>
+          </button>
+          <button id="modalDeleteBtn" onclick="deleteCurrentJob()" title="Delete Job"
+            class="px-2.5 py-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 border border-rose-800/40 rounded-xl transition flex items-center space-x-1.5 text-xs font-medium">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Delete</span>
+          </button>
+          <button onclick="closeDetailModal()" class="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Drawer Body (Scrollable) -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+        <!-- Error / Warning Banner -->
+        <div id="jobErrorBanner" class="hidden p-4 bg-rose-950/40 border border-rose-800/60 rounded-2xl space-y-2">
+          <div class="flex items-center space-x-2 text-rose-400 font-semibold text-xs">
+            <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+            <span id="jobErrorTitle">Job Failure Diagnostics</span>
+          </div>
+          <p id="jobErrorMessage" class="text-xs text-rose-200/90 font-mono leading-relaxed break-words pl-6"></p>
+          <div id="errorBannerRetryContainer" class="pl-6 pt-1">
+            <button onclick="openRetryModal(CURRENT_JOB ? CURRENT_JOB.job_id : null, event)" class="px-3 py-1.5 bg-rose-900/40 hover:bg-rose-900/70 text-rose-200 hover:text-white border border-rose-700/60 rounded-xl text-xs font-medium transition flex items-center space-x-1.5">
+              <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+              <span>Retry Synthesis Now</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- In-Progress Live Pipeline Progress Screen -->
+        <div id="jobRunningBanner" class="hidden bg-zinc-950 border border-amber-500/30 rounded-2xl p-5 space-y-4 shadow-lg shadow-amber-500/5">
+          <div class="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+            <div class="flex items-center space-x-2.5">
+              <div class="relative flex items-center justify-center w-3 h-3">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </div>
+              <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">Live Pipeline Progress</span>
+            </div>
+            <span id="runningStagePill" class="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              SYNTHESIZING
+            </span>
+          </div>
+
+          <!-- Current status headline -->
+          <div class="space-y-1">
+            <div id="runningStageMessage" class="text-xs font-semibold text-zinc-100 flex items-center space-x-2">
+              <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0"></i>
+              <span id="runningMessageText">Executing speech generation...</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed pl-5">Real-time telemetry from Gemini TTS & audio mastering pipeline. Updates live every 3 seconds.</p>
+          </div>
+
+          <!-- Turn Progress Indicator (if multi-turn) -->
+          <div id="runningTurnsContainer" class="hidden space-y-2 p-3 bg-zinc-900/80 border border-zinc-800/80 rounded-xl">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-zinc-400 font-medium">Multi-Turn Batch Progress</span>
+              <span id="runningTurnCounter" class="font-mono text-amber-400 font-semibold">Turn 1 of 3</span>
+            </div>
+            <div id="runningTurnsPills" class="flex flex-wrap gap-1.5 pt-0.5">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- 5-Stage Stepper -->
+          <div class="space-y-2 pt-1">
+            <span class="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 block">Pipeline Execution Milestones</span>
+            
+            <div class="space-y-1.5 text-xs">
+              <!-- Milestone 1: Chunking -->
+              <div id="stepChunking" class="flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition">
+                <div id="stepChunkingIcon" class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-400 font-mono">1</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-zinc-200 text-xs">Text Partitioning & Boundary Analysis</div>
+                  <div class="text-[10px] text-zinc-500 truncate">Sentence-safe splitting near ~400 words</div>
+                </div>
+                <div id="stepChunkingStatus" class="text-[11px] font-mono text-zinc-500 shrink-0">Pending</div>
+              </div>
+
+              <!-- Milestone 2: Synthesizing -->
+              <div id="stepSynthesizing" class="flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition">
+                <div id="stepSynthesizingIcon" class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-400 font-mono">2</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-zinc-200 text-xs">Gemini Neural Voice Synthesis</div>
+                  <div class="text-[10px] text-zinc-500 truncate">Multi-turn TTS with studio acoustic directives</div>
+                </div>
+                <div id="stepSynthesizingStatus" class="text-[11px] font-mono text-zinc-500 shrink-0">Pending</div>
+              </div>
+
+              <!-- Milestone 3: Stitching -->
+              <div id="stepStitching" class="flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition">
+                <div id="stepStitchingIcon" class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-400 font-mono">3</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-zinc-200 text-xs">DSP Mastering & Cross-Fade Stitching</div>
+                  <div class="text-[10px] text-zinc-500 truncate">3000 RMS loudness leveling + 40ms raised-cosine fades</div>
+                </div>
+                <div id="stepStitchingStatus" class="text-[11px] font-mono text-zinc-500 shrink-0">Pending</div>
+              </div>
+
+              <!-- Milestone 4: Uploading -->
+              <div id="stepUploading" class="flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition">
+                <div id="stepUploadingIcon" class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-400 font-mono">4</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-zinc-200 text-xs">Google Cloud Storage Distribution</div>
+                  <div class="text-[10px] text-zinc-500 truncate">Audience prefix routing with 30-day retention</div>
+                </div>
+                <div id="stepUploadingStatus" class="text-[11px] font-mono text-zinc-500 shrink-0">Pending</div>
+              </div>
+
+              <!-- Milestone 5: Evaluating -->
+              <div id="stepEvaluating" class="flex items-center space-x-3 p-2 rounded-xl border border-zinc-800/60 bg-zinc-900/40 transition">
+                <div id="stepEvaluatingIcon" class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-zinc-800 text-zinc-400 font-mono">5</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-zinc-200 text-xs">Multimodal Quality Audit</div>
+                  <div class="text-[10px] text-zinc-500 truncate">Gemini 3.8 Flash direct audio evaluation on 6 rubric metrics</div>
+                </div>
+                <div id="stepEvaluatingStatus" class="text-[11px] font-mono text-zinc-500 shrink-0">Pending</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1. Interactive Audio Player Card -->
+        <div id="audioPlayerCard" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="play-circle" class="w-4 h-4 text-emerald-400"></i>
+              <span>Spoken Audio Broadcast Playback</span>
+            </span>
+            <span id="detailAudioFormat" class="text-xs font-mono text-zinc-500">MP3 24kHz @ 320kbps</span>
+          </div>
+
+          <audio id="audioElement" controls class="w-full mt-2 rounded-lg accent-emerald-500 bg-zinc-900"></audio>
+
+          <div class="mt-4 pt-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center space-x-3 text-zinc-400">
+              <div>Latency: <span id="detailSynthesisLatency" class="font-mono text-zinc-200">--s</span></div>
+              <div class="border-l border-zinc-800 pl-3">Target Speed: <span id="detailSpeed" class="font-mono font-semibold text-emerald-400">1.00x</span></div>
+            </div>
+            <!-- Dynamic Playback Rate Controls -->
+            <div class="flex items-center space-x-1.5 bg-zinc-900 px-2 py-1 rounded-lg border border-zinc-800">
+              <span class="text-[10px] uppercase font-semibold text-zinc-500 mr-1 flex items-center space-x-1">
+                <i data-lucide="gauge" class="w-3 h-3 text-emerald-400"></i>
+                <span>Playback:</span>
+              </span>
+              <button type="button" onclick="setPlaybackRate(0.75)" class="playback-rate-btn px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">0.75x</button>
+              <button type="button" onclick="setPlaybackRate(1.00)" class="playback-rate-btn px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 transition">1.0x</button>
+              <button type="button" onclick="setPlaybackRate(1.25)" class="playback-rate-btn px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">1.25x</button>
+              <button type="button" onclick="setPlaybackRate(1.50)" class="playback-rate-btn px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">1.5x</button>
+              <button type="button" onclick="setPlaybackRate(2.00)" class="playback-rate-btn px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">2.0x</button>
+            </div>
+            <a id="downloadAudioLink" href="#" download="generated_audio.mp3"
+              class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg transition flex items-center space-x-1.5 text-xs font-medium">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Download MP3</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 2. Cloud Storage Coordinates -->
+        <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-3">
+          <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+            <i data-lucide="cloud" class="w-4 h-4 text-cyan-400"></i>
+            <span>Google Cloud Storage Coordinates</span>
+          </span>
+
+          <div class="space-y-2 text-xs">
+            <div>
+              <div class="text-zinc-400 mb-1">GCS Object URI:</div>
+              <div class="flex items-center space-x-2">
+                <input id="detailGcsUri" readonly class="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl font-mono text-emerald-400 text-xs select-all">
+                <button onclick="copyToClipboard('detailGcsUri')" class="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition" title="Copy URI">
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+              <div class="p-3 bg-zinc-900 rounded-xl">
+                <span class="text-zinc-500 block text-[11px]">Audience Prefix Key</span>
+                <span id="detailPrefixKey" class="font-mono text-zinc-200 font-medium">external/audio/</span>
+              </div>
+              <div class="p-3 bg-zinc-900 rounded-xl">
+                <span class="text-zinc-500 block text-[11px]">Lifecycle Retention</span>
+                <span class="font-mono text-amber-400 font-medium">30 Days Auto-Delete</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Token Telemetry & Financial Cost Breakdown -->
+        <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="calculator" class="w-4 h-4 text-amber-400"></i>
+              <span>Token Telemetry & Estimated Spend</span>
+            </span>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono font-medium">Official Gemini Pricing</span>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-center font-mono">
+            <div class="p-3 bg-zinc-900 border border-zinc-800/80 rounded-xl">
+              <span class="text-[10px] text-zinc-400 uppercase block font-sans">Text Input</span>
+              <span id="tokenTextInput" class="text-base font-bold text-zinc-100">--</span>
+              <span class="text-[10px] text-zinc-500 block">tokens</span>
+            </div>
+            <div class="p-3 bg-zinc-900 border border-zinc-800/80 rounded-xl">
+              <span class="text-[10px] text-zinc-400 uppercase block font-sans">Audio Output</span>
+              <span id="tokenAudioOutput" class="text-base font-bold text-purple-400">--</span>
+              <span class="text-[10px] text-zinc-500 block">tokens</span>
+            </div>
+            <div class="p-3 bg-zinc-900 border border-zinc-800/80 rounded-xl">
+              <span class="text-[10px] text-zinc-400 uppercase block font-sans">Judge Tokens</span>
+              <span id="tokenJudge" class="text-base font-bold text-cyan-400">--</span>
+              <span class="text-[10px] text-zinc-500 block">tokens</span>
+            </div>
+            <div class="p-3 bg-zinc-900 border border-zinc-800/80 rounded-xl">
+              <span class="text-[10px] text-zinc-400 uppercase block font-sans">Total Cost</span>
+              <span id="costTotalUsd" class="text-base font-bold text-emerald-400">$0.000</span>
+              <span class="text-[10px] text-zinc-500 block">USD</span>
+            </div>
+          </div>
+
+          <div class="border-t border-zinc-800 pt-3 text-xs space-y-1.5 font-mono">
+            <div class="flex justify-between text-zinc-400">
+              <span>TTS Synthesis Cost (Gemini 3.1 Flash):</span>
+              <span id="costTtsUsd" class="text-zinc-200">$0.000000</span>
+            </div>
+            <div class="flex justify-between text-zinc-400">
+              <span>Multimodal Judge Cost (Gemini 3.8 Flash):</span>
+              <span id="costJudgeUsd" class="text-zinc-200">$0.000000</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Multimodal Quality Scorecard -->
+        <div id="scorecardCard" class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="scale" class="w-4 h-4 text-purple-400"></i>
+              <span>Multimodal Quality Scorecard</span>
+            </span>
+            <span id="detailVerdictBadge" class="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">PASSED</span>
+          </div>
+
+          <div class="flex items-center space-x-4 p-4 bg-zinc-900 rounded-xl">
+            <div class="text-center shrink-0">
+              <div id="detailOverallScore" class="text-3xl font-black font-mono text-emerald-400">4.64</div>
+              <div class="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Overall Score</div>
+            </div>
+            <div class="border-l border-zinc-800 pl-4 text-xs text-zinc-300">
+              Audited by <span id="detailJudgeModel" class="font-mono text-purple-400 font-semibold">gemini-3.8-flash</span> against 6 financial service rubric dimensions with zero audio downloading.
+            </div>
+          </div>
+
+          <!-- Overall Score Reasoning Callout -->
+          <div id="overallReasoningContainer" class="hidden p-4 bg-purple-950/20 border border-purple-800/40 rounded-xl space-y-1.5">
+            <span class="text-xs font-semibold text-purple-400 flex items-center space-x-1.5">
+              <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i>
+              <span>Multimodal Judge Overall Rationale</span>
+            </span>
+            <p id="detailOverallReasoning" class="text-xs text-zinc-300 leading-relaxed italic"></p>
+          </div>
+
+          <!-- Rubric Dimensions List -->
+          <div id="rubricDimensionsList" class="space-y-3 pt-2"></div>
+
+          <!-- Actionable Feedback Callout -->
+          <div id="actionableFeedbackContainer" class="p-4 bg-amber-950/20 border border-amber-800/40 rounded-xl space-y-2">
+            <span class="text-xs font-semibold text-amber-400 flex items-center space-x-1.5">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>Actionable Recommendations</span>
+            </span>
+            <ul id="actionableFeedbackList" class="text-xs text-zinc-300 space-y-1 list-disc pl-4"></ul>
+          </div>
+        </div>
+
+        <!-- 4b. Director's Notes / Voice Customization -->
+        <div id="detailVoiceCustomizationCard" class="hidden bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-2">
+          <span class="text-xs font-semibold text-teal-400 uppercase tracking-wider flex items-center space-x-1.5">
+            <i data-lucide="sliders" class="w-4 h-4"></i>
+            <span>Director's Notes & Vocal Delivery Customization</span>
+          </span>
+          <p id="detailVoiceCustomizationText" class="text-xs text-zinc-300 italic p-3 bg-zinc-900/80 border border-zinc-800/80 rounded-xl leading-relaxed"></p>
+        </div>
+
+        <!-- 4b-2. Auditor Critique Remediation Directives (Critic-Actor Steered) -->
+        <div id="detailRemediationCard" class="hidden bg-cyan-950/20 border border-cyan-500/30 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-cyan-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
+              <span>Auditor Critique Remediation Directives (Take <span id="detailRetryCount">2</span>)</span>
+            </span>
+            <span id="detailScoreDeltaBadge" class="hidden text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono"></span>
+          </div>
+          <pre id="detailRemediationText" class="text-xs text-zinc-300 font-mono leading-relaxed p-3.5 bg-black/50 border border-cyan-900/40 rounded-xl whitespace-pre-wrap max-h-60 overflow-y-auto"></pre>
+        </div>
+
+        <!-- 4c. Source Web URL (for Bulk URL jobs) -->
+        <div id="detailSourceUrlCard" class="hidden bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-teal-400 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="globe" class="w-4 h-4"></i>
+              <span>Original Web Article Source</span>
+            </span>
+            <a id="detailSourceUrlLink" href="#" target="_blank" rel="noopener noreferrer"
+              class="text-xs text-teal-400 hover:text-teal-300 hover:underline flex items-center space-x-1 font-mono">
+              <span id="detailSourceUrlDomain">Visit Source</span>
+              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            </a>
+          </div>
+          <div class="flex items-center space-x-2">
+            <input id="detailSourceUrlInput" readonly class="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl font-mono text-teal-300 text-xs select-all">
+            <button onclick="copyToClipboard('detailSourceUrlInput')" class="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition" title="Copy URL">
+              <i data-lucide="copy" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- 5. Full Transcript Viewer -->
+        <div class="bg-zinc-950 border border-zinc-800 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="file-text" class="w-4 h-4 text-zinc-400"></i>
+              <span>Article Transcript Sent to Speech Model</span>
+            </span>
+            <div class="flex items-center space-x-3 text-xs text-zinc-400">
+              <span><span id="detailWordCount" class="font-mono text-zinc-200">281</span> words</span>
+              <button onclick="copyToClipboard('detailTranscriptText')" class="p-1 text-zinc-400 hover:text-zinc-200 transition" title="Copy Transcript">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <div id="detailTranscriptText" class="p-4 bg-zinc-900 border border-zinc-800/80 rounded-xl text-xs text-zinc-300 leading-relaxed max-h-72 overflow-y-auto whitespace-pre-wrap font-sans select-all">
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+

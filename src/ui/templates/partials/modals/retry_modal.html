@@ -1,0 +1,114 @@
+  <!-- Interactive Retry Voice Synthesis Modal with Auditor Feedback (Option B) -->
+  <div id="modalRetryDialog" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm px-4">
+    <div class="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative max-h-[90vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800 shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl">
+            <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span>Retry Voice Synthesis</span>
+              <span id="retryTakeBadge" class="text-xs px-2.5 py-0.5 rounded-full font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Take 2</span>
+            </h3>
+            <p class="text-xs text-zinc-400">Review Multimodal Auditor feedback & steer Gemini with corrective directives</p>
+          </div>
+        </div>
+        <button onclick="closeRetryModal()" class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+        <!-- Previous Take Summary Card -->
+        <div class="p-4 bg-zinc-950 border border-zinc-800 rounded-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Previous Take Audit Score</span>
+            <div class="flex items-center space-x-2">
+              <span id="retryPrevScoreBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-200">--</span>
+              <span id="retryPrevGateBadge" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">--</span>
+            </div>
+          </div>
+          <p id="retryPrevReasoning" class="text-xs text-zinc-400 leading-relaxed italic"></p>
+        </div>
+
+        <!-- Flagged Defects from Auditor -->
+        <div id="retryFlaggedContainer" class="hidden p-4 bg-rose-950/20 border border-rose-900/40 rounded-xl space-y-2">
+          <div class="flex items-center space-x-2 text-xs font-semibold text-rose-300 uppercase tracking-wider">
+            <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i>
+            <span>Auditor Flagged Deductions</span>
+          </div>
+          <div id="retryFlaggedList" class="space-y-1.5 text-xs text-zinc-300">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Checkbox Toggle to Include Critique -->
+        <div class="flex items-center justify-between p-3 bg-zinc-950/60 border border-zinc-800 rounded-xl">
+          <div class="flex items-center space-x-2">
+            <input type="checkbox" id="retryIncludeCritique" checked onchange="toggleRetryCritiqueInput(this.checked)"
+              class="w-4 h-4 rounded text-cyan-600 bg-zinc-900 border-zinc-700 focus:ring-cyan-500 cursor-pointer">
+            <label for="retryIncludeCritique" class="text-xs font-medium text-zinc-200 cursor-pointer">
+              Inject Auditor Critique & Remediation Instructions into Prompt
+            </label>
+          </div>
+          <span class="text-[11px] text-cyan-400 font-mono">Critic-Actor Mode</span>
+        </div>
+
+        <!-- Editable Directive Textarea -->
+        <div id="retryCritiqueBox" class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              Prompt Remediation Directives (What went wrong & make it right)
+            </label>
+            <button type="button" onclick="resetRetryCritiqueToDefault()" class="text-[11px] text-cyan-400 hover:text-cyan-300 underline">
+              Reset to Auditor Default
+            </button>
+          </div>
+          <textarea id="retryCritiqueText" rows="6"
+            class="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 font-mono leading-relaxed focus:outline-none focus:border-cyan-500 transition"></textarea>
+          <p class="text-[11px] text-zinc-500">You can edit these instructions to highlight specific words, disclaimers, or pacing adjustments for Gemini.</p>
+        </div>
+
+        <!-- Delivery Speed Adjustments (Optional on Retry) -->
+        <div class="p-3 bg-zinc-950/80 border border-zinc-800 rounded-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Delivery Speed Multiplier</label>
+            <span id="retrySpeedDisplay" class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-200">1.00x</span>
+          </div>
+          <input type="range" id="retrySpeed" min="0.5" max="2.0" step="0.05" value="1.0"
+            oninput="updateRetrySpeedDisplay(this.value)"
+            class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+          <div class="flex items-center space-x-1.5 pt-1">
+            <button type="button" onclick="setRetrySpeedPreset(0.8)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">0.8x</button>
+            <button type="button" onclick="setRetrySpeedPreset(1.0)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">1.0x</button>
+            <button type="button" onclick="setRetrySpeedPreset(1.2)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">1.2x</button>
+            <button type="button" onclick="setRetrySpeedPreset(1.5)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">1.5x</button>
+          </div>
+        </div>
+
+        <!-- Optional Voice Customization update -->
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Additional Director's Notes (Optional)</label>
+          <input type="text" id="retryVoiceCustomization"
+            class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500 transition"
+            placeholder="e.g. Slightly warmer inflection on the opening summary...">
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-4 border-t border-zinc-800 flex items-center justify-end space-x-3 shrink-0">
+        <button type="button" onclick="closeRetryModal()" class="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition">
+          Cancel
+        </button>
+        <button type="button" id="confirmRetrySubmitBtn" onclick="confirmAndExecuteRetry()"
+          class="px-5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-cyan-600/20 transition flex items-center space-x-2">
+          <i data-lucide="rotate-cw" id="retrySubmitIcon" class="w-3.5 h-3.5"></i>
+          <span id="retrySubmitText">Confirm & Launch Re-Synthesis</span>
+        </button>
+      </div>
+    </div>
+  </div>
+

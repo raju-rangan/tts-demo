@@ -1,0 +1,109 @@
+  <!-- ================= BULK URL JOB MODAL ================= -->
+  <div id="bulkJobModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm px-4">
+    <div class="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-teal-500/10 text-teal-400 rounded-xl">
+            <i data-lucide="layers" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Bulk Process Web URLs</h3>
+            <p class="text-xs text-zinc-400">Extract clean main article content & synthesize audio sequentially</p>
+          </div>
+        </div>
+        <button onclick="closeBulkJobModal()" class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="bulkJobForm" onsubmit="submitBulkJobs(event)" class="space-y-4 pt-4">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Financial Voice Persona</label>
+          <select id="inputBulkPersona" required class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-teal-500 transition">
+            <option value="Retail Banking Guide">Retail Banking Guide (External Customers | Voice: Sulafat)</option>
+            <option value="Wealth & Market Advisor">Wealth & Market Advisor (External Customers | Voice: Charon)</option>
+            <option value="Regulatory & Policy Officer">Regulatory & Policy Officer (Internal Employees | Voice: Kore)</option>
+            <option value="Employee Enablement & Operations">Employee Enablement & Operations (Internal Employees | Voice: Puck)</option>
+            <option value="Fraud & Security Alert">Fraud & Security Alert (Shared / Universal | Voice: Schedar)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <span>Voice Customization & Delivery Directives</span>
+            <span class="text-[11px] text-zinc-400 font-normal">Director's Notes (Optional)</span>
+          </label>
+          <input type="text" id="inputBulkVoiceCustomization" placeholder="e.g. Speak with an authoritative, measured cadence on market insights..."
+            class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-teal-500 transition">
+          <p class="text-[11px] text-zinc-500 mt-1">Applies custom vocal delivery instructions to every article in the batch.</p>
+        </div>
+
+        <!-- Bulk Speech Speed Control (Gemini TTS) -->
+        <div class="p-3 bg-zinc-950/80 border border-zinc-800 rounded-xl space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="gauge" class="w-3.5 h-3.5 text-teal-400"></i>
+              <span>Batch Speech Speed & Speaking Rate</span>
+            </label>
+            <span id="bulkSpeedValueBadge" class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20">1.00x Normal</span>
+          </div>
+          <div class="flex items-center space-x-3">
+            <span class="text-[11px] font-mono text-zinc-500">0.5x</span>
+            <input type="range" id="inputBulkSpeed" min="0.5" max="2.0" step="0.05" value="1.0"
+              oninput="updateBulkSpeedDisplay(this.value)"
+              class="flex-1 accent-teal-500 h-1.5 bg-zinc-800 rounded-lg cursor-pointer">
+            <span class="text-[11px] font-mono text-zinc-500">2.0x</span>
+          </div>
+          <!-- Preset Chips -->
+          <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span class="text-[10px] text-zinc-500 uppercase font-semibold mr-1">Presets:</span>
+            <button type="button" onclick="setBulkSpeedPreset(0.80)" class="bulk-speed-preset-btn px-2 py-0.5 rounded text-[11px] font-mono bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">0.8x Measured</button>
+            <button type="button" onclick="setBulkSpeedPreset(1.00)" class="bulk-speed-preset-btn px-2 py-0.5 rounded text-[11px] font-mono bg-teal-500/10 text-teal-400 border border-teal-500/30 transition font-semibold">1.0x Standard</button>
+            <button type="button" onclick="setBulkSpeedPreset(1.20)" class="bulk-speed-preset-btn px-2 py-0.5 rounded text-[11px] font-mono bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">1.2x Brisk</button>
+            <button type="button" onclick="setBulkSpeedPreset(1.50)" class="bulk-speed-preset-btn px-2 py-0.5 rounded text-[11px] font-mono bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">1.5x Disclaimer</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">Target Article URLs (One per line)</label>
+            <button type="button" onclick="loadSampleUrls()" class="text-xs text-teal-400 hover:underline">
+              Load Sample Financial URLs
+            </button>
+          </div>
+          <textarea id="inputBulkUrls" rows="6" required oninput="updateBulkUrlStats()" placeholder="https://www.federalreserve.gov/newsevents/pressreleases/monetary20240918a.htm&#10;https://www.fdic.gov/news/press-releases/2024/pr24012.html"
+            class="w-full p-3 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 font-mono focus:outline-none focus:border-teal-500 transition leading-relaxed"></textarea>
+          <div class="flex items-center justify-between text-[11px] text-zinc-400 mt-1 px-1">
+            <span id="bulkUrlStats">0 URLs entered</span>
+            <span id="bulkUrlValidationWarning" class="hidden text-amber-400 font-medium flex items-center space-x-1">
+              <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+              <span id="bulkUrlValidationText"></span>
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="inputBulkRunJudge" checked class="w-4 h-4 rounded text-teal-500 focus:ring-teal-500 bg-zinc-950 border-zinc-700">
+          <label for="inputBulkRunJudge" class="text-xs text-zinc-300 cursor-pointer">
+            Run automated Multimodal Quality Audit with <span class="font-mono text-purple-400">Gemini 3.8 Flash</span>
+          </label>
+        </div>
+
+        <div id="bulkJobStatus" class="hidden p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex items-center space-x-2">
+          <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-teal-400"></i>
+          <span id="bulkJobStatusText" class="text-zinc-300">Enqueuing bulk jobs...</span>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end space-x-3">
+          <button type="button" onclick="closeBulkJobModal()" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-xl transition">
+            Cancel
+          </button>
+          <button type="submit" id="submitBulkJobBtn" class="px-5 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-zinc-950 text-xs font-bold rounded-xl transition shadow-lg shadow-teal-500/10 flex items-center space-x-1.5">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+            <span>Start Bulk Processing</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+

@@ -1,0 +1,80 @@
+      <!-- ================= CREATOR STUDIO SECTION (SARAH JENKINS) ================= -->
+      <div id="creatorStudioSection" class="space-y-6">
+        <!-- Creator Banner -->
+        <div class="bg-gradient-to-r from-emerald-950/40 via-teal-950/20 to-zinc-900 border border-emerald-500/30 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg shadow-emerald-950/10">
+          <div class="flex items-center space-x-3.5">
+            <img src="/static/avatars/creator_sarah.jpg" class="w-12 h-12 rounded-2xl object-cover border border-emerald-400/50 shadow-md">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-xs font-bold text-emerald-300 uppercase tracking-wide">Enterprise Speech Production Studio</span>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-medium">Creator Mode</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1 max-w-2xl leading-relaxed">
+                Operating as <strong>Sarah Jenkins</strong> (Senior Digital Communications Specialist). Convert wealth advisories, regulatory disclosures, and customer articles into natural spoken speech using <strong>Gemini 3.1 Flash TTS</strong>.
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2 shrink-0">
+            <button onclick="openBulkJobModal()" class="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 border border-zinc-700">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-teal-400"></i>
+              <span>Bulk URLs</span>
+            </button>
+            <button onclick="openNewJobModal()" class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 text-xs font-bold rounded-xl transition flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>New Voice Job</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Creator KPI Summary Analytics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Total Jobs Run</span>
+              <span class="p-2 rounded-xl bg-zinc-800/60 text-zinc-400"><i data-lucide="layers" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiTotalJobs" class="text-2xl font-bold font-mono text-white">--</span>
+              <span class="text-xs text-emerald-400 font-medium">All Synced</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">Tracked in <span id="kpiDbBackend">Storage</span></p>
+          </div>
+
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Avg Quality Score</span>
+              <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400"><i data-lucide="award" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiAvgScore" class="text-2xl font-bold font-mono text-emerald-400">--</span>
+              <span class="text-xs text-zinc-400">/ 5.0</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">Audited by Gemini 3.8 Flash</p>
+          </div>
+
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Audio Generated</span>
+              <span class="p-2 rounded-xl bg-purple-500/10 text-purple-400"><i data-lucide="mic" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiTotalAudio" class="text-2xl font-bold font-mono text-white">--</span>
+              <span class="text-xs text-zinc-400">minutes</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">24kHz 320kbps MP3</p>
+          </div>
+
+          <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Total Pipeline Cost</span>
+              <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400"><i data-lucide="badge-dollar-sign" class="w-4 h-4"></i></span>
+            </div>
+            <div class="mt-3 flex items-baseline space-x-2">
+              <span id="kpiTotalCost" class="text-2xl font-bold font-mono text-amber-400">$0.0000</span>
+              <span class="text-xs text-zinc-400">USD</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1">TTS + Multimodal Judge</p>
+          </div>
+        </div>
+      </div>
+

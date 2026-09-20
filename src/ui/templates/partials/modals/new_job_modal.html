@@ -1,0 +1,112 @@
+  <!-- ================= NEW JOB MODAL ================= -->
+  <div id="newJobModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm px-4">
+    <div class="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
+            <i data-lucide="plus" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Create Voice Synthesis Job</h3>
+            <p class="text-xs text-zinc-400">Gemini 3.1 Flash TTS + Gemini 3.8 Flash Multimodal Quality Gate</p>
+          </div>
+        </div>
+        <button onclick="closeNewJobModal()" class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="newJobForm" onsubmit="submitNewJob(event)" class="space-y-4 pt-4">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Financial Voice Persona</label>
+          <select id="inputPersona" required class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition">
+            <option value="Retail Banking Guide">Retail Banking Guide (External Customers | Voice: Sulafat)</option>
+            <option value="Wealth & Market Advisor">Wealth & Market Advisor (External Customers | Voice: Charon)</option>
+            <option value="Regulatory & Policy Officer">Regulatory & Policy Officer (Internal Employees | Voice: Kore)</option>
+            <option value="Employee Enablement & Operations">Employee Enablement & Operations (Internal Employees | Voice: Puck)</option>
+            <option value="Fraud & Security Alert">Fraud & Security Alert (Shared / Universal | Voice: Schedar)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <span>Voice Customization & Delivery Directives</span>
+            <span class="text-[11px] text-zinc-400 font-normal">Director's Notes (Optional)</span>
+          </label>
+          <input type="text" id="inputVoiceCustomization" placeholder="e.g. Speak with an empathetic, reassuring tone and slightly slower cadence on regulatory disclosures..."
+            class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition">
+          <p class="text-[11px] text-zinc-500 mt-1">Directly guides pacing, vocal warmth, emphasis, or emotional nuance in Gemini TTS generation.</p>
+        </div>
+
+        <!-- Speech Speed Control (Gemini TTS) -->
+        <div class="p-3 bg-zinc-950/80 border border-zinc-800 rounded-xl space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="gauge" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>Speech Speed & Speaking Rate</span>
+            </label>
+            <span id="speedValueBadge" class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">1.00x Normal</span>
+          </div>
+          <div class="flex items-center space-x-3">
+            <span class="text-[11px] font-mono text-zinc-500">0.5x</span>
+            <input type="range" id="inputSpeed" min="0.5" max="2.0" step="0.05" value="1.0"
+              oninput="updateSpeedDisplay(this.value)"
+              class="flex-1 accent-emerald-500 h-1.5 bg-zinc-800 rounded-lg cursor-pointer">
+            <span class="text-[11px] font-mono text-zinc-500">2.0x</span>
+          </div>
+          <!-- Preset Chips -->
+          <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span class="text-[10px] text-zinc-500 uppercase font-semibold mr-1">Presets:</span>
+            <button type="button" onclick="setSpeedPreset(0.80)" class="speed-preset-btn px-2 py-0.5 rounded text-[11px] font-mono bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">0.8x Measured</button>
+            <button type="button" onclick="setSpeedPreset(1.00)" class="speed-preset-btn px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 transition font-semibold">1.0x Standard</button>
+            <button type="button" onclick="setSpeedPreset(1.20)" class="speed-preset-btn px-2 py-0.5 rounded text-[11px] font-mono bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">1.2x Brisk</button>
+            <button type="button" onclick="setSpeedPreset(1.50)" class="speed-preset-btn px-2 py-0.5 rounded text-[11px] font-mono bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">1.5x Disclaimer</button>
+          </div>
+          <p class="text-[11px] text-zinc-500 leading-normal">
+            Per Gemini TTS guidelines: values &lt; 1.0 slow down speech for complex financial disclosures; values &gt; 1.0 accelerate speech for market briefs and disclaimers.
+          </p>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">Article / Knowledge Transcript</label>
+            <button type="button" onclick="loadSampleText()" class="text-xs text-emerald-400 hover:underline">
+              Load Sample Banking Article
+            </button>
+          </div>
+          <textarea id="inputText" rows="7" required oninput="updateInputStats()" placeholder="Paste banking guidance article, policy document, or customer explainer here..."
+            class="w-full p-3 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition leading-relaxed"></textarea>
+          <div class="flex items-center justify-between text-[11px] text-zinc-400 mt-1 px-1">
+            <span id="inputWordCount">0 words • 0 characters</span>
+            <span id="inputWordWarning" class="hidden text-blue-400 font-medium flex items-center space-x-1">
+              <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+              <span id="inputWordWarningText">Multi-turn auto-chunking active (~400 words/turn). Audio will be stitched seamlessly.</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="inputRunJudge" checked class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-950 border-zinc-700">
+          <label for="inputRunJudge" class="text-xs text-zinc-300 cursor-pointer">
+            Run automated Multimodal Quality Audit with <span class="font-mono text-purple-400">Gemini 3.8 Flash</span>
+          </label>
+        </div>
+
+        <div id="newJobStatus" class="hidden p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex items-center space-x-2">
+          <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-emerald-400"></i>
+          <span id="newJobStatusText" class="text-zinc-300">Enqueuing job...</span>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end space-x-3">
+          <button type="button" onclick="closeNewJobModal()" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-xl transition">
+            Cancel
+          </button>
+          <button type="submit" id="submitJobBtn" class="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 text-xs font-bold rounded-xl transition shadow-lg shadow-emerald-500/10 flex items-center space-x-1.5">
+            <i data-lucide="mic" class="w-4 h-4"></i>
+            <span>Generate Spoken Audio</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+

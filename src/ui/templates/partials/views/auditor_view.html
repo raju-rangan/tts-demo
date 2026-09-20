@@ -1,0 +1,475 @@
+      <!-- ================= AUDITOR CONSOLE SECTION (DAVID CHEN) ================= -->
+      <div id="auditorConsoleSection" class="hidden space-y-6">
+        <!-- Auditor Mode Banner -->
+        <div id="auditorModeBanner" class="bg-gradient-to-r from-purple-950/50 via-indigo-950/30 to-purple-950/50 border border-purple-500/40 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg shadow-purple-950/20">
+          <div class="flex items-center space-x-3.5">
+            <img src="/static/avatars/auditor_david.jpg" class="w-12 h-12 rounded-2xl object-cover border border-purple-400/50 shadow-md">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-xs font-bold text-purple-200 uppercase tracking-wide">Compliance & Regulatory Auditor Console</span>
+                <span class="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-[10px] text-purple-300 font-medium">Auditor Mode Active</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1 max-w-2xl leading-relaxed">
+                Operating as <strong>David Chen</strong> (Senior Regulatory Compliance Analyst). Overseeing <strong>Gemini 3.8 Flash Multimodal Quality Scorecards</strong>, disclosure clarity, Truth in Lending verification, and FinOps governance.
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2 shrink-0">
+            <button onclick="switchAuditorSubView('dashboard')" class="px-3.5 py-2 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 text-purple-100 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+              <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-purple-300"></i>
+              <span>Open Executive Dashboard</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Auditor Navigation Bar: Full-Page Dashboard vs. Registry -->
+        <div id="auditorSubNav" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-zinc-800/80">
+          <div class="flex items-center space-x-2">
+            <button id="btnAuditorSubDashboard" onclick="switchAuditorSubView('dashboard')"
+              class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 bg-purple-600/30 text-purple-200 border border-purple-500/40 shadow-sm">
+              <i data-lucide="layout-dashboard" class="w-4 h-4 text-purple-300"></i>
+              <span>Executive Governance Dashboard</span>
+            </button>
+            <button id="btnAuditorSubRegistry" onclick="switchAuditorSubView('registry')"
+              class="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border border-transparent transition flex items-center space-x-2">
+              <i data-lucide="file-audio" class="w-4 h-4"></i>
+              <span>Disclosure Audio Registry</span>
+            </button>
+          </div>
+
+          <div class="flex items-center space-x-2.5">
+            <span class="text-[11px] text-zinc-400 font-mono flex items-center space-x-1.5 px-3 py-1.5 bg-zinc-900 rounded-xl border border-zinc-800">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+              <span>Firestore Native: <strong class="text-zinc-200">tts-jobs</strong></span>
+            </span>
+            <button onclick="refreshAuditorDashboard()" title="Refresh Dashboard Telemetry"
+              class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded-xl transition text-xs font-medium flex items-center space-x-1.5 shadow-sm">
+              <i data-lucide="rotate-cw" id="auditorRefreshIcon" class="w-3.5 h-3.5"></i>
+              <span>Refresh Telemetry</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ================= FULL-PAGE EXECUTIVE GOVERNANCE DASHBOARD ================= -->
+        <div id="auditorFullDashboard" class="space-y-6">
+
+          <!-- 1. Top-Line KPI Summary Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Card 1: Total FinOps Spend -->
+            <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden shadow-sm">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Total FinOps Spend</span>
+                <span class="p-2 rounded-xl bg-purple-500/10 text-purple-400"><i data-lucide="badge-dollar-sign" class="w-4 h-4"></i></span>
+              </div>
+              <div class="mt-3 flex items-baseline space-x-2">
+                <span id="fullFoTotalCost" class="text-2xl font-bold font-mono text-purple-300">$0.0000</span>
+                <span id="kpiAuditorCost" class="hidden">$0.0000</span>
+                <span class="text-xs text-zinc-400">USD</span>
+              </div>
+              <p id="fullFoTtsSplit" class="text-xs text-zinc-400 mt-1 font-mono">TTS: $0.0000 | Judge: $0.0000</p>
+              <div class="mt-2 text-[10px] text-zinc-500">Gemini 3.1 Flash TTS + 3.8 Flash Judge</div>
+            </div>
+
+            <!-- Card 2: Cumulative Token Utilization -->
+            <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden shadow-sm">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Token Volume</span>
+                <span class="p-2 rounded-xl bg-cyan-500/10 text-cyan-400"><i data-lucide="cpu" class="w-4 h-4"></i></span>
+              </div>
+              <div class="mt-3 flex items-baseline space-x-2">
+                <span id="fullFoTotalTokens" class="text-2xl font-bold font-mono text-white">0</span>
+                <span class="text-xs text-zinc-400">Tokens</span>
+              </div>
+              <p id="fullFoTokenSplit" class="text-xs text-zinc-400 mt-1 font-mono truncate">Text: 0 | Audio: 0 | Judge: 0</p>
+              <div class="mt-2 text-[10px] text-zinc-500">Context, Audio Stream & Multimodal Evaluation</div>
+            </div>
+
+            <!-- Card 3: Compliance Pass Rate -->
+            <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden shadow-sm">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Compliance Quality Gate</span>
+                <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400"><i data-lucide="shield-check" class="w-4 h-4"></i></span>
+              </div>
+              <div class="mt-3 flex items-baseline space-x-2">
+                <span id="fullFoPassRate" class="text-2xl font-bold font-mono text-emerald-400">0.0%</span>
+                <span id="kpiPassRate" class="hidden">0.0%</span>
+                <span class="text-xs text-zinc-400 font-medium">Gate &ge; 4.0</span>
+              </div>
+              <p id="fullFoPassCounts" class="text-xs text-zinc-400 mt-1 font-medium">0 Compliant / 0 Needs Review</p>
+              <div class="mt-2 text-[10px] text-zinc-500">Truth in Lending & Enterprise Adherence</div>
+            </div>
+
+            <!-- Card 4: Audited Disclosures Volume -->
+            <div class="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden shadow-sm">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-medium uppercase tracking-wider text-zinc-400">Audited Audio Runtime</span>
+                <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400"><i data-lucide="headphones" class="w-4 h-4"></i></span>
+              </div>
+              <div class="mt-3 flex items-baseline space-x-2">
+                <span id="fullFoTotalMinutes" class="text-2xl font-bold font-mono text-amber-300">0.0 min</span>
+                <span id="kpiAuditedDisclosures" class="hidden">0</span>
+                <span id="kpiFlaggedItems" class="hidden">0</span>
+                <span class="text-xs text-zinc-400">Runtime</span>
+              </div>
+              <p class="text-xs text-zinc-400 mt-1 font-medium">Avg Quality: <span id="fullFoAvgScore" class="font-bold text-white font-mono">--</span></p>
+              <div class="mt-2 text-[10px] text-zinc-500">24kHz PCM / 320kbps MP3 Master</div>
+            </div>
+          </div>
+
+          <!-- 2. Primary Visualizations Grid: Radar & FinOps Split -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Radar Chart: 6-Dimension Multimodal Rubric -->
+            <div class="lg:col-span-7 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+              <div class="flex items-center justify-between pb-4 border-b border-zinc-800/80">
+                <div class="flex items-center space-x-2.5">
+                  <div class="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    <i data-lucide="radar" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-sm font-bold text-white">Multimodal Quality Rubric Radar</h4>
+                    <p class="text-xs text-zinc-400">6 evaluation dimensions scored by Gemini 3.8 Flash vs. 4.0 Benchmark</p>
+                  </div>
+                </div>
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Gate: 4.0</span>
+              </div>
+              <div class="relative w-full h-[320px] mt-4">
+                <canvas id="chartRubricRadar"></canvas>
+              </div>
+              <div class="mt-4 pt-3 border-t border-zinc-800/60 grid grid-cols-3 gap-2 text-center text-[11px] text-zinc-400">
+                <div><span class="block text-zinc-200 font-bold font-mono" id="statRadarTopDim">--</span>Top Performing</div>
+                <div><span class="block text-amber-400 font-bold font-mono" id="statRadarLagDim">--</span>Needs Attention</div>
+                <div><span class="block text-emerald-400 font-bold font-mono">6 of 6</span>Dimensions Audited</div>
+              </div>
+            </div>
+
+            <!-- Doughnut Chart: FinOps Pipeline Expenditure Split -->
+            <div class="lg:col-span-5 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+              <div class="flex items-center justify-between pb-4 border-b border-zinc-800/80">
+                <div class="flex items-center space-x-2.5">
+                  <div class="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    <i data-lucide="pie-chart" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-sm font-bold text-white">FinOps Pipeline Cost Allocation</h4>
+                    <p class="text-xs text-zinc-400">Speech Generation vs. Multimodal Auditing</p>
+                  </div>
+                </div>
+              </div>
+              <div class="relative w-full h-[260px] my-auto">
+                <canvas id="chartFinopsSplit"></canvas>
+              </div>
+              <div class="pt-4 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-400">
+                <span>Auditing Overhead Ratio:</span>
+                <span id="fullFoJudgeRatio" class="font-mono font-bold text-purple-300">--% of pipeline</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Secondary Visualizations Grid: Persona Benchmark Bars & Token Modality Stack -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Bar Chart: Persona Multimodal Quality Benchmarks -->
+            <div class="lg:col-span-7 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+              <div class="flex items-center justify-between pb-4 border-b border-zinc-800/80">
+                <div class="flex items-center space-x-2.5">
+                  <div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-sm font-bold text-white">Banking Persona Quality Benchmarks</h4>
+                    <p class="text-xs text-zinc-400">Mean multimodal scores across personas against the 4.0 threshold</p>
+                  </div>
+                </div>
+              </div>
+              <div class="relative w-full h-[240px] mt-4">
+                <canvas id="chartPersonaBars"></canvas>
+              </div>
+            </div>
+
+            <!-- Bar Chart: Token Utilization by Model (Input vs. Output) -->
+            <div class="lg:col-span-5 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+              <div class="flex items-center justify-between pb-4 border-b border-zinc-800/80">
+                <div class="flex items-center space-x-2.5">
+                  <div class="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <i data-lucide="layers" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-sm font-bold text-white">Token Usage & Cost per Model</h4>
+                    <p class="text-xs text-zinc-400">Input (Prompt) vs. Output (Audio/Eval) Tokens</p>
+                  </div>
+                </div>
+                <span class="text-[10px] font-mono text-zinc-400 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700">Split by I/O</span>
+              </div>
+              <div class="relative w-full h-[240px] mt-4">
+                <canvas id="chartTokenStack"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Foundation Model Telemetry & FinOps Cost Matrix -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
+            <div class="p-5 border-b border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center space-x-2.5">
+                <div class="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  <i data-lucide="cpu" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <div class="flex items-center space-x-2">
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wide">Foundation Model Telemetry & FinOps Matrix</h4>
+                    <span class="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-[10px] text-purple-300 font-mono">Gemini 3.x Flash Family</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400">Total usage per model, split by input (prompt) and output (candidate/audio) tokens with incurred USD costs</p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-3 text-xs font-mono">
+                <span class="text-zinc-400">Active Models: <strong class="text-white" id="modelMatrixActiveCount">2</strong></span>
+                <span class="text-zinc-600">|</span>
+                <span class="text-zinc-400">Fleet Spend: <strong class="text-purple-300" id="modelMatrixFleetSpend">$0.0000</strong></span>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-zinc-950/60 text-zinc-400 uppercase tracking-wider font-mono text-[10px] border-b border-zinc-800">
+                  <tr>
+                    <th class="py-3 px-4">AI Foundation Model</th>
+                    <th class="py-3 px-4">Pipeline Role & Modality</th>
+                    <th class="py-3 px-4 text-right">Input Tokens</th>
+                    <th class="py-3 px-4 text-right">Output Tokens</th>
+                    <th class="py-3 px-4 text-right">Total Tokens</th>
+                    <th class="py-3 px-4 text-right">FinOps Spend</th>
+                    <th class="py-3 px-4 text-center">Cost Share</th>
+                  </tr>
+                </thead>
+                <tbody id="fullFoModelTableBody" class="divide-y divide-zinc-800/60 text-zinc-300">
+                  <!-- Dynamically populated by renderAuditorDashboard() -->
+                </tbody>
+                <tfoot id="fullFoModelTableFoot" class="bg-zinc-950/80 border-t border-zinc-800 font-mono text-xs text-zinc-200">
+                  <!-- Dynamically populated totals -->
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <!-- 5. Persona Governance & Spend Matrix Table -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
+            <div class="p-5 border-b border-zinc-800/80 flex items-center justify-between">
+              <div class="flex items-center space-x-2.5">
+                <div class="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+                  <i data-lucide="users" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-white uppercase tracking-wide">Banking Persona Governance Matrix</h4>
+                  <p class="text-[11px] text-zinc-400">Disclosures, pass rates, average quality scores, and cumulative FinOps expenditure</p>
+                </div>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-zinc-950/60 text-zinc-400 uppercase tracking-wider font-mono text-[10px] border-b border-zinc-800">
+                  <tr>
+                    <th class="py-3 px-4">Banking Persona</th>
+                    <th class="py-3 px-4 text-center">Volume</th>
+                    <th class="py-3 px-4 text-center">Pass Rate</th>
+                    <th class="py-3 px-4 text-center">Avg Score</th>
+                    <th class="py-3 px-4 text-right">FinOps Spend</th>
+                    <th class="py-3 px-4 text-right">Tokens</th>
+                    <th class="py-3 px-4 text-center">Regulatory Status</th>
+                  </tr>
+                </thead>
+                <tbody id="fullFoPersonaTableBody" class="divide-y divide-zinc-800/60 text-zinc-300">
+                  <!-- Dynamically populated by renderAuditorDashboard() -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 5. Unit Economics & Cloud Governance Specs -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Unit Economics -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+              <div class="flex items-center space-x-2 text-xs font-bold text-zinc-300 uppercase tracking-wide pb-2 border-b border-zinc-800">
+                <i data-lucide="calculator" class="w-4 h-4 text-emerald-400"></i>
+                <span>Unit Economics & FinOps Efficiency</span>
+              </div>
+              <div class="space-y-2.5 text-xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-zinc-400">Cost per Audio Minute:</span>
+                  <span id="fullFoCostPerMin" class="font-mono font-bold text-emerald-400">$0.0034 / min</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-zinc-400">Cost per Audited Disclosure:</span>
+                  <span id="fullFoCostPerJob" class="font-mono font-bold text-zinc-200">$0.0182 / disclosure</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-zinc-400">Auditor Overhead Ratio:</span>
+                  <span id="fullFoAuditorOverhead" class="font-mono text-purple-300">--%</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-zinc-400">Audio Encoding Spec:</span>
+                  <span class="font-mono text-zinc-300">24kHz PCM / 320kbps MP3</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cloud Infrastructure & Security -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+              <div class="flex items-center space-x-2 text-xs font-bold text-zinc-300 uppercase tracking-wide pb-2 border-b border-zinc-800">
+                <i data-lucide="server" class="w-4 h-4 text-cyan-400"></i>
+                <span>Cloud Infrastructure & Governance</span>
+              </div>
+              <div class="space-y-2.5 text-xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-zinc-400">Persistence Store:</span>
+                  <span class="font-mono text-amber-300 flex items-center space-x-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                    <span id="fullFoBackendRepo">Firestore Native (tts-jobs)</span>
+                  </span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-zinc-400">Audio Storage Bucket:</span>
+                  <span id="fullFoBucketName" class="font-mono text-zinc-300 truncate max-w-[200px]">knowledge-to-audio-poc</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-zinc-400">Compliance Retention:</span>
+                  <span class="font-mono text-zinc-300">30-Day GCS Lifecycle Purge</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-zinc-400">Audit Trail Security:</span>
+                  <span class="text-emerald-400 font-semibold">Immutable Record Logs</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. Flagged Disclosures Action Center (< 4.0) -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-zinc-800">
+              <div class="flex items-center space-x-2 text-xs font-bold text-amber-400 uppercase tracking-wide">
+                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                <span>Flagged Disclosures Requiring Compliance Review (&lt; 4.0)</span>
+              </div>
+              <span id="fullFoFlaggedBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium">0 Flagged</span>
+            </div>
+
+            <div id="fullFoFlaggedContainer" class="space-y-2.5">
+              <!-- Dynamically populated by renderAuditorDashboard() -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Job Directory & Filters -->
+      <div id="jobDirectorySection" class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
+        
+        <!-- Filter Header -->
+        <div class="p-5 border-b border-zinc-800/80 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h3 id="tableTitle" class="text-base font-semibold text-white">Synthesis & Quality Audit Job History</h3>
+            <p id="tableSubtitle" class="text-xs text-zinc-400 mt-0.5">Click on any job to inspect full transcripts, GCS storage paths, token metrics, and diagnostic scorecards.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <!-- Auditor Compliance Filter Tabs -->
+            <div id="complianceFilterTabs" class="hidden flex items-center bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs font-medium">
+              <button id="filterTabAll" onclick="setComplianceFilter('all')" class="px-3 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 transition font-semibold">All Disclosures</button>
+              <button id="filterTabCompliant" onclick="setComplianceFilter('compliant')" class="px-3 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 border border-transparent transition">Compliant (&ge; 4.0)</button>
+              <button id="filterTabFlagged" onclick="setComplianceFilter('flagged')" class="px-3 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 border border-transparent transition">Needs Review (&lt; 4.0)</button>
+            </div>
+
+            <select id="personaFilter" onchange="filterJobs(true)"
+              class="px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 transition">
+              <option value="All">All Voice Personas</option>
+              <option value="Retail Banking Guide">Retail Banking Guide</option>
+              <option value="Wealth & Market Advisor">Wealth & Market Advisor</option>
+              <option value="Regulatory & Policy Officer">Regulatory & Policy Officer</option>
+              <option value="Employee Enablement & Operations">Employee Enablement & Operations</option>
+              <option value="Fraud & Security Alert">Fraud & Security Alert</option>
+            </select>
+
+            <button onclick="loadJobs()" title="Refresh" class="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Jobs Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-zinc-950/60 text-zinc-400 uppercase tracking-wider font-mono text-[11px] border-b border-zinc-800">
+              <tr>
+                <th class="px-5 py-3.5">Job ID & Timestamp</th>
+                <th class="px-5 py-3.5">Article Title</th>
+                <th class="px-5 py-3.5">Persona & Voice</th>
+                <th class="px-5 py-3.5">Audience & Prefix</th>
+                <th class="px-5 py-3.5">Audio Duration</th>
+                <th class="px-5 py-3.5">Quality Gate</th>
+                <th class="px-5 py-3.5">Estimated Cost</th>
+                <th class="px-5 py-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="jobsTableBody" class="divide-y divide-zinc-800/60">
+              <tr>
+                <td colspan="8" class="px-5 py-8 text-center text-zinc-500">
+                  <div class="flex items-center justify-center space-x-2">
+                    <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-emerald-400"></i>
+                    <span>Loading speech jobs telemetry...</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination Footer -->
+        <div id="paginationContainer" class="p-4 border-t border-zinc-800/80 bg-zinc-950/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <!-- Item Count Summary -->
+          <div class="text-xs text-zinc-400 flex items-center space-x-1.5">
+            <span>Showing</span>
+            <span id="paginationRangeStart" class="font-mono font-semibold text-zinc-200">0</span>
+            <span>to</span>
+            <span id="paginationRangeEnd" class="font-mono font-semibold text-zinc-200">0</span>
+            <span>of</span>
+            <span id="paginationTotalItems" class="font-mono font-semibold text-zinc-200">0</span>
+            <span>jobs</span>
+          </div>
+
+          <!-- Page Controls & Size Selector -->
+          <div class="flex flex-wrap items-center gap-4">
+            <!-- Items per Page Dropdown -->
+            <div class="flex items-center space-x-2 text-xs text-zinc-400">
+              <label for="pageSizeSelect" class="text-xs text-zinc-400">Rows per page:</label>
+              <select id="pageSizeSelect" onchange="changePageSize(this.value)"
+                class="px-2.5 py-1 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 transition font-mono">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+
+            <!-- Page Navigation Buttons -->
+            <nav aria-label="Job History Pagination" class="flex items-center space-x-1">
+              <button id="btnFirstPage" onclick="goToPage(1)" title="First Page"
+                class="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:pointer-events-none transition">
+                <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+              </button>
+              <button id="btnPrevPage" onclick="goToPage(CURRENT_PAGE - 1)" title="Previous Page"
+                class="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:pointer-events-none transition">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+              </button>
+
+              <!-- Dynamic Page Numbers Container -->
+              <div id="pageNumberButtons" class="flex items-center space-x-1 font-mono text-xs"></div>
+
+              <button id="btnNextPage" onclick="goToPage(CURRENT_PAGE + 1)" title="Next Page"
+                class="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:pointer-events-none transition">
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+              <button id="btnLastPage" onclick="goToLastPage()" title="Last Page"
+                class="p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:pointer-events-none transition">
+                <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>

@@ -1,0 +1,41 @@
+{% include "partials/head_meta.html" %}
+{% include "partials/styles.html" %}
+<body class="h-full bg-zinc-950 text-zinc-100 flex flex-col font-sans antialiased selection:bg-cyan-500/20 selection:text-cyan-300">
+
+  {% include "partials/auth/auth_gate.html" %}
+  {% include "partials/auth/persona_select.html" %}
+
+  <!-- ================= MAIN APP DASHBOARD ================= -->
+  <div id="appSection" class="hidden flex-1 flex flex-col h-full overflow-hidden">
+    {% include "partials/nav/header.html" %}
+
+    <!-- Main Content Area with Dynamic Persona Views -->
+    <main class="flex-1 overflow-y-auto p-8 relative">
+      <div class="max-w-7xl mx-auto space-y-8">
+        {% include "partials/views/creator_view.html" %}
+        {% include "partials/views/auditor_view.html" %}
+      </div>
+    </main>
+  </div>
+
+  {% include "partials/drawers/job_detail_drawer.html" %}
+  {% include "partials/drawers/finops_drawer.html" %}
+  {% include "partials/modals/new_job_modal.html" %}
+  {% include "partials/modals/bulk_job_modal.html" %}
+  {% include "partials/modals/retry_modal.html" %}
+
+  <!-- ================= JAVASCRIPT APPLICATION LOGIC ================= -->
+  <script>
+    {% include "partials/scripts/state.js" %}
+    {% include "partials/scripts/auth.js" %}
+    {% include "partials/scripts/jobs_table.js" %}
+    {% include "partials/scripts/job_detail.js" %}
+    {% include "partials/scripts/retry_dialog.js" %}
+    {% include "partials/scripts/creator.js" %}
+    {% include "partials/scripts/finops.js" %}
+    {% include "partials/scripts/auditor_dashboard.js" %}
+    {% include "partials/scripts/tour.js" %}
+    {% include "partials/scripts/main.js" %}
+  </script>
+</body>
+</html>
