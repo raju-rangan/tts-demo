@@ -26,7 +26,7 @@ from src.ai.personas import PERSONAS, get_persona
 from src.ai.generator import GeminiAudioGenerator
 from src.ai.judge import MultimodalAudioJudge
 from src.storage.gcs_client import GCSStorageClient
-from src.ai.cost_calculator import TokenCostCalculator
+from src.ai.cost_calculator import TokenCostCalculator, PRICING
 from src.utils.extractor import validate_url, extract_article_from_url
 
 # Initialize GCP Cloud Logging + Persistent Local Rotating File + Console
@@ -548,6 +548,54 @@ def get_dashboard_stats(user: Dict[str, Any] = Depends(get_current_user)):
     cost_per_job = round(total_cost / total_jobs, 4) if total_jobs > 0 else 0.0182
     judge_cost_percent = round((judge_cost / total_cost * 100.0), 1) if total_cost > 0 else 25.0
 
+    # Foundation Model Usage & Cost Matrix
+    model_matrix = {}
+    tts_model_name = settings.voice_model
+    tts_in = input_text_tokens
+    tts_out = audio_output_tokens
+    tts_tot = tts_in + tts_out
+    tts_spend = round(tts_cost, 4)
+    tts_pricing = PRICING.get(tts_model_name, {"text_input_per_1m": 0.10, "audio_output_per_1m": 2.00})
+
+    model_matrix[tts_model_name] = {
+        "model": tts_model_name,
+        "display_name": "Gemini 3.1 Flash Speech",
+        "role": "Generative Speech Synthesis (TTS)",
+        "modality": "Text In → Audio Out (24kHz MP3)",
+        "input_pricing": f"${tts_pricing.get('text_input_per_1m', 0.10):.2f} / 1M",
+        "output_pricing": f"${tts_pricing.get('audio_output_per_1m', 2.00):.2f} / 1M",
+        "input_tokens": tts_in,
+        "output_tokens": tts_out,
+        "total_tokens": tts_tot,
+        "total_cost_usd": tts_spend,
+        "cost_percentage": round((tts_spend / total_cost * 100.0), 1) if total_cost > 0 else 0.0,
+        "token_percentage": round((tts_tot / total_tokens * 100.0), 1) if total_tokens > 0 else 0.0,
+        "job_count": total_jobs,
+    }
+
+    judge_model_name = settings.judge_model
+    judge_in = judge_input_tokens
+    judge_out = judge_output_tokens
+    judge_tot = judge_in + judge_out
+    judge_spend = round(judge_cost, 4)
+    judge_pricing = PRICING.get(judge_model_name, {"input_per_1m": 0.15, "output_per_1m": 0.60})
+
+    model_matrix[judge_model_name] = {
+        "model": judge_model_name,
+        "display_name": "Gemini 3.8 Flash Multimodal",
+        "role": "Multimodal Regulatory Quality Judge",
+        "modality": "Audio+Text In → JSON Scorecard Out",
+        "input_pricing": f"${judge_pricing.get('input_per_1m', 0.15):.2f} / 1M",
+        "output_pricing": f"${judge_pricing.get('output_per_1m', 0.60):.2f} / 1M",
+        "input_tokens": judge_in,
+        "output_tokens": judge_out,
+        "total_tokens": judge_tot,
+        "total_cost_usd": judge_spend,
+        "cost_percentage": round((judge_spend / total_cost * 100.0), 1) if total_cost > 0 else 0.0,
+        "token_percentage": round((judge_tot / total_tokens * 100.0), 1) if total_tokens > 0 else 0.0,
+        "job_count": audited_count,
+    }
+
     return {
         "total_jobs": total_jobs,
         "total_cost_usd": round(total_cost, 4),
@@ -573,6 +621,7 @@ def get_dashboard_stats(user: Dict[str, Any] = Depends(get_current_user)):
         },
         "rubric_averages": rubric_averages,
         "persona_matrix": persona_matrix,
+        "model_matrix": model_matrix,
         "flagged_jobs": flagged_jobs,
         "unit_economics": {
             "cost_per_audio_minute": cost_per_minute,

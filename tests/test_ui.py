@@ -85,10 +85,17 @@ def test_authenticated_jobs_and_stats(client):
     assert "input_text_tokens" in stats["token_breakdown"]
     assert "rubric_averages" in stats
     assert "script_adherence_and_accuracy" in stats["rubric_averages"]
-    assert "persona_matrix" in stats
-    assert "Retail Banking Guide" in stats["persona_matrix"]
-    assert "unit_economics" in stats
-    assert "flagged_jobs" in stats
+    assert "model_matrix" in stats
+    assert len(stats["model_matrix"]) >= 2
+    for m_name, m_data in stats["model_matrix"].items():
+        assert "input_tokens" in m_data
+        assert "output_tokens" in m_data
+        assert "total_tokens" in m_data
+        assert "total_cost_usd" in m_data
+        assert "role" in m_data
+        assert "input_pricing" in m_data
+        assert "output_pricing" in m_data
+        assert m_data["total_tokens"] == m_data["input_tokens"] + m_data["output_tokens"]
 
 def test_stream_audio_isolation(client):
     """Verify failed/running/unknown jobs do not leak or cross-contaminate audio."""

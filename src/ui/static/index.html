@@ -528,7 +528,7 @@
               </div>
             </div>
 
-            <!-- Bar Chart: Token Utilization by Modality -->
+            <!-- Bar Chart: Token Utilization by Model (Input vs. Output) -->
             <div class="lg:col-span-5 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
               <div class="flex items-center justify-between pb-4 border-b border-zinc-800/80">
                 <div class="flex items-center space-x-2.5">
@@ -536,10 +536,11 @@
                     <i data-lucide="layers" class="w-4 h-4"></i>
                   </div>
                   <div>
-                    <h4 class="text-sm font-bold text-white">Token Volume by Modality</h4>
-                    <p class="text-xs text-zinc-400">Input Text, Audio Stream, and Judge Evaluation</p>
+                    <h4 class="text-sm font-bold text-white">Token Usage & Cost per Model</h4>
+                    <p class="text-xs text-zinc-400">Input (Prompt) vs. Output (Audio/Eval) Tokens</p>
                   </div>
                 </div>
+                <span class="text-[10px] font-mono text-zinc-400 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700">Split by I/O</span>
               </div>
               <div class="relative w-full h-[240px] mt-4">
                 <canvas id="chartTokenStack"></canvas>
@@ -547,7 +548,51 @@
             </div>
           </div>
 
-          <!-- 4. Persona Governance & Spend Matrix Table -->
+          <!-- 4. Foundation Model Telemetry & FinOps Cost Matrix -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
+            <div class="p-5 border-b border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center space-x-2.5">
+                <div class="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  <i data-lucide="cpu" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <div class="flex items-center space-x-2">
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wide">Foundation Model Telemetry & FinOps Matrix</h4>
+                    <span class="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-[10px] text-purple-300 font-mono">Gemini 3.x Flash Family</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400">Total usage per model, split by input (prompt) and output (candidate/audio) tokens with incurred USD costs</p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-3 text-xs font-mono">
+                <span class="text-zinc-400">Active Models: <strong class="text-white" id="modelMatrixActiveCount">2</strong></span>
+                <span class="text-zinc-600">|</span>
+                <span class="text-zinc-400">Fleet Spend: <strong class="text-purple-300" id="modelMatrixFleetSpend">$0.0000</strong></span>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-zinc-950/60 text-zinc-400 uppercase tracking-wider font-mono text-[10px] border-b border-zinc-800">
+                  <tr>
+                    <th class="py-3 px-4">AI Foundation Model</th>
+                    <th class="py-3 px-4">Pipeline Role & Modality</th>
+                    <th class="py-3 px-4 text-right">Input Tokens</th>
+                    <th class="py-3 px-4 text-right">Output Tokens</th>
+                    <th class="py-3 px-4 text-right">Total Tokens</th>
+                    <th class="py-3 px-4 text-right">FinOps Spend</th>
+                    <th class="py-3 px-4 text-center">Cost Share</th>
+                  </tr>
+                </thead>
+                <tbody id="fullFoModelTableBody" class="divide-y divide-zinc-800/60 text-zinc-300">
+                  <!-- Dynamically populated by renderAuditorDashboard() -->
+                </tbody>
+                <tfoot id="fullFoModelTableFoot" class="bg-zinc-950/80 border-t border-zinc-800 font-mono text-xs text-zinc-200">
+                  <!-- Dynamically populated totals -->
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <!-- 5. Persona Governance & Spend Matrix Table -->
           <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
             <div class="p-5 border-b border-zinc-800/80 flex items-center justify-between">
               <div class="flex items-center space-x-2.5">
@@ -3243,7 +3288,91 @@
       const avgScoreEl = document.getElementById('fullFoAvgScore');
       if (avgScoreEl) avgScoreEl.textContent = stats.avg_quality_score ? `${stats.avg_quality_score.toFixed(2)} / 5.0` : '--';
 
-      // 2. Persona Governance Matrix Table
+      // 2. Foundation Model Telemetry & FinOps Matrix Table
+      const modelTbody = document.getElementById('fullFoModelTableBody');
+      const modelTfoot = document.getElementById('fullFoModelTableFoot');
+      const modelActiveEl = document.getElementById('modelMatrixActiveCount');
+      const modelSpendEl = document.getElementById('modelMatrixFleetSpend');
+
+      if (stats.model_matrix && modelTbody) {
+        const models = Object.values(stats.model_matrix);
+        if (modelActiveEl) modelActiveEl.textContent = `${models.length} Active`;
+        if (modelSpendEl) modelSpendEl.textContent = `$${(stats.total_cost_usd || 0).toFixed(4)}`;
+
+        modelTbody.innerHTML = models.map(m => {
+          const isTts = m.role.toLowerCase().includes('speech') || m.role.toLowerCase().includes('tts');
+          const badgeColor = isTts
+            ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20'
+            : 'bg-purple-500/10 text-purple-300 border-purple-500/20';
+          const iconName = isTts ? 'mic' : 'shield-check';
+
+          return `
+            <tr class="hover:bg-zinc-800/40 transition">
+              <td class="py-3 px-4">
+                <div class="flex items-center space-x-2.5">
+                  <span class="p-1.5 rounded-lg ${badgeColor} border">
+                    <i data-lucide="${iconName}" class="w-3.5 h-3.5"></i>
+                  </span>
+                  <div>
+                    <div class="font-bold text-white text-xs font-mono">${m.model}</div>
+                    <div class="text-[11px] text-zinc-400">${m.display_name || m.role}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="py-3 px-4">
+                <div class="text-xs text-zinc-200 font-medium">${m.role}</div>
+                <div class="text-[10px] text-zinc-400 font-mono">${m.modality}</div>
+              </td>
+              <td class="py-3 px-4 text-right">
+                <div class="font-mono text-cyan-300 font-bold">${(m.input_tokens || 0).toLocaleString()}</div>
+                <div class="text-[10px] text-zinc-500 font-mono">${m.input_pricing}</div>
+              </td>
+              <td class="py-3 px-4 text-right">
+                <div class="font-mono text-purple-300 font-bold">${(m.output_tokens || 0).toLocaleString()}</div>
+                <div class="text-[10px] text-zinc-500 font-mono">${m.output_pricing}</div>
+              </td>
+              <td class="py-3 px-4 text-right">
+                <div class="font-mono text-white font-bold">${(m.total_tokens || 0).toLocaleString()}</div>
+                <div class="text-[10px] text-zinc-400 font-mono">${m.token_percentage}% fleet</div>
+              </td>
+              <td class="py-3 px-4 text-right">
+                <div class="font-mono text-emerald-400 font-bold">$${(m.total_cost_usd || 0).toFixed(4)}</div>
+                <div class="text-[10px] text-zinc-500 font-mono">${m.job_count} runs</div>
+              </td>
+              <td class="py-3 px-4 text-center">
+                <div class="flex flex-col items-center gap-1">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono ${isTts ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30' : 'bg-purple-500/10 text-purple-300 border border-purple-500/30'}">
+                    ${m.cost_percentage}%
+                  </span>
+                  <div class="w-16 bg-zinc-800 rounded-full h-1 overflow-hidden">
+                    <div class="${isTts ? 'bg-cyan-400' : 'bg-purple-400'} h-1 rounded-full" style="width: ${Math.min(100, m.cost_percentage)}%"></div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        if (modelTfoot) {
+          const totalIn = models.reduce((acc, m) => acc + (m.input_tokens || 0), 0);
+          const totalOut = models.reduce((acc, m) => acc + (m.output_tokens || 0), 0);
+          const totalTokens = totalIn + totalOut;
+          const totalCost = models.reduce((acc, m) => acc + (m.total_cost_usd || 0), 0);
+
+          modelTfoot.innerHTML = `
+            <tr>
+              <td class="py-3 px-4 font-bold text-white uppercase text-[10px] tracking-wider" colspan="2">Fleet Combined Totals</td>
+              <td class="py-3 px-4 text-right text-cyan-300 font-bold">${totalIn.toLocaleString()} in</td>
+              <td class="py-3 px-4 text-right text-purple-300 font-bold">${totalOut.toLocaleString()} out</td>
+              <td class="py-3 px-4 text-right text-white font-bold">${totalTokens.toLocaleString()}</td>
+              <td class="py-3 px-4 text-right text-emerald-400 font-bold">$${totalCost.toFixed(4)}</td>
+              <td class="py-3 px-4 text-center text-zinc-400 font-bold">100.0%</td>
+            </tr>
+          `;
+        }
+      }
+
+      // 3. Persona Governance Matrix Table
       const personaTbody = document.getElementById('fullFoPersonaTableBody');
       if (personaTbody && stats.persona_matrix) {
         personaTbody.innerHTML = Object.entries(stats.persona_matrix).map(([name, p]) => {
@@ -3548,32 +3677,52 @@
         });
       }
 
-      // 4. Bar Chart: Token Utilization by Modality
+      // 4. Bar Chart: Token Utilization by Model (Input vs. Output Tokens)
       const tokenCanvas = document.getElementById('chartTokenStack');
-      if (tokenCanvas && stats.token_breakdown) {
+      if (tokenCanvas && (stats.model_matrix || stats.token_breakdown)) {
         if (chartInstances.tokens) chartInstances.tokens.destroy();
 
-        const tb = stats.token_breakdown;
-        const inputTokens = tb.input_text_tokens || 0;
-        const audioTokens = tb.audio_output_tokens || 0;
-        const judgeTokens = (tb.judge_input_tokens || 0) + (tb.judge_output_tokens || 0);
+        let labels = [];
+        let inputData = [];
+        let outputData = [];
+        let costs = [];
+
+        if (stats.model_matrix) {
+          const models = Object.values(stats.model_matrix);
+          labels = models.map(m => m.display_name || m.model);
+          inputData = models.map(m => m.input_tokens || 0);
+          outputData = models.map(m => m.output_tokens || 0);
+          costs = models.map(m => m.total_cost_usd || 0);
+        } else {
+          const tb = stats.token_breakdown || {};
+          labels = ['Gemini 3.1 Flash Speech', 'Gemini 3.8 Flash Judge'];
+          inputData = [tb.input_text_tokens || 0, tb.judge_input_tokens || 0];
+          outputData = [tb.audio_output_tokens || 0, tb.judge_output_tokens || 0];
+          costs = [stats.cost_breakdown?.tts_cost_usd || 0, stats.cost_breakdown?.judge_cost_usd || 0];
+        }
 
         chartInstances.tokens = new Chart(tokenCanvas, {
           type: 'bar',
           data: {
-            labels: ['Article Text', 'Audio Stream', 'Judge Multimodal'],
-            datasets: [{
-              label: 'Tokens Consumed',
-              data: [inputTokens, audioTokens, judgeTokens],
-              backgroundColor: [
-                'rgba(59, 130, 246, 0.75)',
-                'rgba(245, 158, 11, 0.75)',
-                'rgba(168, 85, 247, 0.75)'
-              ],
-              borderColor: ['#3b82f6', '#f59e0b', '#a855f7'],
-              borderWidth: 1.5,
-              borderRadius: 6
-            }]
+            labels: labels,
+            datasets: [
+              {
+                label: 'Input Tokens (Prompt)',
+                data: inputData,
+                backgroundColor: 'rgba(6, 182, 212, 0.8)',
+                borderColor: '#06b6d4',
+                borderWidth: 1.5,
+                borderRadius: 6
+              },
+              {
+                label: 'Output Tokens (Candidate / Audio)',
+                data: outputData,
+                backgroundColor: 'rgba(168, 85, 247, 0.8)',
+                borderColor: '#a855f7',
+                borderWidth: 1.5,
+                borderRadius: 6
+              }
+            ]
           },
           options: {
             responsive: true,
@@ -3588,16 +3737,26 @@
                 grid: { color: 'rgba(63, 63, 70, 0.3)' }
               },
               x: {
-                ticks: { color: '#e4e4e7', font: { family: 'DM Sans', size: 10 } },
+                ticks: { color: '#e4e4e7', font: { family: 'DM Sans', size: 10, weight: '500' } },
                 grid: { display: false }
               }
             },
             plugins: {
-              legend: { display: false },
+              legend: {
+                position: 'bottom',
+                labels: { color: '#a1a1aa', font: { family: 'DM Sans', size: 10 }, boxWidth: 10, padding: 10 }
+              },
               tooltip: {
                 callbacks: {
                   label: function(ctx) {
-                    return ` Tokens: ${(ctx.raw || 0).toLocaleString()}`;
+                    return ` ${ctx.dataset.label.split('(')[0].trim()}: ${(ctx.raw || 0).toLocaleString()} tokens`;
+                  },
+                  afterBody: function(ctxList) {
+                    if (ctxList.length > 0 && costs.length > ctxList[0].dataIndex) {
+                      const cost = costs[ctxList[0].dataIndex];
+                      return ` FinOps Spend: $${cost.toFixed(4)} USD`;
+                    }
+                    return '';
                   }
                 }
               }

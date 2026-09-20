@@ -15,7 +15,6 @@ import websockets
 SCREENSHOT_DIR = "/Users/rrangan/Documents/customers/tts-demo/docs/images"
 
 async def main():
-    # 1. Fetch active targets from Chrome DevTools on [::1]:9222
     try:
         req = urllib.request.urlopen("http://[::1]:9222/json/list")
         targets = json.loads(req.read().decode())
@@ -75,7 +74,7 @@ async def main():
         # Navigate to app
         print("Navigating to http://127.0.0.1:8000...")
         await send_cmd("Page.navigate", {"url": "http://127.0.0.1:8000"})
-        await asyncio.sleep(2.5)
+        await asyncio.sleep(3.0)
 
         # -------------------------------------------------------------
         # 1. Login Screen / Workspace Persona Selector Hub
@@ -93,14 +92,18 @@ async def main():
         # -------------------------------------------------------------
         print("2. Capturing 02_studio_dashboard.png...")
         await eval_js("""
-            choosePersona('creator');
-            if (typeof closeCreateJobModal === 'function') closeCreateJobModal();
-            if (typeof closeBulkJobModal === 'function') closeBulkJobModal();
-            if (typeof closeDetailModal === 'function') closeDetailModal();
-            if (typeof closeFinOpsDrawer === 'function') closeFinOpsDrawer();
-            if (window.lucide) lucide.createIcons();
+            (async () => {
+                await choosePersona('creator');
+                if (typeof closeCreateJobModal === 'function') closeCreateJobModal();
+                if (typeof closeBulkJobModal === 'function') closeBulkJobModal();
+                if (typeof closeDetailModal === 'function') closeDetailModal();
+                if (typeof closeFinOpsDrawer === 'function') closeFinOpsDrawer();
+                await loadJobs();
+                await loadStats();
+                if (window.lucide) lucide.createIcons();
+            })()
         """)
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(2.0)
         await capture("02_studio_dashboard.png", width=1440, height=900)
 
         # -------------------------------------------------------------
@@ -108,24 +111,30 @@ async def main():
         # -------------------------------------------------------------
         print("3. Capturing 03_progress_synthesis.png...")
         await eval_js("""
-            const sampleRunningJob = {
-                job_id: 'job_synth_preview',
-                status: 'RUNNING',
-                created_at: new Date().toISOString(),
-                article_title: 'High-Yield Savings Accounts vs. Certificates of Deposit (CDs): A Financial Guide for Retail Banking Customers',
-                persona_name: 'Retail Banking Guide (External Customers | Voice: Sulafat)',
-                audience_prefix: 'external/audio/',
-                target_url: null,
-                progress_stage: 'SYNTHESIZING',
-                current_turn: 1,
-                total_turns: 2,
-                turns_completed: 0,
-                latency_seconds: 14.8
-            };
-            openJobDetail('job_synth_preview', sampleRunningJob);
-            if (window.lucide) lucide.createIcons();
+            (async () => {
+                const sampleRunningJob = {
+                    job_id: 'job_synth_preview',
+                    status: 'RUNNING',
+                    created_at: new Date().toISOString(),
+                    article_title: 'High-Yield Savings Accounts vs. Certificates of Deposit (CDs): A Financial Guide for Retail Banking Customers',
+                    persona_name: 'Retail Banking Guide (External Customers | Voice: Sulafat)',
+                    audience: 'External Customers',
+                    audience_prefix: 'external/audio/',
+                    transcript: 'When planning your short-to-medium-term savings strategy, two of the most secure instruments available are High-Yield Savings Accounts (HYSA) and Certificates of Deposit (CDs)...',
+                    word_count: 227,
+                    voice_customization: 'Speak with an articulate, reassuring retail banking demeanor. Enunciate "High-Yield" and acronyms FDIC, APY, CD with precision.',
+                    target_url: null,
+                    progress_stage: 'SYNTHESIZING',
+                    current_turn: 1,
+                    total_turns: 2,
+                    turns_completed: 0,
+                    latency_seconds: 14.8
+                };
+                await openJobDetail('job_synth_preview', sampleRunningJob);
+                if (window.lucide) lucide.createIcons();
+            })()
         """)
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(1.5)
         await capture("03_progress_synthesis.png", width=1440, height=900)
 
         # -------------------------------------------------------------
@@ -133,15 +142,18 @@ async def main():
         # -------------------------------------------------------------
         print("4. Capturing 04_audio_player_scorecard.png...")
         await eval_js("""
-            const target = ALL_JOBS.find(j => j.status === 'COMPLETED' && j.overall_score >= 4.0) || ALL_JOBS[0];
-            if (target) {
-                openJobDetail(target.job_id);
-            }
-            if (window.lucide) lucide.createIcons();
-            const scrollable = document.querySelector('#jobDetailModal .overflow-y-auto');
-            if (scrollable) scrollable.scrollTop = 120;
+            (async () => {
+                await loadJobs();
+                const target = ALL_JOBS.find(j => j.status === 'COMPLETED' && j.overall_score >= 4.0) || ALL_JOBS[0];
+                if (target) {
+                    await openJobDetail(target.job_id);
+                }
+                if (window.lucide) lucide.createIcons();
+                const scrollable = document.querySelector('#jobDetailModal .overflow-y-auto');
+                if (scrollable) scrollable.scrollTop = 0;
+            })()
         """)
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(1.5)
         await capture("04_audio_player_scorecard.png", width=1440, height=1050)
 
         # -------------------------------------------------------------
@@ -153,7 +165,7 @@ async def main():
             openFinOpsDrawer();
             if (window.lucide) lucide.createIcons();
         """)
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(1.5)
         await capture("05_finops_drawer.png", width=1440, height=900)
 
         # -------------------------------------------------------------
@@ -172,7 +184,7 @@ async def main():
             updateBulkUrlStats();
             if (window.lucide) lucide.createIcons();
         """)
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(1.5)
         await capture("06_bulk_url_processing.png", width=1440, height=900)
 
         # -------------------------------------------------------------
@@ -180,13 +192,15 @@ async def main():
         # -------------------------------------------------------------
         print("7. Capturing 07_auditor_dashboard.png...")
         await eval_js("""
-            closeBulkJobModal();
-            choosePersona('auditor');
-            switchAuditorSubView('dashboard');
-            if (window.lucide) lucide.createIcons();
+            (async () => {
+                closeBulkJobModal();
+                await choosePersona('auditor');
+                switchAuditorSubView('dashboard');
+                if (window.lucide) lucide.createIcons();
+            })()
         """)
-        await asyncio.sleep(2.0)
-        await capture("07_auditor_dashboard.png", width=1440, height=1050)
+        await asyncio.sleep(2.5)  # Chart.js animations
+        await capture("07_auditor_dashboard.png", width=1440, height=1100)
 
         print("🎉 All 7 screenshots captured successfully!")
     return 0
