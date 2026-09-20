@@ -5,7 +5,7 @@ import sqlite3
 import logging
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.db.models import JobRecord, TokenUsageDetails, CostBreakdown
 from src.config import settings
@@ -45,6 +45,16 @@ class BaseJobRepository(ABC):
         total_turns: Optional[int] = None,
     ) -> None:
         """Updates live progress stage and turn counters for a running job."""
+        pass
+
+    @abstractmethod
+    def get_user_tour_status(self, user_email: str) -> bool:
+        """Returns True if the user has completed or dismissed the onboarding tour, False otherwise."""
+        pass
+
+    @abstractmethod
+    def set_user_tour_dismissed(self, user_email: str, dismissed: bool = True) -> None:
+        """Persists user onboarding tour completion / dismissal state."""
         pass
 
 
@@ -114,6 +124,13 @@ class SQLiteJobRepository(BaseJobRepository):
                     pass
             conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs (created_at DESC)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_persona ON jobs (persona)")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_preferences (
+                    user_email TEXT PRIMARY KEY,
+                    has_seen_tour INTEGER DEFAULT 0,
+                    tour_dismissed_at TEXT
+                )
+            """)
             conn.commit()
 
     def save_job(self, job: JobRecord) -> None:
@@ -242,6 +259,31 @@ class SQLiteJobRepository(BaseJobRepository):
             source_url=source_url
         )
 
+    def get_user_tour_status(self, user_email: str) -> bool:
+        clean_email = user_email.lower().strip()
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT has_seen_tour FROM user_preferences WHERE user_email = ?",
+                (clean_email,)
+            ).fetchone()
+            if row:
+                return bool(row["has_seen_tour"])
+        return False
+
+    def set_user_tour_dismissed(self, user_email: str, dismissed: bool = True) -> None:
+        clean_email = user_email.lower().strip()
+        now_iso = datetime.now(timezone.utc).isoformat() if dismissed else None
+        has_seen = 1 if dismissed else 0
+        with self._get_conn() as conn:
+            conn.execute("""
+                INSERT INTO user_preferences (user_email, has_seen_tour, tour_dismissed_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_email) DO UPDATE SET
+                    has_seen_tour = excluded.has_seen_tour,
+                    tour_dismissed_at = excluded.tour_dismissed_at
+            """, (clean_email, has_seen, now_iso))
+            conn.commit()
+
 
 class FirestoreJobRepository(BaseJobRepository):
     """Google Cloud Firestore (Firebase Native Mode) repository."""
@@ -307,6 +349,31 @@ class FirestoreJobRepository(BaseJobRepository):
             "current_turn": current_turn,
             "total_turns": total_turns,
         })
+
+    def get_user_tour_status(self, user_email: str) -> bool:
+        clean_email = user_email.lower().strip()
+        try:
+            doc_ref = self.client.collection("user_preferences").document(clean_email)
+            doc = doc_ref.get()
+            if doc.exists:
+                data = doc.to_dict() or {}
+                return bool(data.get("has_seen_tour", False))
+        except Exception as e:
+            logger.warning(f"Failed to fetch user tour status from Firestore: {e}")
+        return False
+
+    def set_user_tour_dismissed(self, user_email: str, dismissed: bool = True) -> None:
+        clean_email = user_email.lower().strip()
+        now_iso = datetime.now(timezone.utc).isoformat() if dismissed else None
+        try:
+            doc_ref = self.client.collection("user_preferences").document(clean_email)
+            doc_ref.set({
+                "user_email": clean_email,
+                "has_seen_tour": dismissed,
+                "tour_dismissed_at": now_iso,
+            }, merge=True)
+        except Exception as e:
+            logger.warning(f"Failed to set user tour dismissal in Firestore: {e}")
 
 
 _active_repo: Optional[BaseJobRepository] = None

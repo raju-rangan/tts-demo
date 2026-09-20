@@ -425,6 +425,46 @@ def get_me(user: Dict[str, Any] = Depends(get_current_user)):
     return {"user": user}
 
 
+@app.get("/api/user/tour-status")
+def get_user_tour_status_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
+    """Returns whether the authenticated user has already completed or dismissed the onboarding tour."""
+    repo = get_job_repository()
+    email = user.get("email", "")
+    has_seen = repo.get_user_tour_status(email)
+    return {
+        "user_email": email,
+        "has_seen_tour": has_seen
+    }
+
+
+@app.post("/api/user/tour-dismiss")
+def dismiss_user_tour_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
+    """Records that the user has seen, completed, or dismissed the onboarding tour."""
+    repo = get_job_repository()
+    email = user.get("email", "")
+    repo.set_user_tour_dismissed(email, dismissed=True)
+    logger.info(f"✓ Onboarding tour marked as dismissed for user '{email}'")
+    return {
+        "user_email": email,
+        "has_seen_tour": True,
+        "status": "dismissed"
+    }
+
+
+@app.post("/api/user/tour-reset")
+def reset_user_tour_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
+    """Resets the onboarding tour status so the user can experience the auto-prompt tour again."""
+    repo = get_job_repository()
+    email = user.get("email", "")
+    repo.set_user_tour_dismissed(email, dismissed=False)
+    logger.info(f"✓ Onboarding tour reset for user '{email}'")
+    return {
+        "user_email": email,
+        "has_seen_tour": False,
+        "status": "reset"
+    }
+
+
 @app.get("/api/personas")
 def list_personas():
     """Returns all 5 banking voice personas with metadata and pronunciation rules."""
