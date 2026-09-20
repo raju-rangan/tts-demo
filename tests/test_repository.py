@@ -158,29 +158,37 @@ def test_firestore_repository_mock_operations(monkeypatch):
 
 
 def test_sqlite_user_tour_status_lifecycle(temp_repo):
-    """Verify SQLite tracking of onboarding tour keyed by authenticated Google identity, NOT persona."""
+    """Verify SQLite tracking of onboarding tour keyed per Google identity per persona (google_email, persona)."""
     google_user_1 = "alex.morgan@apexbank.com"
-    # 1. New Google user has not seen tour
-    assert temp_repo.get_user_tour_status(google_user_1) is False
+    # 1. New Google user has not seen tour for either creator or auditor
+    assert temp_repo.get_user_tour_status(google_user_1, "creator") is False
+    assert temp_repo.get_user_tour_status(google_user_1, "auditor") is False
 
-    # 2. Mark tour as completed/dismissed for Google user 1
-    temp_repo.set_user_tour_dismissed(google_user_1, dismissed=True)
-    assert temp_repo.get_user_tour_status(google_user_1) is True
+    # 2. Mark tour as completed/dismissed for Google user 1 in Creator view
+    temp_repo.set_user_tour_dismissed(google_user_1, "creator", dismissed=True)
+    assert temp_repo.get_user_tour_status(google_user_1, "creator") is True
+    # Auditor view tour MUST remain unseen (False)
+    assert temp_repo.get_user_tour_status(google_user_1, "auditor") is False
 
-    # 3. Mark tour as reset/unseen
-    temp_repo.set_user_tour_dismissed(google_user_1, dismissed=False)
-    assert temp_repo.get_user_tour_status(google_user_1) is False
+    # 3. Mark tour as completed/dismissed for Google user 1 in Auditor view
+    temp_repo.set_user_tour_dismissed(google_user_1, "auditor", dismissed=True)
+    assert temp_repo.get_user_tour_status(google_user_1, "creator") is True
+    assert temp_repo.get_user_tour_status(google_user_1, "auditor") is True
 
     # 4. Independent tracking across distinct Google accounts (e.g. Rachel vs Alex)
     google_user_2 = "rachel.lee@apexbank.com"
-    assert temp_repo.get_user_tour_status(google_user_2) is False
-    temp_repo.set_user_tour_dismissed(google_user_2, dismissed=True)
-    assert temp_repo.get_user_tour_status(google_user_2) is True
-    assert temp_repo.get_user_tour_status(google_user_1) is False
+    assert temp_repo.get_user_tour_status(google_user_2, "creator") is False
+    assert temp_repo.get_user_tour_status(google_user_2, "auditor") is False
+
+    # 5. Reset all tour tracking
+    temp_repo.reset_all_tour_tracking()
+    assert temp_repo.get_user_tour_status(google_user_1, "creator") is False
+    assert temp_repo.get_user_tour_status(google_user_1, "auditor") is False
+    assert temp_repo.get_user_tour_status(google_user_2, "creator") is False
 
 
 def test_firestore_user_tour_status_lifecycle(monkeypatch):
-    """Verify Firestore repository tracking of Google identity preferences document."""
+    """Verify Firestore repository tracking of (google_email, persona) composite preferences document."""
     from unittest.mock import MagicMock
     from src.db.repository import FirestoreJobRepository
     import sys
@@ -204,18 +212,25 @@ def test_firestore_user_tour_status_lifecycle(monkeypatch):
     mock_snap_empty = MagicMock()
     mock_snap_empty.exists = False
     mock_doc_ref.get.return_value = mock_snap_empty
-    assert repo.get_user_tour_status(google_email) is False
+    assert repo.get_user_tour_status(google_email, "creator") is False
+    mock_collection.document.assert_called_with(f"{google_email}__creator")
 
     # 2. Mock set dismissal
-    repo.set_user_tour_dismissed(google_email, dismissed=True)
-    mock_collection.document.assert_called_with(google_email)
+    repo.set_user_tour_dismissed(google_email, "creator", dismissed=True)
+    mock_collection.document.assert_called_with(f"{google_email}__creator")
     mock_doc_ref.set.assert_called_once()
 
     # 3. Mock get when doc exists with has_seen_tour = True
     mock_snap_seen = MagicMock()
     mock_snap_seen.exists = True
-    mock_snap_seen.to_dict.return_value = {"has_seen_tour": True, "google_email": google_email}
+    mock_snap_seen.to_dict.return_value = {"has_seen_tour": True, "google_email": google_email, "persona": "creator"}
     mock_doc_ref.get.return_value = mock_snap_seen
-    assert repo.get_user_tour_status(google_email) is True
+    assert repo.get_user_tour_status(google_email, "creator") is True
+
+    # 4. Test reset_all_tour_tracking
+    mock_doc_1 = MagicMock()
+    mock_collection.stream.return_value = [mock_doc_1]
+    repo.reset_all_tour_tracking()
+    mock_doc_1.reference.delete.assert_called_once()
 
 

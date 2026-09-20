@@ -1698,6 +1698,7 @@
           console.warn("Could not refresh user after persona change:", e);
         }
       }
+      checkAndPromptTour();
     }
 
     function updatePersonaUI() {
@@ -3876,15 +3877,19 @@
     async function checkAndPromptTour() {
       if (!AUTH_TOKEN) return;
       try {
-        const resp = await fetch('/api/user/tour-status', {
+        const personaParam = encodeURIComponent(CURRENT_PERSONA || 'creator');
+        const resp = await fetch(`/api/user/tour-status?persona=${personaParam}`, {
           headers: getAuthHeaders()
         });
         if (resp.ok) {
           const data = await resp.json();
-          // If user has not yet completed or dismissed the tour, auto-launch
+          // If user has not yet completed or dismissed the tour for this persona, auto-launch
           if (data && data.has_seen_tour === false) {
             setTimeout(() => {
-              startGuidedTour(false);
+              // Ensure we are still on this persona and app is visible
+              if (!document.getElementById('appSection')?.classList.contains('hidden')) {
+                startGuidedTour(false);
+              }
             }, 800);
           }
         }
@@ -3898,9 +3903,10 @@
       try {
         await fetch('/api/user/tour-dismiss', {
           method: 'POST',
-          headers: getAuthHeaders()
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ persona: CURRENT_PERSONA })
         });
-        console.log("✓ Tour dismissal recorded in database");
+        console.log(`✓ Tour dismissal recorded in database for persona '${CURRENT_PERSONA}'`);
       } catch (err) {
         console.warn("Failed to record tour dismissal:", err);
       }
@@ -3911,12 +3917,27 @@
       try {
         await fetch('/api/user/tour-reset', {
           method: 'POST',
-          headers: getAuthHeaders()
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ persona: CURRENT_PERSONA })
         });
-        console.log("✓ Tour status reset in database");
+        console.log(`✓ Tour status reset in database for persona '${CURRENT_PERSONA}'`);
         startGuidedTour(true);
       } catch (err) {
         console.warn("Failed to reset tour status:", err);
+      }
+    }
+
+    async function resetAllTours() {
+      if (!AUTH_TOKEN) return;
+      try {
+        await fetch('/api/user/tour-reset-all', {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
+        console.log("✓ All onboarding tour records reset across database");
+        startGuidedTour(true);
+      } catch (err) {
+        console.warn("Failed to reset all tour records:", err);
       }
     }
 
@@ -4067,6 +4088,7 @@
     // Expose for testing & console interaction
     window.startGuidedTour = startGuidedTour;
     window.resetTourStatus = resetTourStatus;
+    window.resetAllTours = resetAllTours;
     window.checkAndPromptTour = checkAndPromptTour;
   </script>
 </body>
