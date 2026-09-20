@@ -133,6 +133,7 @@
   - **Updated FastAPI Handler**: Wired `fastapi.templating.Jinja2Templates` into `app.get("/")`.
   - **Clean Single Source of Truth**: Removed obsolete `src/ui/static/index.html`.
   - **Full-Screen Responsive Layout Optimization**: Replaced `max-w-7xl mx-auto` (which artificially constrained layout width to 1280px / 80rem) with `w-full` in `index.html`. Expanded title truncation widths from `max-w-xs` (320px) to `max-w-md lg:max-w-xl`, eliminating column squeezing across the 8-column Jobs Table and Chart.js dashboards.
+  - **Retry Modal Loading Spinner & Clean State Transitions**: Added glassmorphic loading spinner overlay (`#retryModalLoading`) inside `#modalRetryDialog`. Resets stale form values on click and disables submit button until auditor critique is retrieved from `/api/jobs/{id}/retry-preview`.
   - All **90 out of 90 automated tests passing**.
 
 ---
