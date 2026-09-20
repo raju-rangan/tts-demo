@@ -900,17 +900,26 @@ def build_remediation_directive(job: JobRecord) -> Dict[str, Any]:
 
     metric_labels = {
         "script_adherence_and_accuracy": "Script Adherence & Verbatim Accuracy",
+        "Script Adherence And Accuracy": "Script Adherence & Verbatim Accuracy",
+        "Script Adherence & Verbatim Accuracy": "Script Adherence & Verbatim Accuracy",
         "naturalness_and_inflection": "Naturalness & Vocal Inflection",
+        "Naturalness And Inflection": "Naturalness & Vocal Inflection",
         "pacing_and_breathing": "Pacing & Breathing",
+        "Pacing And Breathing": "Pacing & Breathing",
+        "Pacing And Pause Structure": "Pacing & Breathing",
         "tone_congruence": "Tone Congruence",
+        "Tone Congruence": "Tone Congruence",
+        "Tone Consistency": "Tone Congruence",
         "pronunciation_and_jargon": "Financial Pronunciation & Jargon",
-        "acoustic_quality": "Acoustic Clarity & Production Quality"
+        "Pronunciation And Jargon": "Financial Pronunciation & Jargon",
+        "acoustic_quality": "Acoustic Clarity & Production Quality",
+        "Acoustic Quality": "Acoustic Clarity & Production Quality"
     }
 
     for m_key, m_val in metrics.items():
         if isinstance(m_val, dict):
             score = float(m_val.get("score", 5.0))
-            rationale = m_val.get("rationale", "")
+            rationale = m_val.get("rationale") or m_val.get("reasoning") or ""
             if score < 4.0:
                 flagged.append({
                     "metric_key": m_key,

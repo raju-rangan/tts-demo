@@ -746,12 +746,17 @@ def test_html_guided_tour_assets_and_elements(client):
     assert "/api/user/tour-dismiss" in html
 
 
-def test_create_job_with_speed_control(client):
+def test_create_job_with_speed_control(client, monkeypatch):
     """Verify /api/jobs accepts speed and persists it in the created job."""
     # 1. Login
     login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
     token = login_resp.json()["token"]
     headers = {"Authorization": f"Bearer {token}"}
+
+    # Mock _execute_async_synthesis to prevent live network call
+    def mock_execute(*args, **kwargs):
+        pass
+    monkeypatch.setattr("src.ui.app._execute_async_synthesis", mock_execute)
 
     # 2. Submit job with custom speed = 1.25
     payload = {
@@ -792,6 +797,170 @@ def test_html_speed_control_elements(client):
     assert 'updateSpeedDisplay' in html
     assert 'setSpeedPreset' in html
     assert 'setPlaybackRate' in html
+
+
+def test_retry_preview_endpoint(client):
+    """Verify GET /api/jobs/{job_id}/retry-preview parses evaluations and generates critique directives."""
+    from src.db.repository import get_job_repository
+    from src.db.models import JobRecord
+
+    # 1. Login
+    login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. 404 for non-existent job
+    resp_404 = client.get("/api/jobs/job_preview_nonexistent/retry-preview", headers=headers)
+    assert resp_404.status_code == 404
+
+    # 3. Create job with low scoring evaluation
+    repo = get_job_repository()
+    job = JobRecord(
+        job_id="job_preview_test_1",
+        persona="Retail Banking Guide",
+        audience="External Customers",
+        voice_name="Sulafat",
+        transcript="Apex Bank CD rates with FDIC insurance.",
+        word_count=7,
+        char_count=42,
+        gcs_uri="gs://test-bucket/pending/job_preview_test_1.mp3",
+        status="COMPLETED",
+        overall_score=3.2,
+        passed_rubric=False,
+        rubric_metrics={
+            "Script Adherence And Accuracy": {
+                "score": 2.0,
+                "passed": False,
+                "reasoning": "Skipped the introductory title and omitted parenthetical '(FDIC)'."
+            },
+            "Tone Consistency": {
+                "score": 4.5,
+                "passed": True,
+                "reasoning": "Professional and clear delivery."
+            }
+        },
+        overall_reasoning="Good tone but failed verbatim accuracy requirements.",
+        actionable_feedback=["Ensure the full title is spoken aloud and all abbreviations are pronounced."]
+    )
+    repo.save_job(job)
+
+    try:
+        # 4. Request preview
+        resp = client.get("/api/jobs/job_preview_test_1/retry-preview", headers=headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["job_id"] == "job_preview_test_1"
+        assert data["overall_score"] == 3.2
+        assert len(data["flagged_metrics"]) == 1
+        assert data["flagged_metrics"][0]["label"] == "Script Adherence & Verbatim Accuracy"
+        assert data["flagged_metrics"][0]["score"] == 2.0
+        assert "PREVIOUS TAKE AUDITOR ASSESSMENT" in data["suggested_directive"]
+        assert "Skipped the introductory title" in data["suggested_directive"]
+        assert "Ensure the full title is spoken aloud" in data["suggested_directive"]
+    finally:
+        repo.delete_job("job_preview_test_1")
+
+
+def test_retry_job_with_critique_injection(client, monkeypatch):
+    """Verify POST /api/jobs/{job_id}/retry accepts RetryJobRequest, increments retry_count, and injects critique."""
+    from src.db.repository import get_job_repository
+    from src.db.models import JobRecord
+
+    # 1. Login
+    login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Setup job in repo
+    repo = get_job_repository()
+    job = JobRecord(
+        job_id="job_critic_retry_exec_test",
+        persona="Retail Banking Guide",
+        audience="External Customers",
+        voice_name="Sulafat",
+        transcript="Test retry critique execution.",
+        word_count=4,
+        char_count=30,
+        gcs_uri="gs://test-bucket/pending/job_critic_retry_exec_test.mp3",
+        status="COMPLETED",
+        overall_score=3.5,
+        passed_rubric=False,
+        rubric_metrics={
+            "Pacing And Pause Structure": {
+                "score": 3.0,
+                "passed": False,
+                "reasoning": "Rushed through bullet points."
+            }
+        },
+        overall_reasoning="Pacing needs improvement.",
+        actionable_feedback=["Slow down between key points."]
+    )
+    repo.save_job(job)
+
+    # 3. Intercept _execute_async_synthesis
+    captured_args = {}
+    def mock_execute(job_id, text, persona_name, run_judge, title, voice_customization=None, speed=1.0, critique_feedback=None, **kwargs):
+        captured_args["job_id"] = job_id
+        captured_args["speed"] = speed
+        captured_args["critique_feedback"] = critique_feedback
+
+    monkeypatch.setattr("src.ui.app._execute_async_synthesis", mock_execute)
+
+    try:
+        # 4. Post retry request with custom critique and speed
+        req_payload = {
+            "include_critique": True,
+            "custom_critique": "CRITICAL: Emphasize numbers slowly and pause at colons.",
+            "speed": 0.95
+        }
+        resp = client.post("/api/jobs/job_critic_retry_exec_test/retry", json=req_payload, headers=headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["job"]["retry_count"] == 1
+        assert data["job"]["previous_attempt_score"] == 3.5
+        assert data["job"]["remediation_prompt"] == "CRITICAL: Emphasize numbers slowly and pause at colons."
+        assert data["job"]["speed"] == 0.95
+
+        # 5. Check mock execution received parameters
+        assert captured_args["job_id"] == "job_critic_retry_exec_test"
+        assert captured_args["speed"] == 0.95
+        assert captured_args["critique_feedback"] == "CRITICAL: Emphasize numbers slowly and pause at colons."
+
+        # 6. Verify in repo
+        updated_job = repo.get_job("job_critic_retry_exec_test")
+        assert updated_job.retry_count == 1
+        assert updated_job.previous_attempt_score == 3.5
+        assert updated_job.remediation_prompt == "CRITICAL: Emphasize numbers slowly and pause at colons."
+    finally:
+        repo.delete_job("job_critic_retry_exec_test")
+
+
+def test_html_critic_retry_dialog_elements(client):
+    """Verify index.html includes the critic-guided retry modal, controls, and detail remediation card."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # Modal Elements
+    assert 'id="modalRetryDialog"' in html
+    assert 'id="retryCritiqueText"' in html
+    assert 'id="retryIncludeCritique"' in html
+    assert 'id="retryPrevScoreBadge"' in html
+    assert 'id="retryFlaggedList"' in html
+    assert 'id="retrySpeed"' in html
+    assert 'id="retrySpeedDisplay"' in html
+
+    # Drawer Elements
+    assert 'id="detailRetryBadge"' in html
+    assert 'id="detailScoreDeltaBadge"' in html
+    assert 'id="detailRemediationCard"' in html
+    assert 'id="detailRemediationText"' in html
+
+    # JavaScript Handlers
+    assert "openRetryModal" in html
+    assert "confirmAndExecuteRetry" in html
+    assert "setRetrySpeedPreset" in html
+
 
 
 
