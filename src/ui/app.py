@@ -121,6 +121,12 @@ class BulkJobRequest(BaseModel):
     voice_customization: Optional[str] = Field(default=None, description="Custom director notes or vocal delivery directives")
     speed: Optional[float] = Field(default=1.0, ge=0.5, le=2.0, description="Speech delivery rate (0.5 to 2.0, default 1.0)")
 
+class RetryJobRequest(BaseModel):
+    include_critique: bool = Field(default=True, description="Whether to inject Auditor critique and remediation instructions into the retry prompt")
+    custom_critique: Optional[str] = Field(default=None, description="User-reviewed or custom critique and remediation directive")
+    voice_customization: Optional[str] = Field(default=None, description="Custom director notes or vocal delivery directives")
+    speed: Optional[float] = Field(default=None, ge=0.5, le=2.0, description="Speech delivery rate (0.5 to 2.0)")
+
 def verify_gcip_token(token: str) -> Optional[Dict[str, Any]]:
     """Verifies a Google Cloud Identity Platform (Firebase) ID token against Google's public certs."""
     project_id = os.getenv("GCP_PROJECT_ID", "").strip()
@@ -884,6 +890,72 @@ def stream_job_audio(job_id: str):
         raise HTTPException(status_code=404, detail="Audio artifact unavailable in cloud storage")
 
 
+def build_remediation_directive(job: JobRecord) -> Dict[str, Any]:
+    """
+    Extracts Multimodal Judge deductions and formats structured Critic-Actor
+    remediation instructions for re-synthesizing audio.
+    """
+    metrics = job.rubric_metrics or {}
+    flagged = []
+
+    metric_labels = {
+        "script_adherence_and_accuracy": "Script Adherence & Verbatim Accuracy",
+        "naturalness_and_inflection": "Naturalness & Vocal Inflection",
+        "pacing_and_breathing": "Pacing & Breathing",
+        "tone_congruence": "Tone Congruence",
+        "pronunciation_and_jargon": "Financial Pronunciation & Jargon",
+        "acoustic_quality": "Acoustic Clarity & Production Quality"
+    }
+
+    for m_key, m_val in metrics.items():
+        if isinstance(m_val, dict):
+            score = float(m_val.get("score", 5.0))
+            rationale = m_val.get("rationale", "")
+            if score < 4.0:
+                flagged.append({
+                    "metric_key": m_key,
+                    "label": metric_labels.get(m_key, m_key),
+                    "score": score,
+                    "rationale": rationale
+                })
+
+    flagged.sort(key=lambda x: x["score"])
+
+    lines = []
+    lines.append("PREVIOUS TAKE AUDITOR ASSESSMENT:")
+    if job.overall_score is not None:
+        status_str = "FAILED COMPLIANCE GATE" if not job.passed_rubric else "NEEDS REFINEMENT"
+        lines.append(f"- Overall Quality Rating: {job.overall_score:.2f} / 5.0 ({status_str})")
+    if job.overall_reasoning:
+        lines.append(f"- Auditor Findings: {job.overall_reasoning.strip()}")
+
+    if flagged:
+        lines.append("\nSPECIFIC DEFECTS TO REMEDIATE:")
+        for item in flagged:
+            lines.append(f"• {item['label']} (Rating: {item['score']:.1f}/5.0): {item['rationale']}")
+
+    recommendations = job.actionable_feedback or []
+    if recommendations:
+        lines.append("\nAUDITOR ACTIONABLE RECOMMENDATIONS:")
+        for rec in recommendations:
+            lines.append(f"• {rec.strip()}")
+
+    lines.append("\nMANDATORY REMEDIATION INSTRUCTIONS FOR THIS TAKE:")
+    lines.append("1. Verbatim Fidelity: You MUST read the reference text with 100% exact word-for-word accuracy. Do NOT omit headers, skip parentheticals, paraphrase, or drop bullet points.")
+    lines.append("2. Correct All Flagged Flaws: Directly address each defect listed above.")
+    lines.append("3. Professional Banking Standard: Maintain steady pacing, clear pauses around monetary figures, and correct financial pronunciation throughout.")
+
+    prompt_directive = "\n".join(lines)
+    return {
+        "overall_score": job.overall_score,
+        "passed_rubric": job.passed_rubric,
+        "flagged_metrics": flagged,
+        "actionable_feedback": recommendations,
+        "overall_reasoning": job.overall_reasoning,
+        "suggested_directive": prompt_directive
+    }
+
+
 def _execute_async_synthesis(
     job_id: str,
     text: str,
@@ -893,7 +965,11 @@ def _execute_async_synthesis(
     voice_customization: Optional[str] = None,
     speed: float = 1.0,
     source_url: Optional[str] = None,
-    created_by: Optional[str] = None
+    created_by: Optional[str] = None,
+    critique_feedback: Optional[str] = None,
+    retry_count: int = 0,
+    previous_attempt_score: Optional[float] = None,
+    remediation_prompt: Optional[str] = None
 ):
     """Background worker that runs TTS synthesis, GCS upload, and Multimodal Judge."""
     repo = get_job_repository()
@@ -916,7 +992,8 @@ def _execute_async_synthesis(
 
     words = len(text.split())
     chars = len(text)
-    logger.info(f"▶ [{job_id}] Starting synthesis job | Persona: '{persona_name}' | Speed: {speed:.2f}x | Words: {words} | Chars: {chars} | Run Judge: {run_judge} | Customization: {bool(voice_customization)}")
+    critique_note = " | Critique Remediation Active" if critique_feedback else ""
+    logger.info(f"▶ [{job_id}] Starting synthesis job | Persona: '{persona_name}' | Speed: {speed:.2f}x | Words: {words} | Chars: {chars} | Run Judge: {run_judge} | Customization: {bool(voice_customization)}{critique_note}")
     t0 = time.time()
     try:
         # Step 1: Voice Generation (multi-turn auto-chunking & DSP mastering)
@@ -926,6 +1003,7 @@ def _execute_async_synthesis(
             job_id=job_id,
             voice_customization=voice_customization,
             speed=speed,
+            critique_feedback=critique_feedback,
             progress_callback=progress_callback
         )
         synth_time = time.time() - t0
@@ -1017,6 +1095,9 @@ def _execute_async_synthesis(
             judge_latency_sec=judge_time if eval_result else None,
             error_message=f"Audio generated, but Multimodal Judge evaluation failed: {judge_error}" if judge_error else None,
             voice_customization=voice_customization,
+            retry_count=retry_count,
+            remediation_prompt=remediation_prompt,
+            previous_attempt_score=previous_attempt_score,
             progress_stage="COMPLETED",
             progress_message="Pipeline execution completed successfully",
             source_url=source_url,
@@ -1043,6 +1124,9 @@ def _execute_async_synthesis(
             speed=speed,
             error_message=str(e),
             voice_customization=voice_customization,
+            retry_count=retry_count,
+            remediation_prompt=remediation_prompt,
+            previous_attempt_score=previous_attempt_score,
             progress_stage="FAILED",
             progress_message=str(e),
             source_url=source_url,
@@ -1110,22 +1194,66 @@ def create_job(
     }
 
 
-@app.post("/api/jobs/{job_id}/retry")
-def retry_job(
+@app.get("/api/jobs/{job_id}/retry-preview")
+def get_retry_preview(
     job_id: str,
-    background_tasks: BackgroundTasks,
     user: Dict[str, Any] = Depends(get_current_user)
 ):
-    """Re-runs speech synthesis and multimodal evaluation for an existing job."""
+    """Returns previous audit deductions and pre-populated remediation prompt for interactive retry review."""
     clean_id = os.path.basename(job_id.strip())
     repo = get_job_repository()
     job = repo.get_job(clean_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Job '{clean_id}' not found")
 
-    job_speed = float(getattr(job, "speed", 1.0) or 1.0)
+    preview_data = build_remediation_directive(job)
+    return {
+        "job_id": job.job_id,
+        "persona": job.persona,
+        "article_title": job.article_title,
+        "speed": getattr(job, "speed", 1.0) or 1.0,
+        "voice_customization": job.voice_customization,
+        "retry_count": getattr(job, "retry_count", 0) or 0,
+        "overall_score": job.overall_score,
+        "passed_rubric": job.passed_rubric,
+        "overall_reasoning": job.overall_reasoning,
+        "flagged_metrics": preview_data["flagged_metrics"],
+        "actionable_feedback": preview_data["actionable_feedback"],
+        "suggested_directive": preview_data["suggested_directive"]
+    }
 
-    # Reset job record to RUNNING and clear previous error/scores while preserving customization
+
+@app.post("/api/jobs/{job_id}/retry")
+def retry_job(
+    job_id: str,
+    background_tasks: BackgroundTasks,
+    req: Optional[RetryJobRequest] = None,
+    user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Re-runs speech synthesis and multimodal evaluation for an existing job, optionally injecting Auditor critique."""
+    clean_id = os.path.basename(job_id.strip())
+    repo = get_job_repository()
+    job = repo.get_job(clean_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job '{clean_id}' not found")
+
+    job_speed = float(req.speed) if (req and req.speed is not None) else float(getattr(job, "speed", 1.0) or 1.0)
+    voice_cust = req.voice_customization if (req and req.voice_customization is not None) else job.voice_customization
+
+    # Determine critique text
+    critique_text = None
+    if req is None or req.include_critique:
+        if req and req.custom_critique and req.custom_critique.strip():
+            critique_text = req.custom_critique.strip()
+        else:
+            remediation_info = build_remediation_directive(job)
+            if remediation_info["overall_score"] is not None or remediation_info["flagged_metrics"] or remediation_info["actionable_feedback"]:
+                critique_text = remediation_info["suggested_directive"]
+
+    new_retry_count = (getattr(job, "retry_count", 0) or 0) + 1
+    prev_score = job.overall_score
+
+    # Reset job record to RUNNING and clear previous error/scores while preserving customization & setting critique
     updated_job = JobRecord(
         job_id=job.job_id,
         created_at=datetime.now(timezone.utc).isoformat(),
@@ -1140,17 +1268,20 @@ def retry_job(
         status="RUNNING",
         speed=job_speed,
         error_message=None,
-        voice_customization=job.voice_customization,
+        voice_customization=voice_cust,
+        retry_count=new_retry_count,
+        remediation_prompt=critique_text,
+        previous_attempt_score=prev_score,
         progress_stage="CHUNKING",
-        progress_message="Partitioning text for synthesis retry...",
+        progress_message=f"Partitioning text for Take {new_retry_count + 1} synthesis...",
         source_url=job.source_url,
         created_by=user.get("email") or job.created_by
     )
     repo.save_job(updated_job)
 
-    logger.info(f"🔄 Retrying job {clean_id} (requested by user: {user.get('email', 'unknown')})")
+    logger.info(f"🔄 Retrying job {clean_id} (Take {new_retry_count + 1}, critique injected: {bool(critique_text)}, requested by user: {user.get('email', 'unknown')})")
 
-    # Launch background synthesis worker
+    # Launch background synthesis worker with critique steering
     background_tasks.add_task(
         _execute_async_synthesis,
         job_id=job.job_id,
@@ -1158,16 +1289,20 @@ def retry_job(
         persona_name=job.persona,
         run_judge=True,
         title=job.article_title,
-        voice_customization=job.voice_customization,
+        voice_customization=voice_cust,
         speed=job_speed,
         source_url=job.source_url,
-        created_by=user.get("email") or job.created_by
+        created_by=user.get("email") or job.created_by,
+        critique_feedback=critique_text,
+        retry_count=new_retry_count,
+        previous_attempt_score=prev_score,
+        remediation_prompt=critique_text
     )
 
     return {
         "job_id": job.job_id,
         "status": "RUNNING",
-        "message": f"Retry started for job '{job.job_id}'",
+        "message": f"Retry started for job '{job.job_id}' (Take {new_retry_count + 1})",
         "job": updated_job
     }
 

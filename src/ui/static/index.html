@@ -926,13 +926,14 @@
             <div class="flex items-center space-x-2">
               <span id="detailJobId" class="font-mono text-sm font-bold text-white">job_xxxx</span>
               <span id="detailStatusBadge" class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">COMPLETED</span>
+              <span id="detailRetryBadge" class="hidden px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">Take 2</span>
             </div>
             <p id="detailTimestamp" class="text-xs text-zinc-400 mt-0.5">--</p>
           </div>
         </div>
 
         <div class="flex items-center space-x-2">
-          <button id="modalRetryBtn" onclick="retryCurrentJob()" title="Retry Voice Synthesis"
+          <button id="modalRetryBtn" onclick="openRetryModal(CURRENT_JOB ? CURRENT_JOB.job_id : null, event)" title="Retry Voice Synthesis with Auditor Feedback"
             class="px-2.5 py-1.5 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/50 border border-cyan-800/40 rounded-xl transition flex items-center space-x-1.5 text-xs font-medium">
             <i data-lucide="rotate-cw" id="modalRetryIcon" class="w-3.5 h-3.5"></i>
             <span id="modalRetryText">Retry</span>
@@ -959,7 +960,7 @@
           </div>
           <p id="jobErrorMessage" class="text-xs text-rose-200/90 font-mono leading-relaxed break-words pl-6"></p>
           <div id="errorBannerRetryContainer" class="pl-6 pt-1">
-            <button onclick="retryCurrentJob()" class="px-3 py-1.5 bg-rose-900/40 hover:bg-rose-900/70 text-rose-200 hover:text-white border border-rose-700/60 rounded-xl text-xs font-medium transition flex items-center space-x-1.5">
+            <button onclick="openRetryModal(CURRENT_JOB ? CURRENT_JOB.job_id : null, event)" class="px-3 py-1.5 bg-rose-900/40 hover:bg-rose-900/70 text-rose-200 hover:text-white border border-rose-700/60 rounded-xl text-xs font-medium transition flex items-center space-x-1.5">
               <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
               <span>Retry Synthesis Now</span>
             </button>
@@ -1221,6 +1222,18 @@
             <span>Director's Notes & Vocal Delivery Customization</span>
           </span>
           <p id="detailVoiceCustomizationText" class="text-xs text-zinc-300 italic p-3 bg-zinc-900/80 border border-zinc-800/80 rounded-xl leading-relaxed"></p>
+        </div>
+
+        <!-- 4b-2. Auditor Critique Remediation Directives (Critic-Actor Steered) -->
+        <div id="detailRemediationCard" class="hidden bg-cyan-950/20 border border-cyan-500/30 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-cyan-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
+              <span>Auditor Critique Remediation Directives (Take <span id="detailRetryCount">2</span>)</span>
+            </span>
+            <span id="detailScoreDeltaBadge" class="hidden text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono"></span>
+          </div>
+          <pre id="detailRemediationText" class="text-xs text-zinc-300 font-mono leading-relaxed p-3.5 bg-black/50 border border-cyan-900/40 rounded-xl whitespace-pre-wrap max-h-60 overflow-y-auto"></pre>
         </div>
 
         <!-- 4c. Source Web URL (for Bulk URL jobs) -->
@@ -1704,6 +1717,120 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Interactive Retry Voice Synthesis Modal with Auditor Feedback (Option B) -->
+  <div id="modalRetryDialog" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm px-4">
+    <div class="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative max-h-[90vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800 shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl">
+            <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span>Retry Voice Synthesis</span>
+              <span id="retryTakeBadge" class="text-xs px-2.5 py-0.5 rounded-full font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Take 2</span>
+            </h3>
+            <p class="text-xs text-zinc-400">Review Multimodal Auditor feedback & steer Gemini with corrective directives</p>
+          </div>
+        </div>
+        <button onclick="closeRetryModal()" class="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+        <!-- Previous Take Summary Card -->
+        <div class="p-4 bg-zinc-950 border border-zinc-800 rounded-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Previous Take Audit Score</span>
+            <div class="flex items-center space-x-2">
+              <span id="retryPrevScoreBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-200">--</span>
+              <span id="retryPrevGateBadge" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">--</span>
+            </div>
+          </div>
+          <p id="retryPrevReasoning" class="text-xs text-zinc-400 leading-relaxed italic"></p>
+        </div>
+
+        <!-- Flagged Defects from Auditor -->
+        <div id="retryFlaggedContainer" class="hidden p-4 bg-rose-950/20 border border-rose-900/40 rounded-xl space-y-2">
+          <div class="flex items-center space-x-2 text-xs font-semibold text-rose-300 uppercase tracking-wider">
+            <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i>
+            <span>Auditor Flagged Deductions</span>
+          </div>
+          <div id="retryFlaggedList" class="space-y-1.5 text-xs text-zinc-300">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Checkbox Toggle to Include Critique -->
+        <div class="flex items-center justify-between p-3 bg-zinc-950/60 border border-zinc-800 rounded-xl">
+          <div class="flex items-center space-x-2">
+            <input type="checkbox" id="retryIncludeCritique" checked onchange="toggleRetryCritiqueInput(this.checked)"
+              class="w-4 h-4 rounded text-cyan-600 bg-zinc-900 border-zinc-700 focus:ring-cyan-500 cursor-pointer">
+            <label for="retryIncludeCritique" class="text-xs font-medium text-zinc-200 cursor-pointer">
+              Inject Auditor Critique & Remediation Instructions into Prompt
+            </label>
+          </div>
+          <span class="text-[11px] text-cyan-400 font-mono">Critic-Actor Mode</span>
+        </div>
+
+        <!-- Editable Directive Textarea -->
+        <div id="retryCritiqueBox" class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              Prompt Remediation Directives (What went wrong & make it right)
+            </label>
+            <button type="button" onclick="resetRetryCritiqueToDefault()" class="text-[11px] text-cyan-400 hover:text-cyan-300 underline">
+              Reset to Auditor Default
+            </button>
+          </div>
+          <textarea id="retryCritiqueText" rows="6"
+            class="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 font-mono leading-relaxed focus:outline-none focus:border-cyan-500 transition"></textarea>
+          <p class="text-[11px] text-zinc-500">You can edit these instructions to highlight specific words, disclaimers, or pacing adjustments for Gemini.</p>
+        </div>
+
+        <!-- Delivery Speed Adjustments (Optional on Retry) -->
+        <div class="p-3 bg-zinc-950/80 border border-zinc-800 rounded-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Delivery Speed Multiplier</label>
+            <span id="retrySpeedDisplay" class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-200">1.00x</span>
+          </div>
+          <input type="range" id="retrySpeed" min="0.5" max="2.0" step="0.05" value="1.0"
+            oninput="updateRetrySpeedDisplay(this.value)"
+            class="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+          <div class="flex items-center space-x-1.5 pt-1">
+            <button type="button" onclick="setRetrySpeedPreset(0.8)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">0.8x</button>
+            <button type="button" onclick="setRetrySpeedPreset(1.0)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">1.0x</button>
+            <button type="button" onclick="setRetrySpeedPreset(1.2)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">1.2x</button>
+            <button type="button" onclick="setRetrySpeedPreset(1.5)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">1.5x</button>
+          </div>
+        </div>
+
+        <!-- Optional Voice Customization update -->
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Additional Director's Notes (Optional)</label>
+          <input type="text" id="retryVoiceCustomization"
+            class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500 transition"
+            placeholder="e.g. Slightly warmer inflection on the opening summary...">
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-4 border-t border-zinc-800 flex items-center justify-end space-x-3 shrink-0">
+        <button type="button" onclick="closeRetryModal()" class="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition">
+          Cancel
+        </button>
+        <button type="button" id="confirmRetrySubmitBtn" onclick="confirmAndExecuteRetry()"
+          class="px-5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-cyan-600/20 transition flex items-center space-x-2">
+          <i data-lucide="rotate-cw" id="retrySubmitIcon" class="w-3.5 h-3.5"></i>
+          <span id="retrySubmitText">Confirm & Launch Re-Synthesis</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -2380,7 +2507,10 @@
         return `
           <tr class="${cursorStyle} transition" ${rowClick}>
             <td class="px-5 py-4 whitespace-nowrap">
-              <div class="font-mono font-bold text-white text-xs">${j.job_id}</div>
+              <div class="font-mono font-bold text-white text-xs flex items-center space-x-1">
+                <span>${j.job_id}</span>
+                ${j.retry_count && j.retry_count > 0 ? `<span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30" title="Take ${j.retry_count + 1} (Critic-Steered)">Take ${j.retry_count + 1}</span>` : ''}
+              </div>
               <div class="text-[11px] text-zinc-500">${timeStr}</div>
             </td>
             <td class="px-5 py-4">
@@ -2403,14 +2533,18 @@
             </td>
             <td class="px-5 py-4 whitespace-nowrap">
               ${scoreBadge}
+              ${j.previous_attempt_score && j.overall_score ? `
+                <div class="text-[10px] font-mono mt-0.5 ${(j.overall_score - j.previous_attempt_score) >= 0 ? 'text-emerald-400' : 'text-rose-400'}" title="Score vs previous take">
+                  ${(j.overall_score - j.previous_attempt_score) >= 0 ? '+' : ''}${(j.overall_score - j.previous_attempt_score).toFixed(1)} vs Take 1
+                </div>` : ''}
             </td>
             <td class="px-5 py-4 whitespace-nowrap font-mono text-emerald-400 font-semibold">
               ${costStr}
             </td>
             <td class="px-5 py-4 whitespace-nowrap text-right" onclick="event.stopPropagation()">
               <div class="flex items-center justify-end space-x-1.5">
-                ${showAdminActions && j.status === 'FAILED' ? `
-                <button onclick="retryJob('${j.job_id}', event)" title="Retry Voice Synthesis"
+                ${showAdminActions ? `
+                <button onclick="openRetryModal('${j.job_id}', event)" title="Retry Voice Synthesis with Auditor Feedback"
                   class="p-1.5 bg-zinc-800/80 hover:bg-cyan-950/60 text-zinc-400 hover:text-cyan-400 border border-zinc-700/60 hover:border-cyan-800/60 rounded-lg transition flex items-center justify-center">
                   <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
                 </button>` : ''}
@@ -2564,6 +2698,43 @@
           voiceCustText.textContent = `"${job.voice_customization.trim()}"`;
         } else {
           voiceCustCard.classList.add('hidden');
+        }
+      }
+
+      // Auditor Critique Remediation (for retried/steered jobs)
+      const remediationCard = document.getElementById('detailRemediationCard');
+      const remediationText = document.getElementById('detailRemediationText');
+      const retryCountEl = document.getElementById('detailRetryCount');
+      const deltaBadge = document.getElementById('detailScoreDeltaBadge');
+      const detailRetryBadge = document.getElementById('detailRetryBadge');
+
+      const retryCount = job.retry_count || 0;
+      if (detailRetryBadge) {
+        if (retryCount > 0) {
+          detailRetryBadge.textContent = `Take ${retryCount + 1}`;
+          detailRetryBadge.classList.remove('hidden');
+        } else {
+          detailRetryBadge.classList.add('hidden');
+        }
+      }
+
+      if (remediationCard && remediationText) {
+        if (job.remediation_prompt && job.remediation_prompt.trim()) {
+          remediationCard.classList.remove('hidden');
+          remediationText.textContent = job.remediation_prompt.trim();
+          if (retryCountEl) retryCountEl.textContent = retryCount + 1;
+          if (deltaBadge) {
+            if (job.previous_attempt_score && job.overall_score) {
+              const diff = job.overall_score - job.previous_attempt_score;
+              const sign = diff >= 0 ? '+' : '';
+              deltaBadge.textContent = `Take ${retryCount}: ${job.previous_attempt_score.toFixed(1)} ➔ Take ${retryCount + 1}: ${job.overall_score.toFixed(1)} (${sign}${diff.toFixed(1)})`;
+              deltaBadge.classList.remove('hidden');
+            } else {
+              deltaBadge.classList.add('hidden');
+            }
+          }
+        } else {
+          remediationCard.classList.add('hidden');
         }
       }
 
@@ -2846,22 +3017,177 @@
       await deleteJob(CURRENT_JOB.job_id);
     }
 
-    async function retryJob(jobId, event) {
-      if (event) event.stopPropagation();
-      const retryBtn = document.getElementById('modalRetryBtn');
-      const retryIcon = document.getElementById('modalRetryIcon');
-      const retryText = document.getElementById('modalRetryText');
+    let ACTIVE_RETRY_JOB_ID = null;
+    let DEFAULT_RETRY_CRITIQUE = '';
 
-      if (retryBtn) {
-        retryBtn.disabled = true;
-        if (retryIcon) retryIcon.classList.add('animate-spin');
-        if (retryText) retryText.textContent = 'Retrying...';
+    function toggleRetryCritiqueInput(enabled) {
+      const box = document.getElementById('retryCritiqueBox');
+      if (box) {
+        if (enabled) {
+          box.classList.remove('opacity-40', 'pointer-events-none');
+        } else {
+          box.classList.add('opacity-40', 'pointer-events-none');
+        }
       }
+    }
+
+    function resetRetryCritiqueToDefault() {
+      const txt = document.getElementById('retryCritiqueText');
+      if (txt) txt.value = DEFAULT_RETRY_CRITIQUE;
+    }
+
+    function updateRetrySpeedDisplay(val) {
+      const num = parseFloat(val);
+      const disp = document.getElementById('retrySpeedDisplay');
+      if (disp) disp.textContent = `${num.toFixed(2)}x`;
+    }
+
+    function setRetrySpeedPreset(val) {
+      const slider = document.getElementById('retrySpeed');
+      if (slider) {
+        slider.value = val;
+        updateRetrySpeedDisplay(val);
+      }
+    }
+
+    function closeRetryModal() {
+      const modal = document.getElementById('modalRetryDialog');
+      if (modal) modal.classList.add('hidden');
+      ACTIVE_RETRY_JOB_ID = null;
+    }
+
+    async function openRetryModal(jobId, event) {
+      if (event) event.stopPropagation();
+      if (!jobId) {
+        if (CURRENT_JOB) jobId = CURRENT_JOB.job_id;
+        else return;
+      }
+      ACTIVE_RETRY_JOB_ID = jobId;
+
+      const modal = document.getElementById('modalRetryDialog');
+      if (modal) modal.classList.remove('hidden');
+
+      const takeBadge = document.getElementById('retryTakeBadge');
+      const prevScoreBadge = document.getElementById('retryPrevScoreBadge');
+      const prevGateBadge = document.getElementById('retryPrevGateBadge');
+      const prevReasoning = document.getElementById('retryPrevReasoning');
+      const flaggedContainer = document.getElementById('retryFlaggedContainer');
+      const flaggedList = document.getElementById('retryFlaggedList');
+      const critiqueText = document.getElementById('retryCritiqueText');
+      const voiceCustInput = document.getElementById('retryVoiceCustomization');
+      const speedSlider = document.getElementById('retrySpeed');
+      const includeCritiqueCb = document.getElementById('retryIncludeCritique');
+
+      if (includeCritiqueCb) includeCritiqueCb.checked = true;
+      toggleRetryCritiqueInput(true);
+
+      try {
+        const resp = await fetch(`/api/jobs/${jobId}/retry-preview`, {
+          headers: getAuthHeaders()
+        });
+        if (!resp.ok) {
+          throw new Error(`Preview failed: ${resp.statusText}`);
+        }
+        const data = await resp.json();
+
+        const currentTake = (data.retry_count || 0) + 1;
+        const nextTake = currentTake + 1;
+        if (takeBadge) takeBadge.textContent = `Take ${nextTake}`;
+
+        if (prevScoreBadge) {
+          if (data.overall_score !== null && data.overall_score !== undefined) {
+            prevScoreBadge.textContent = `${Number(data.overall_score).toFixed(1)} / 5.0`;
+            if (data.overall_score >= 4.0) {
+              prevScoreBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+            } else {
+              prevScoreBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30';
+            }
+          } else {
+            prevScoreBadge.textContent = 'Unscored';
+            prevScoreBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300';
+          }
+        }
+
+        if (prevGateBadge) {
+          if (data.passed_rubric !== null && data.passed_rubric !== undefined) {
+            prevGateBadge.textContent = data.passed_rubric ? 'Passed Compliance Gate' : 'Failed Compliance Gate';
+            prevGateBadge.className = data.passed_rubric
+              ? 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              : 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20';
+          } else {
+            prevGateBadge.textContent = 'Pending Audit';
+            prevGateBadge.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400';
+          }
+        }
+
+        if (prevReasoning) {
+          prevReasoning.textContent = data.overall_reasoning || 'No auditor evaluation findings recorded for previous take.';
+        }
+
+        // Flagged deductions
+        if (flaggedContainer && flaggedList) {
+          if (data.flagged_metrics && data.flagged_metrics.length > 0) {
+            flaggedList.innerHTML = data.flagged_metrics.map(m => `
+              <div class="flex items-start space-x-2">
+                <span class="text-rose-400 font-bold shrink-0">•</span>
+                <div>
+                  <span class="font-semibold text-rose-200">${m.label} (${Number(m.score).toFixed(1)}/5.0):</span>
+                  <span class="text-zinc-300 ml-1">${m.rationale}</span>
+                </div>
+              </div>
+            `).join('');
+            flaggedContainer.classList.remove('hidden');
+          } else {
+            flaggedList.innerHTML = '';
+            flaggedContainer.classList.add('hidden');
+          }
+        }
+
+        DEFAULT_RETRY_CRITIQUE = data.suggested_directive || '';
+        if (critiqueText) critiqueText.value = DEFAULT_RETRY_CRITIQUE;
+
+        if (voiceCustInput) voiceCustInput.value = data.voice_customization || '';
+        if (speedSlider) {
+          const spd = data.speed || 1.0;
+          speedSlider.value = spd;
+          updateRetrySpeedDisplay(spd);
+        }
+      } catch (err) {
+        console.warn('Could not load retry preview, using defaults:', err);
+        DEFAULT_RETRY_CRITIQUE = '';
+        if (critiqueText) critiqueText.value = '';
+        if (prevReasoning) prevReasoning.textContent = 'Unable to fetch prior evaluation preview.';
+      }
+
+      lucide.createIcons();
+    }
+
+    async function confirmAndExecuteRetry() {
+      if (!ACTIVE_RETRY_JOB_ID) return;
+      const jobId = ACTIVE_RETRY_JOB_ID;
+      const btn = document.getElementById('confirmRetrySubmitBtn');
+      const icon = document.getElementById('retrySubmitIcon');
+      const text = document.getElementById('retrySubmitText');
+
+      if (btn) btn.disabled = true;
+      if (icon) icon.classList.add('animate-spin');
+      if (text) text.textContent = 'Launching Re-Synthesis...';
+
+      const includeCritique = document.getElementById('retryIncludeCritique')?.checked ?? true;
+      const customCritique = document.getElementById('retryCritiqueText')?.value || '';
+      const speed = parseFloat(document.getElementById('retrySpeed')?.value || '1.0');
+      const voiceCustomization = document.getElementById('retryVoiceCustomization')?.value || null;
 
       try {
         const resp = await fetch(`/api/jobs/${jobId}/retry`, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' })
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            include_critique: includeCritique,
+            custom_critique: customCritique,
+            speed: speed,
+            voice_customization: voiceCustomization
+          })
         });
 
         if (!resp.ok) {
@@ -2881,7 +3207,7 @@
         filterJobs(false);
         await loadStats();
 
-        // Refresh detail modal ONLY if user currently has the drawer open for this job
+        // Refresh detail modal if open
         const modalEl = document.getElementById('jobDetailModal');
         const isModalOpen = modalEl && !modalEl.classList.contains('hidden');
         if (isModalOpen && CURRENT_JOB && CURRENT_JOB.job_id === jobId) {
@@ -2889,22 +3215,20 @@
           openJobDetail(jobId);
         }
 
-        // Trigger polling so status and subsequent completion update live
+        closeRetryModal();
         checkAndStartPolling();
       } catch (err) {
         alert(`Error retrying job: ${err.message}`);
       } finally {
-        if (retryBtn) {
-          retryBtn.disabled = false;
-          if (retryIcon) retryIcon.classList.remove('animate-spin');
-          if (retryText) retryText.textContent = 'Retry';
-        }
+        if (btn) btn.disabled = false;
+        if (icon) icon.classList.remove('animate-spin');
+        if (text) text.textContent = 'Confirm & Launch Re-Synthesis';
       }
     }
 
     async function retryCurrentJob() {
       if (!CURRENT_JOB) return;
-      await retryJob(CURRENT_JOB.job_id);
+      await openRetryModal(CURRENT_JOB.job_id);
     }
 
     // Copy to Clipboard Utility

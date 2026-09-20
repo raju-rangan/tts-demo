@@ -54,7 +54,12 @@ FINANCIAL PRONUNCIATION & TERMINOLOGY GUIDELINES:
   * "QoQ" -> "quarter-over-quarter"
   * "ROI" -> "R-O-I" (Return on Investment)
 - Figures & Percentages:
-  * Read dollar amounts with clear natural phrasing (e.g. "$1.5M" as "one point five million dollars", "$250K" as "two hundred fifty thousand dollars").
+  * Currency & Numerical Values: Speak all dollar amounts and numbers using standard US English base-thousand numbering conventions (hundreds, thousands, millions, billions).
+  * STRICT PROHIBITION: NEVER use regional numbering terms such as 'lakh' or 'crore'. For example:
+    - "$250,000" MUST be read as "two hundred fifty thousand dollars".
+    - "$100,000" MUST be read as "one hundred thousand dollars".
+    - "$1.5M" MUST be read as "one point five million dollars".
+    - "$250K" MUST be read as "two hundred fifty thousand dollars".
   * Read interest rates accurately (e.g. "4.75%" as "four point seven five percent").
 
 ACOUSTIC MASTERING & STUDIO ENVIRONMENT DIRECTIVES:

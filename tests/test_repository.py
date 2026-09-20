@@ -266,9 +266,52 @@ def test_job_speed_persistence_and_defaults(temp_repo):
         gcs_uri="gs://test-bucket/external/audio/job_speed_002.mp3"
     )
     temp_repo.save_job(job_default)
-
     retrieved_def = temp_repo.get_job("job_speed_002")
     assert retrieved_def is not None
     assert retrieved_def.speed == 1.0
+
+
+def test_job_retry_telemetry_persistence(temp_repo):
+    """Verify retry_count, remediation_prompt, and previous_attempt_score roundtrip through SQLite."""
+    # 1. Job with retry metadata
+    job_retried = JobRecord(
+        job_id="job_retry_001",
+        persona="Retail Banking Guide",
+        audience="External Customers",
+        voice_name="Sulafat",
+        transcript="Test retry persistence transcript.",
+        word_count=5,
+        char_count=36,
+        gcs_uri="gs://test-bucket/external/audio/job_retry_001.mp3",
+        retry_count=1,
+        remediation_prompt="WHAT YOU DID INCORRECTLY: Skipped main title.\nMAKE IT RIGHT: Read the title clearly.",
+        previous_attempt_score=3.2
+    )
+    temp_repo.save_job(job_retried)
+
+    retrieved = temp_repo.get_job("job_retry_001")
+    assert retrieved is not None
+    assert retrieved.retry_count == 1
+    assert "Skipped main title" in retrieved.remediation_prompt
+    assert retrieved.previous_attempt_score == 3.2
+
+    # 2. Defaults for unretried job
+    job_fresh = JobRecord(
+        job_id="job_retry_002",
+        persona="Retail Banking Guide",
+        audience="External Customers",
+        voice_name="Sulafat",
+        transcript="Fresh job without retries.",
+        word_count=5,
+        char_count=27,
+        gcs_uri="gs://test-bucket/external/audio/job_retry_002.mp3"
+    )
+    temp_repo.save_job(job_fresh)
+
+    retrieved_fresh = temp_repo.get_job("job_retry_002")
+    assert retrieved_fresh is not None
+    assert retrieved_fresh.retry_count == 0
+    assert retrieved_fresh.remediation_prompt is None
+    assert retrieved_fresh.previous_attempt_score is None
 
 

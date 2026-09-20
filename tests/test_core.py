@@ -376,3 +376,85 @@ def test_speech_speed_prompt_directives():
     call_args_std = mock_client.models.generate_content.call_args.kwargs
     contents_std = call_args_std["contents"]
     assert "SPEED & PACING DIRECTIVE" not in contents_std
+
+
+def test_verbatim_script_adherence_and_currency_directives():
+    """Verify verbatim script adherence and US currency normalization rules are embedded in prompts."""
+    from src.ai.personas import COMMON_FINANCIAL_PRONUNCIATION_DIRECTIVES, get_persona
+    from src.ai.generator import GeminiAudioGenerator
+    from unittest.mock import MagicMock
+
+    # 1. Verify currency normalization rule in common financial directives
+    assert "STRICT PROHIBITION: NEVER use regional numbering terms such as 'lakh' or 'crore'" in COMMON_FINANCIAL_PRONUNCIATION_DIRECTIVES
+    assert "$250,000" in COMMON_FINANCIAL_PRONUNCIATION_DIRECTIVES
+    assert "two hundred fifty thousand dollars" in COMMON_FINANCIAL_PRONUNCIATION_DIRECTIVES
+
+    # 2. Verify verbatim script adherence block in prompt
+    gen = GeminiAudioGenerator()
+    mock_client = MagicMock()
+    gen._client = mock_client
+    mock_resp = MagicMock()
+    mock_resp.usage_metadata = MagicMock(prompt_token_count=100, candidates_token_count=100)
+    mock_resp.candidates = [MagicMock()]
+    mock_part = MagicMock()
+    mock_part.inline_data.data = b"\x00" * 4800
+    mock_resp.candidates[0].content.parts = [mock_part]
+    mock_client.models.generate_content.return_value = mock_resp
+
+    persona = get_persona("Retail Banking Guide")
+    gen._generate_single_chunk(
+        chunk_text="# Investment Guide\n\nHere are the details.",
+        persona=persona,
+        job_id="job_adherence_test"
+    )
+
+    call_args = mock_client.models.generate_content.call_args.kwargs
+    prompt = call_args["contents"]
+
+    assert "VERBATIM SCRIPT ADHERENCE DIRECTIVE:" in prompt
+    assert "100% Word-for-Word Fidelity:" in prompt
+    assert "Titles & Headlines: If the text begins with a title or headline" in prompt
+    assert "Section Headers & Bullet Points: Speak every section header" in prompt
+    assert "Parenthetical Expressions: Read all parenthetical expressions" in prompt
+
+
+def test_critique_feedback_prompt_injection():
+    """Verify critic feedback is injected into the prompt when re-synthesizing a job."""
+    from src.ai.personas import get_persona
+    from src.ai.generator import GeminiAudioGenerator
+    from unittest.mock import MagicMock
+
+    gen = GeminiAudioGenerator()
+    mock_client = MagicMock()
+    gen._client = mock_client
+    mock_resp = MagicMock()
+    mock_resp.usage_metadata = MagicMock(prompt_token_count=100, candidates_token_count=100)
+    mock_resp.candidates = [MagicMock()]
+    mock_part = MagicMock()
+    mock_part.inline_data.data = b"\x00" * 4800
+    mock_resp.candidates[0].content.parts = [mock_part]
+    mock_client.models.generate_content.return_value = mock_resp
+
+    persona = get_persona("Retail Banking Guide")
+    test_critique = (
+        "WHAT YOU DID INCORRECTLY:\n"
+        "- Script Adherence: You omitted the title 'Investment Guide'.\n"
+        "MANDATORY REMEDIATION:\n"
+        "- Read the title clearly aloud before reading paragraph 1."
+    )
+
+    gen._generate_single_chunk(
+        chunk_text="# Investment Guide\n\nHere are the details.",
+        persona=persona,
+        job_id="job_critique_test",
+        critique_feedback=test_critique
+    )
+
+    call_args = mock_client.models.generate_content.call_args.kwargs
+    prompt = call_args["contents"]
+
+    assert "AUDITOR CRITIQUE & MANDATORY DEFECT REMEDIATION (RE-TAKE / RETRY):" in prompt
+    assert "Strictly remediate the auditor's findings:" in prompt
+    assert "WHAT YOU DID INCORRECTLY:" in prompt
+    assert "You omitted the title 'Investment Guide'" in prompt
+    assert "Read the title clearly aloud before reading paragraph 1" in prompt

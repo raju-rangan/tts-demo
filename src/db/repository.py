@@ -105,7 +105,10 @@ class SQLiteJobRepository(BaseJobRepository):
                     judge_model TEXT,
                     judge_latency_sec REAL,
                     error_message TEXT,
-                    speed REAL DEFAULT 1.0
+                    speed REAL DEFAULT 1.0,
+                    retry_count INTEGER DEFAULT 0,
+                    remediation_prompt TEXT,
+                    previous_attempt_score REAL
                 )
             """)
             try:
@@ -124,6 +127,9 @@ class SQLiteJobRepository(BaseJobRepository):
                 ("total_turns", "INTEGER"),
                 ("source_url", "TEXT"),
                 ("speed", "REAL DEFAULT 1.0"),
+                ("retry_count", "INTEGER DEFAULT 0"),
+                ("remediation_prompt", "TEXT"),
+                ("previous_attempt_score", "REAL"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} {col_type}")
@@ -152,8 +158,8 @@ class SQLiteJobRepository(BaseJobRepository):
                     cost_json, overall_score, overall_reasoning, passed_rubric, rubric_metrics_json,
                     actionable_feedback_json, judge_model, judge_latency_sec, error_message,
                     voice_customization, progress_stage, progress_message, current_turn, total_turns,
-                    source_url, speed
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    source_url, speed, retry_count, remediation_prompt, previous_attempt_score
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 job.job_id, job.created_at, job.persona, job.audience, job.voice_name, job.article_title,
                 job.transcript, job.word_count, job.char_count, job.gcs_uri, job.signed_url, job.audio_format,
@@ -174,7 +180,10 @@ class SQLiteJobRepository(BaseJobRepository):
                 job.current_turn,
                 job.total_turns,
                 job.source_url,
-                getattr(job, "speed", 1.0) or 1.0
+                getattr(job, "speed", 1.0) or 1.0,
+                getattr(job, "retry_count", 0) or 0,
+                getattr(job, "remediation_prompt", None),
+                getattr(job, "previous_attempt_score", None)
             ))
             conn.commit()
 
@@ -235,6 +244,9 @@ class SQLiteJobRepository(BaseJobRepository):
         total_turns = row["total_turns"] if "total_turns" in row.keys() else None
         source_url = row["source_url"] if "source_url" in row.keys() else None
         speed = float(row["speed"]) if ("speed" in row.keys() and row["speed"] is not None) else 1.0
+        retry_count = int(row["retry_count"]) if ("retry_count" in row.keys() and row["retry_count"] is not None) else 0
+        remediation_prompt = row["remediation_prompt"] if "remediation_prompt" in row.keys() else None
+        previous_attempt_score = float(row["previous_attempt_score"]) if ("previous_attempt_score" in row.keys() and row["previous_attempt_score"] is not None) else None
 
         return JobRecord(
             job_id=row["job_id"],
@@ -264,6 +276,9 @@ class SQLiteJobRepository(BaseJobRepository):
             judge_latency_sec=row["judge_latency_sec"],
             error_message=error_message,
             voice_customization=voice_customization,
+            retry_count=retry_count,
+            remediation_prompt=remediation_prompt,
+            previous_attempt_score=previous_attempt_score,
             progress_stage=progress_stage,
             progress_message=progress_message,
             current_turn=current_turn,

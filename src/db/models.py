@@ -50,8 +50,11 @@ class JobRecord(BaseModel):
     judge_latency_sec: Optional[float] = Field(default=None, description="Evaluation time in seconds")
     error_message: Optional[str] = Field(default=None, description="Error message or diagnostic details if job failed")
     
-    # Customization & Progress Telemetry
+    # Customization, Remediation & Progress Telemetry
     voice_customization: Optional[str] = Field(default=None, description="Custom director notes or vocal delivery directives")
+    retry_count: int = Field(default=0, description="Number of retry synthesis attempts")
+    remediation_prompt: Optional[str] = Field(default=None, description="Auditor critique and remediation instructions used to steer the retry")
+    previous_attempt_score: Optional[float] = Field(default=None, description="Overall quality score from the previous attempt prior to retry")
     progress_stage: Optional[str] = Field(default=None, description="Active pipeline stage (e.g. CHUNKING, SYNTHESIZING, STITCHING, UPLOADING, EVALUATING, COMPLETED)")
     progress_message: Optional[str] = Field(default=None, description="Human-readable live progress description")
     current_turn: Optional[int] = Field(default=None, description="Active turn index being processed")

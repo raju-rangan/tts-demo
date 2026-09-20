@@ -205,14 +205,15 @@ class GeminiAudioGenerator:
         chunk_index: int = 1,
         total_chunks: int = 1,
         voice_customization: Optional[str] = None,
-        speed: float = 1.0
+        speed: float = 1.0,
+        critique_feedback: Optional[str] = None
     ) -> Tuple[bytes, Optional[Any]]:
         """
         Executes single-turn Gemini TTS synthesis for a text chunk.
         Returns raw PCM bytes (24kHz 16-bit mono) and usage_metadata.
         """
         turn_label = f" (turn {chunk_index}/{total_chunks})" if total_chunks > 1 else ""
-        logger.info(f"Synthesizing{turn_label} for job {job_id} using persona '{persona.name}', voice '{persona.voice_name}', speed {speed:.2f}x")
+        logger.info(f"Synthesizing{turn_label} for job {job_id} using persona '{persona.name}', voice '{persona.voice_name}', speed {speed:.2f}x | Critique: {bool(critique_feedback)}")
 
         turn_context = ""
         if total_chunks > 1:
@@ -249,6 +250,15 @@ class GeminiAudioGenerator:
                     "Maintain rapid, fluid delivery with minimal pauses while ensuring articulation remains distinct.\n\n"
                 )
 
+        script_adherence_block = (
+            "VERBATIM SCRIPT ADHERENCE DIRECTIVE:\n"
+            "- 100% Word-for-Word Fidelity: You MUST read the reference text exactly as written. Do NOT omit, skip, summarize, paraphrase, or add any words.\n"
+            "- Titles & Headlines: If the text begins with a title or headline (including markdown '#' or article titles), you MUST clearly read the title aloud before narrating the body text.\n"
+            "- Section Headers & Bullet Points: Speak every section header and every numbered or bulleted list item completely in sequence. Do not skip list items.\n"
+            "- Parenthetical Expressions: Read all parenthetical expressions, acronyms, and expansions (e.g., '(CDs)', '(FDIC)', '(APR)') out loud as part of the natural spoken narrative.\n"
+            "- No Unscripted Additions: Do not add conversational lead-ins (e.g., 'Welcome to...', 'Sure, here is...'), improvised transitions, or unscripted concluding remarks.\n\n"
+        )
+
         customization_block = ""
         if voice_customization and voice_customization.strip():
             customization_block = (
@@ -257,13 +267,26 @@ class GeminiAudioGenerator:
                 f"\"{voice_customization.strip()}\"\n\n"
             )
 
+        remediation_block = ""
+        if critique_feedback and critique_feedback.strip():
+            remediation_block = (
+                "======================================================================\n"
+                "AUDITOR CRITIQUE & MANDATORY DEFECT REMEDIATION (RE-TAKE / RETRY):\n"
+                "The previous recording of this transcript was audited and flagged for defects.\n"
+                "You are re-recording this audio. Strictly remediate the auditor's findings:\n"
+                f"{critique_feedback.strip()}\n"
+                "======================================================================\n\n"
+            )
+
         full_prompt = (
             f"SYSTEM DIRECTIVES & PERSONA GUIDELINES:\n{persona.system_instruction}\n\n"
             f"{speed_block}"
+            f"{script_adherence_block}"
             f"{customization_block}"
+            f"{remediation_block}"
             f"{turn_context}"
             f"INSTRUCTION:\nPlease read the following financial guidance article aloud adhering strictly to your assigned persona, "
-            f"pacing pauses, and financial pronunciation directives:\n\n{chunk_text}"
+            f"pacing pauses, verbatim adherence, and financial pronunciation directives:\n\n{chunk_text}"
         )
 
         max_attempts = 2
@@ -304,6 +327,7 @@ class GeminiAudioGenerator:
         job_id: Optional[str] = None,
         voice_customization: Optional[str] = None,
         speed: float = 1.0,
+        critique_feedback: Optional[str] = None,
         progress_callback: Optional[Any] = None
     ) -> GenerationResult:
         """
@@ -318,10 +342,11 @@ class GeminiAudioGenerator:
         chunks = split_text_into_chunks(text, target_words=settings.tts_chunk_word_limit)
         total_chunks = len(chunks)
 
+        critique_label = " | Critique Remediation Active" if critique_feedback else ""
         if total_chunks > 1:
-            logger.info(f"▶ [{job_id}] Article length ({words} words) exceeds {settings.tts_chunk_word_limit} word threshold. Partitioned into {total_chunks} complete-sentence turns (~{settings.tts_chunk_word_limit} words/turn) | Speed: {speed:.2f}x.")
+            logger.info(f"▶ [{job_id}] Article length ({words} words) exceeds {settings.tts_chunk_word_limit} word threshold. Partitioned into {total_chunks} complete-sentence turns (~{settings.tts_chunk_word_limit} words/turn) | Speed: {speed:.2f}x{critique_label}.")
         else:
-            logger.info(f"▶ [{job_id}] Single-turn generation for {words} words using persona '{persona.name}' | Speed: {speed:.2f}x")
+            logger.info(f"▶ [{job_id}] Single-turn generation for {words} words using persona '{persona.name}' | Speed: {speed:.2f}x{critique_label}")
 
         if progress_callback:
             progress_callback(
@@ -357,7 +382,8 @@ class GeminiAudioGenerator:
                 chunk_index=idx,
                 total_chunks=total_chunks,
                 voice_customization=voice_customization,
-                speed=speed
+                speed=speed,
+                critique_feedback=critique_feedback
             )
 
             # Apply DSP mastering: RMS loudness normalization + 40ms raised-cosine micro-fades
