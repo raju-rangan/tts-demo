@@ -1,6 +1,6 @@
 # Apex Bank Knowledge-to-Speech Studio & Multimodal LLM-as-a-Judge Platform
 
-> **Enterprise Financial Services Knowledge-to-Audio Platform with Direct Multimodal Quality Auditing and FinOps Telemetry powered by Google Gemini (Vertex AI) and Google Cloud Storage.**
+> **Enterprise Financial Services Knowledge-to-Audio Platform with Direct Multimodal Quality Auditing, Full-Page Executive FinOps Governance, and Serverless Cloud Firestore Persistence powered by Google Gemini (Vertex AI), Google Cloud Storage, and Google Cloud Run.**
 
 ---
 
@@ -14,7 +14,11 @@ The **Apex Bank Knowledge-to-Speech Studio** solves these challenges using **Goo
 3. **Acoustic Mastering & Multi-Turn Splicing**: Sentence-boundary chunking, RMS loudness normalization, 40ms raised-cosine micro-fading, and 300ms inter-turn pause stitching.
 4. **Google Cloud Storage Audience Prefix Routing**: Automatic partitioning into `external/audio/`, `internal/audio/`, and `shared/audio/` prefixes for IAM CEL Condition access control.
 5. **Multimodal LLM-as-a-Judge Quality Audit**: Automated evaluation of the synthesized audio directly from its GCS URI pointer (`types.Part.from_uri()`) against a strict 6-dimension rubric, with zero audio download or streaming into the worker.
-6. **FinOps Telemetry**: Granular per-article token accounting (TTS input/output, Judge input/output) and real-time USD billing calculations.
+6. **Executive FinOps & Compliance Governance**: Full-page interactive **Chart.js** dashboard for compliance auditors featuring Rubric Radars, FinOps spend allocations, persona volume comparisons, and token utilization breakdowns.
+7. **Cloud Firestore Serverless Persistence**: Enterprise persistence using **Google Cloud Firestore Native Mode** (`tts-jobs` database), ensuring job history and audit records persist seamlessly across Cloud Run container deployments with automatic SQLite fallback for isolated offline testing.
+8. **Dual-Persona Workspace Hub**: Seamless top-navigation switching between **Sarah Jenkins** (Chief Communications Officer - Content Creator) and **David Chen** (VP Regulatory Compliance - Compliance Auditor).
+9. **Zero-Config Localhost Auth Bypass**: Automatic loopback detection (`127.0.0.1` / `localhost`) bypassing Google OAuth origin restrictions for instant local developer access while strictly enforcing GCIP JWT cryptographic verification on Google Cloud Run.
+10. **Resilient Real-Time Progress UX**: Instant state unshift, self-healing job details fetch, 5-stage live stepper (`CHUNKING` → `SYNTHESIZING` → `STITCHING` → `UPLOADING` → `EVALUATING`), and sample disclosures director tuning.
 
 ```mermaid
 flowchart TD
@@ -26,44 +30,47 @@ flowchart TD
     classDef storageStyle fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#14532D;
 
     subgraph CLIENT["1. Client & Ingestion Layer"]
-        UI["👤 Web Studio Portal / CLI Runner<br/>(URL Extraction or Raw Transcript)"]
+        CREATOR["👩‍💼 Sarah Jenkins (Creator Studio)<br/>• Article Transcript or URL Extraction<br/>• Voice Persona & Director Notes<br/>• Real-time 5-Stage Synthesis Stepper"]
+        AUDITOR["👨‍💼 David Chen (Compliance Auditor)<br/>• Full-Page Executive Governance Dashboard<br/>• 4 Interactive Chart.js Visualizations<br/>• Persona Matrix & Flagged Action Center"]
     end
 
-    subgraph ORCHESTRATION["2. Orchestration & Pre-Processing"]
-        API["FastAPI App (src/ui/app.py)<br/>• Chunking: ~400-word sentence boundaries<br/>• Injects Financial Directives & Persona"]
+    subgraph ORCHESTRATION["2. Orchestration & Security"]
+        API["FastAPI Orchestrator (src/ui/app.py)<br/>• Localhost Auth Bypass (127.0.0.1 / localhost)<br/>• Production GCIP Google Sign-In & JWT Auth<br/>• Sentence-Boundary Chunking (~400 words)<br/>• Background Worker Task Pipeline"]
     end
 
     subgraph AI_GEN["3. Generative Speech Model (Vertex AI)"]
-        GEMINI_TTS["🎙️ Gemini 3.1 Flash TTS Preview<br/>(24kHz 16-bit Mono Raw PCM)"]
+        GEMINI_TTS["🎙️ Gemini 3.1 Flash TTS Preview<br/>(us-central1 | 24kHz 16-bit Mono Raw PCM)"]
     end
 
     subgraph DSP_CHAIN["4. DSP Mastering & Transcoding"]
         DSP["Audio DSP Engine<br/>• RMS Loudness Normalizer (3000 RMS)<br/>• 40ms Raised-Cosine Micro-Fades<br/>• 300ms Silence Inter-Turn Stitching<br/>• In-Memory MP3 Transcoder (lameenc 320kbps)"]
     end
 
-    subgraph PERSISTENCE["5. Google Cloud Storage & Telemetry"]
+    subgraph PERSISTENCE["5. Google Cloud Storage & Firestore"]
         GCS[("📦 Cloud Storage Bucket<br/>Prefix: external/ | internal/ | shared/")]
-        REPO[("💾 Job Repository<br/>Firestore / SQLite")]
+        FIRESTORE[("🔥 Cloud Firestore Native Database<br/>Database: tts-jobs | Collection: tts_jobs<br/>(Offline Fallback: Local SQLite)")]
     end
 
     subgraph AI_JUDGE["6. Multimodal Quality Auditor"]
-        JUDGE["⚖️ Gemini 3.8 Flash Multimodal Judge<br/>(Direct GCS URI Evaluation: Part.from_uri)"]
+        JUDGE["⚖️ Gemini 3.8 Flash Multimodal Judge<br/>(global | Direct GCS URI: Part.from_uri)"]
     end
 
-    UI -->|"1. Submit Text / URL"| API
+    CREATOR -->|"1. Submit Text / URL"| API
+    AUDITOR -->|"Inspect Governance & Scorecards"| API
     API -->|"2. Multi-turn Chunks & Prompts"| GEMINI_TTS
     GEMINI_TTS -->|"3. Raw PCM Audio Stream"| DSP
     DSP -->|"4. Mastered Broadcast MP3"| GCS
-    DSP -->|"5. Update Job Record"| REPO
-    GCS <== "6. Internal GCS Reference (Zero Download)" ==> JUDGE
-    JUDGE -->|"7. 6-Dimension Scorecard JSON"| REPO
-    REPO -.->|"8. Real-time Telemetry & Stream"| UI
+    DSP -->|"5. Update Job Progress & Telemetry"| FIRESTORE
+    GCS <== "6. Zero-Download GCS Pointer (Part.from_uri)" ==> JUDGE
+    JUDGE -->|"7. 6-Dimension Scorecard & Feedback"| FIRESTORE
+    FIRESTORE -.->|"8. Real-time Telemetry & Stream"| CREATOR
+    FIRESTORE -.->|"8. Governance Analytics & Charts"| AUDITOR
 
-    class UI clientStyle;
+    class CREATOR,AUDITOR clientStyle;
     class API computeStyle;
     class GEMINI_TTS,JUDGE aiStyle;
     class DSP dspStyle;
-    class GCS,REPO storageStyle;
+    class GCS,FIRESTORE storageStyle;
 ```
 
 ---

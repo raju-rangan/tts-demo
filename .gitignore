@@ -86,3 +86,9 @@ logs/*.log
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Scratch & test artifacts
+.chrome-user-dir/
+test.html
+*.pdf
+
