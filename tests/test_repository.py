@@ -234,3 +234,41 @@ def test_firestore_user_tour_status_lifecycle(monkeypatch):
     mock_doc_1.reference.delete.assert_called_once()
 
 
+def test_job_speed_persistence_and_defaults(temp_repo):
+    """Verify speed field is correctly persisted and defaults to 1.0."""
+    # 1. Custom speed
+    job_speedy = JobRecord(
+        job_id="job_speed_001",
+        persona="Retail Banking Guide",
+        audience="External Customers",
+        voice_name="Sulafat",
+        transcript="Fast speech delivery test",
+        word_count=4,
+        char_count=25,
+        gcs_uri="gs://test-bucket/external/audio/job_speed_001.mp3",
+        speed=1.25
+    )
+    temp_repo.save_job(job_speedy)
+
+    retrieved = temp_repo.get_job("job_speed_001")
+    assert retrieved is not None
+    assert retrieved.speed == 1.25
+
+    # 2. Default speed
+    job_default = JobRecord(
+        job_id="job_speed_002",
+        persona="Retail Banking Guide",
+        audience="External Customers",
+        voice_name="Sulafat",
+        transcript="Default speech delivery test",
+        word_count=4,
+        char_count=28,
+        gcs_uri="gs://test-bucket/external/audio/job_speed_002.mp3"
+    )
+    temp_repo.save_job(job_default)
+
+    retrieved_def = temp_repo.get_job("job_speed_002")
+    assert retrieved_def is not None
+    assert retrieved_def.speed == 1.0
+
+

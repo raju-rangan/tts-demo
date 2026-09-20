@@ -204,14 +204,15 @@ class GeminiAudioGenerator:
         job_id: str,
         chunk_index: int = 1,
         total_chunks: int = 1,
-        voice_customization: Optional[str] = None
+        voice_customization: Optional[str] = None,
+        speed: float = 1.0
     ) -> Tuple[bytes, Optional[Any]]:
         """
         Executes single-turn Gemini TTS synthesis for a text chunk.
         Returns raw PCM bytes (24kHz 16-bit mono) and usage_metadata.
         """
         turn_label = f" (turn {chunk_index}/{total_chunks})" if total_chunks > 1 else ""
-        logger.info(f"Synthesizing{turn_label} for job {job_id} using persona '{persona.name}' and voice '{persona.voice_name}'")
+        logger.info(f"Synthesizing{turn_label} for job {job_id} using persona '{persona.name}', voice '{persona.voice_name}', speed {speed:.2f}x")
 
         turn_context = ""
         if total_chunks > 1:
@@ -227,6 +228,27 @@ class GeminiAudioGenerator:
                     "vocal energy, speaking cadence, microphone distance, and dry studio acoustic space so this segment splices seamlessly into the preceding recording.\n\n"
                 )
 
+        speed_block = ""
+        if abs(speed - 1.0) >= 0.05:
+            if speed < 0.95:
+                speed_block = (
+                    f"SPEED & PACING DIRECTIVE (Delivery Rate: {speed:.2f}x):\n"
+                    f"Deliver the speech at a deliberate, measured, and unhurried pace ({speed:.2f}x standard tempo). "
+                    "Pause naturally between clauses, complex financial figures, and regulatory disclosures to maximize clarity and customer comprehension.\n\n"
+                )
+            elif speed <= 1.30:
+                speed_block = (
+                    f"SPEED & PACING DIRECTIVE (Delivery Rate: {speed:.2f}x):\n"
+                    f"Deliver the speech at a brisk, energetic speaking rate ({speed:.2f}x standard tempo). "
+                    "Narrate with swift transitions between sentences while retaining crisp, professional enunciation.\n\n"
+                )
+            else:
+                speed_block = (
+                    f"SPEED & PACING DIRECTIVE (Delivery Rate: {speed:.2f}x):\n"
+                    f"Deliver the speech at a high-tempo, accelerated rate ({speed:.2f}x standard tempo), suitable for rapid regulatory disclosures and fast-paced bulletins. "
+                    "Maintain rapid, fluid delivery with minimal pauses while ensuring articulation remains distinct.\n\n"
+                )
+
         customization_block = ""
         if voice_customization and voice_customization.strip():
             customization_block = (
@@ -237,6 +259,7 @@ class GeminiAudioGenerator:
 
         full_prompt = (
             f"SYSTEM DIRECTIVES & PERSONA GUIDELINES:\n{persona.system_instruction}\n\n"
+            f"{speed_block}"
             f"{customization_block}"
             f"{turn_context}"
             f"INSTRUCTION:\nPlease read the following financial guidance article aloud adhering strictly to your assigned persona, "
@@ -280,6 +303,7 @@ class GeminiAudioGenerator:
         persona_name: str = "Technical Explainer",
         job_id: Optional[str] = None,
         voice_customization: Optional[str] = None,
+        speed: float = 1.0,
         progress_callback: Optional[Any] = None
     ) -> GenerationResult:
         """
@@ -295,9 +319,9 @@ class GeminiAudioGenerator:
         total_chunks = len(chunks)
 
         if total_chunks > 1:
-            logger.info(f"▶ [{job_id}] Article length ({words} words) exceeds {settings.tts_chunk_word_limit} word threshold. Partitioned into {total_chunks} complete-sentence turns (~{settings.tts_chunk_word_limit} words/turn).")
+            logger.info(f"▶ [{job_id}] Article length ({words} words) exceeds {settings.tts_chunk_word_limit} word threshold. Partitioned into {total_chunks} complete-sentence turns (~{settings.tts_chunk_word_limit} words/turn) | Speed: {speed:.2f}x.")
         else:
-            logger.info(f"▶ [{job_id}] Single-turn generation for {words} words using persona '{persona.name}'")
+            logger.info(f"▶ [{job_id}] Single-turn generation for {words} words using persona '{persona.name}' | Speed: {speed:.2f}x")
 
         if progress_callback:
             progress_callback(
@@ -316,7 +340,7 @@ class GeminiAudioGenerator:
             if progress_callback:
                 progress_callback(
                     stage="SYNTHESIZING",
-                    message=f"Synthesizing turn {idx}/{total_chunks} ({len(chunk.split())} words)...",
+                    message=f"Synthesizing turn {idx}/{total_chunks} ({len(chunk.split())} words, {speed:.2f}x)...",
                     current_turn=idx,
                     total_turns=total_chunks
                 )
@@ -332,7 +356,8 @@ class GeminiAudioGenerator:
                 job_id=job_id,
                 chunk_index=idx,
                 total_chunks=total_chunks,
-                voice_customization=voice_customization
+                voice_customization=voice_customization,
+                speed=speed
             )
 
             # Apply DSP mastering: RMS loudness normalization + 40ms raised-cosine micro-fades

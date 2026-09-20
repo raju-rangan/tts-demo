@@ -112,12 +112,14 @@ class CreateJobRequest(BaseModel):
     run_judge: bool = Field(default=True)
     title: Optional[str] = Field(default=None)
     voice_customization: Optional[str] = Field(default=None, description="Custom director notes or vocal delivery directives")
+    speed: Optional[float] = Field(default=1.0, ge=0.5, le=2.0, description="Speech delivery rate (0.5 to 2.0, default 1.0)")
 
 class BulkJobRequest(BaseModel):
     urls: List[str] = Field(..., min_length=1, description="List of article URLs to extract and synthesize")
     persona: str = Field(default="Retail Banking Guide")
     run_judge: bool = Field(default=True)
     voice_customization: Optional[str] = Field(default=None, description="Custom director notes or vocal delivery directives")
+    speed: Optional[float] = Field(default=1.0, ge=0.5, le=2.0, description="Speech delivery rate (0.5 to 2.0, default 1.0)")
 
 def verify_gcip_token(token: str) -> Optional[Dict[str, Any]]:
     """Verifies a Google Cloud Identity Platform (Firebase) ID token against Google's public certs."""
@@ -889,6 +891,7 @@ def _execute_async_synthesis(
     run_judge: bool,
     title: str,
     voice_customization: Optional[str] = None,
+    speed: float = 1.0,
     source_url: Optional[str] = None,
     created_by: Optional[str] = None
 ):
@@ -913,7 +916,7 @@ def _execute_async_synthesis(
 
     words = len(text.split())
     chars = len(text)
-    logger.info(f"▶ [{job_id}] Starting synthesis job | Persona: '{persona_name}' | Words: {words} | Chars: {chars} | Run Judge: {run_judge} | Customization: {bool(voice_customization)}")
+    logger.info(f"▶ [{job_id}] Starting synthesis job | Persona: '{persona_name}' | Speed: {speed:.2f}x | Words: {words} | Chars: {chars} | Run Judge: {run_judge} | Customization: {bool(voice_customization)}")
     t0 = time.time()
     try:
         # Step 1: Voice Generation (multi-turn auto-chunking & DSP mastering)
@@ -922,6 +925,7 @@ def _execute_async_synthesis(
             persona_name=persona_name,
             job_id=job_id,
             voice_customization=voice_customization,
+            speed=speed,
             progress_callback=progress_callback
         )
         synth_time = time.time() - t0
@@ -1000,6 +1004,7 @@ def _execute_async_synthesis(
             audio_format="MP3 24kHz @ 320kbps",
             duration_seconds=gen_result.duration_seconds,
             synthesis_latency_sec=synth_time,
+            speed=speed,
             status="COMPLETED",
             token_usage=token_usage,
             cost=cost,
@@ -1035,6 +1040,7 @@ def _execute_async_synthesis(
             gcs_uri="N/A",
             status="FAILED",
             synthesis_latency_sec=time.time() - t0,
+            speed=speed,
             error_message=str(e),
             voice_customization=voice_customization,
             progress_stage="FAILED",
@@ -1059,6 +1065,7 @@ def create_job(
     """Enqueues a new speech generation and multimodal evaluation pipeline job."""
     job_id = f"job_{secrets.token_hex(4)}"
     persona_obj = get_persona(req.persona)
+    speed = float(req.speed) if req.speed is not None else 1.0
 
     # Pre-save running record with initial progress
     repo = get_job_repository()
@@ -1074,6 +1081,7 @@ def create_job(
         char_count=len(req.text),
         gcs_uri="gs://knowledge-to-audio-poc/pending/" + job_id,
         status="RUNNING",
+        speed=speed,
         voice_customization=req.voice_customization,
         progress_stage="CHUNKING",
         progress_message="Partitioning text into natural conversational turns...",
@@ -1090,6 +1098,7 @@ def create_job(
         run_judge=req.run_judge,
         title=req.title,
         voice_customization=req.voice_customization,
+        speed=speed,
         created_by=user.get("email")
     )
 
@@ -1114,6 +1123,8 @@ def retry_job(
     if not job:
         raise HTTPException(status_code=404, detail=f"Job '{clean_id}' not found")
 
+    job_speed = float(getattr(job, "speed", 1.0) or 1.0)
+
     # Reset job record to RUNNING and clear previous error/scores while preserving customization
     updated_job = JobRecord(
         job_id=job.job_id,
@@ -1127,6 +1138,7 @@ def retry_job(
         char_count=job.char_count,
         gcs_uri="gs://knowledge-to-audio-poc/pending/" + job.job_id,
         status="RUNNING",
+        speed=job_speed,
         error_message=None,
         voice_customization=job.voice_customization,
         progress_stage="CHUNKING",
@@ -1147,6 +1159,7 @@ def retry_job(
         run_judge=True,
         title=job.article_title,
         voice_customization=job.voice_customization,
+        speed=job_speed,
         source_url=job.source_url,
         created_by=user.get("email") or job.created_by
     )
@@ -1164,13 +1177,14 @@ def _execute_bulk_url_processing(
     persona_name: str,
     run_judge: bool,
     voice_customization: Optional[str] = None,
+    speed: float = 1.0,
     created_by: Optional[str] = None
 ):
     """Background worker that sequentially extracts content from URLs and executes speech synthesis jobs one by one."""
     repo = get_job_repository()
     persona_obj = get_persona(persona_name)
     total = len(job_items)
-    logger.info(f"🚀 Starting sequential bulk URL processing for {total} items with persona '{persona_name}'")
+    logger.info(f"🚀 Starting sequential bulk URL processing for {total} items with persona '{persona_name}' | Speed: {speed:.2f}x")
 
     for idx, item in enumerate(job_items, start=1):
         job_id = item["job_id"]
@@ -1198,6 +1212,7 @@ def _execute_bulk_url_processing(
                 job.transcript = extracted.text
                 job.word_count = extracted.word_count
                 job.char_count = extracted.char_count
+                job.speed = speed
                 job.progress_stage = "CHUNKING"
                 job.progress_message = f"Partitioning article text ({extracted.word_count} words)..."
                 repo.save_job(job)
@@ -1210,6 +1225,7 @@ def _execute_bulk_url_processing(
                 run_judge=run_judge,
                 title=extracted.title,
                 voice_customization=voice_customization,
+                speed=speed,
                 source_url=url,
                 created_by=created_by
             )
@@ -1229,6 +1245,7 @@ def _execute_bulk_url_processing(
                     char_count=0,
                     gcs_uri="N/A",
                     status="FAILED",
+                    speed=speed,
                     error_message=str(e),
                     voice_customization=voice_customization,
                     progress_stage="FAILED",
@@ -1238,6 +1255,7 @@ def _execute_bulk_url_processing(
                 )
             else:
                 failed_job.status = "FAILED"
+                failed_job.speed = speed
                 failed_job.error_message = str(e)
                 failed_job.progress_stage = "FAILED"
                 failed_job.progress_message = f"Extraction error: {str(e)}"
@@ -1276,6 +1294,7 @@ def create_bulk_jobs(
 
     persona_obj = get_persona(req.persona)
     repo = get_job_repository()
+    speed = float(req.speed) if req.speed is not None else 1.0
 
     job_items = []
     created_jobs = []
@@ -1300,6 +1319,7 @@ def create_bulk_jobs(
             char_count=0,
             gcs_uri=f"gs://knowledge-to-audio-poc/pending/{job_id}",
             status="RUNNING",
+            speed=speed,
             voice_customization=req.voice_customization,
             progress_stage="QUEUED",
             progress_message="Queued for sequential bulk extraction and synthesis...",
@@ -1315,6 +1335,7 @@ def create_bulk_jobs(
         persona_name=req.persona,
         run_judge=req.run_judge,
         voice_customization=req.voice_customization,
+        speed=speed,
         created_by=user.get("email")
     )
 

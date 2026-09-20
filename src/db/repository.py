@@ -104,7 +104,8 @@ class SQLiteJobRepository(BaseJobRepository):
                     actionable_feedback_json TEXT,
                     judge_model TEXT,
                     judge_latency_sec REAL,
-                    error_message TEXT
+                    error_message TEXT,
+                    speed REAL DEFAULT 1.0
                 )
             """)
             try:
@@ -122,6 +123,7 @@ class SQLiteJobRepository(BaseJobRepository):
                 ("current_turn", "INTEGER"),
                 ("total_turns", "INTEGER"),
                 ("source_url", "TEXT"),
+                ("speed", "REAL DEFAULT 1.0"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE jobs ADD COLUMN {col} {col_type}")
@@ -150,8 +152,8 @@ class SQLiteJobRepository(BaseJobRepository):
                     cost_json, overall_score, overall_reasoning, passed_rubric, rubric_metrics_json,
                     actionable_feedback_json, judge_model, judge_latency_sec, error_message,
                     voice_customization, progress_stage, progress_message, current_turn, total_turns,
-                    source_url
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    source_url, speed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 job.job_id, job.created_at, job.persona, job.audience, job.voice_name, job.article_title,
                 job.transcript, job.word_count, job.char_count, job.gcs_uri, job.signed_url, job.audio_format,
@@ -171,7 +173,8 @@ class SQLiteJobRepository(BaseJobRepository):
                 job.progress_message,
                 job.current_turn,
                 job.total_turns,
-                job.source_url
+                job.source_url,
+                getattr(job, "speed", 1.0) or 1.0
             ))
             conn.commit()
 
@@ -231,6 +234,7 @@ class SQLiteJobRepository(BaseJobRepository):
         current_turn = row["current_turn"] if "current_turn" in row.keys() else None
         total_turns = row["total_turns"] if "total_turns" in row.keys() else None
         source_url = row["source_url"] if "source_url" in row.keys() else None
+        speed = float(row["speed"]) if ("speed" in row.keys() and row["speed"] is not None) else 1.0
 
         return JobRecord(
             job_id=row["job_id"],
@@ -247,6 +251,7 @@ class SQLiteJobRepository(BaseJobRepository):
             audio_format=row["audio_format"] or "MP3 24kHz @ 320kbps",
             duration_seconds=row["duration_seconds"] or 0.0,
             synthesis_latency_sec=row["synthesis_latency_sec"] or 0.0,
+            speed=speed,
             status=row["status"],
             token_usage=TokenUsageDetails(**token_usage_data),
             cost=CostBreakdown(**cost_data),

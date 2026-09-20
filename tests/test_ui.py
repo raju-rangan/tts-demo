@@ -382,6 +382,7 @@ def test_execute_bulk_url_processing_worker():
             run_judge=False,
             title=mock_article.title,
             voice_customization=None,
+            speed=1.0,
             source_url="https://apexbank.com/test-article",
             created_by=None
         )
@@ -743,6 +744,54 @@ def test_html_guided_tour_assets_and_elements(client):
     assert "resetTourStatus" in html
     assert "/api/user/tour-status" in html
     assert "/api/user/tour-dismiss" in html
+
+
+def test_create_job_with_speed_control(client):
+    """Verify /api/jobs accepts speed and persists it in the created job."""
+    # 1. Login
+    login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Submit job with custom speed = 1.25
+    payload = {
+        "text": "This is a detailed retail banking transcript with financial terms.",
+        "persona": "Retail Banking Guide",
+        "run_judge": False,
+        "speed": 1.25
+    }
+    resp = client.post("/api/jobs", json=payload, headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "job" in data
+    assert data["job"]["speed"] == 1.25
+
+    # 3. Verify validation error on out-of-range speed (e.g. 3.0)
+    bad_payload = {
+        "text": "This is a detailed retail banking transcript with financial terms.",
+        "persona": "Retail Banking Guide",
+        "run_judge": False,
+        "speed": 3.0
+    }
+    bad_resp = client.post("/api/jobs", json=bad_payload, headers=headers)
+    assert bad_resp.status_code == 422
+
+
+def test_html_speed_control_elements(client):
+    """Verify HTML contains speech speed slider, preset buttons, and player playback controls."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert 'id="inputSpeed"' in html
+    assert 'id="speedValueBadge"' in html
+    assert 'id="inputBulkSpeed"' in html
+    assert 'id="bulkSpeedValueBadge"' in html
+    assert 'id="detailSpeed"' in html
+    assert 'playback-rate-btn' in html
+    assert 'updateSpeedDisplay' in html
+    assert 'setSpeedPreset' in html
+    assert 'setPlaybackRate' in html
 
 
 

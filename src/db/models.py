@@ -33,6 +33,7 @@ class JobRecord(BaseModel):
     audio_format: str = Field(default="MP3 24kHz @ 320kbps", description="Encoding format")
     duration_seconds: float = Field(default=0.0, description="Duration of generated audio in seconds")
     synthesis_latency_sec: float = Field(default=0.0, description="Time taken to generate speech")
+    speed: float = Field(default=1.0, ge=0.5, le=2.0, description="Speech delivery rate / speed multiplier (0.5 to 2.0, default 1.0)")
     status: str = Field(default="COMPLETED", description="Job status: COMPLETED, FAILED, RUNNING")
     
     # Token & Cost Telemetry

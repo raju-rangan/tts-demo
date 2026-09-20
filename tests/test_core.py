@@ -308,3 +308,71 @@ def test_voice_customization_and_progress_callback():
         assert "CHUNKING" in stage_names
         assert "SYNTHESIZING" in stage_names
         assert "STITCHING" in stage_names
+
+
+def test_speech_speed_prompt_directives():
+    """Verify generate_speech passes speed and formats pacing directives correctly."""
+    from unittest.mock import patch, MagicMock
+    from src.ai.generator import GeminiAudioGenerator
+
+    gen = GeminiAudioGenerator()
+    mock_usage = MagicMock(prompt_token_count=100, candidates_token_count=200)
+    mock_pcm = b"\x05\x00" * 2400
+
+    # 1. Test speed passed to _generate_single_chunk
+    with patch.object(gen, "_generate_single_chunk", return_value=(mock_pcm, mock_usage)) as mock_chunk:
+        gen.generate_speech(
+            text="Brief banking explainer text with complete sentence.",
+            persona_name="Retail Banking Guide",
+            speed=0.85
+        )
+        assert mock_chunk.called
+        assert mock_chunk.call_args.kwargs["speed"] == 0.85
+
+    # 2. Test prompt construction with different speeds
+    mock_client = MagicMock()
+    gen._client = mock_client
+    mock_resp = MagicMock()
+    mock_resp.usage_metadata = mock_usage
+    mock_resp.candidates = [MagicMock()]
+    mock_part = MagicMock()
+    mock_part.inline_data.data = mock_pcm
+    mock_resp.candidates[0].content.parts = [mock_part]
+    mock_client.models.generate_content.return_value = mock_resp
+
+    persona = get_persona("Retail Banking Guide")
+
+    # Slow speed (0.80x)
+    gen._generate_single_chunk(
+        chunk_text="Test slow chunk",
+        persona=persona,
+        job_id="job_speed_slow",
+        speed=0.80
+    )
+    call_args = mock_client.models.generate_content.call_args.kwargs
+    contents_prompt = call_args["contents"]
+    assert "SPEED & PACING DIRECTIVE (Delivery Rate: 0.80x):" in contents_prompt
+    assert "deliberate, measured, and unhurried pace" in contents_prompt
+
+    # Fast disclaimer speed (1.50x)
+    gen._generate_single_chunk(
+        chunk_text="Test fast chunk",
+        persona=persona,
+        job_id="job_speed_fast",
+        speed=1.50
+    )
+    call_args_fast = mock_client.models.generate_content.call_args.kwargs
+    contents_fast = call_args_fast["contents"]
+    assert "SPEED & PACING DIRECTIVE (Delivery Rate: 1.50x):" in contents_fast
+    assert "accelerated rate" in contents_fast
+
+    # Standard speed (1.00x) - no extra speed directive needed
+    gen._generate_single_chunk(
+        chunk_text="Test standard chunk",
+        persona=persona,
+        job_id="job_speed_std",
+        speed=1.00
+    )
+    call_args_std = mock_client.models.generate_content.call_args.kwargs
+    contents_std = call_args_std["contents"]
+    assert "SPEED & PACING DIRECTIVE" not in contents_std
