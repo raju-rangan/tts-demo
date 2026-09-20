@@ -50,7 +50,7 @@ def test_live_project_access_permission_denied():
 # ------------------------------------------------------------------------------
 from fastapi.testclient import TestClient
 from fastapi import HTTPException
-from src.ui.app import app, get_current_user, verify_gcip_token
+from src.ui.app import app, get_current_user, verify_gcip_token, is_localhost_request
 
 def test_api_auth_config():
     """Verify /api/auth/config endpoint returns public configuration."""
@@ -63,6 +63,65 @@ def test_api_auth_config():
     assert "auth_domain" in data
     assert "enable_demo_auth" in data
     assert "has_gcip" in data
+    assert "is_localhost" in data
+
+
+def test_is_localhost_request():
+    """Verify is_localhost_request accurately distinguishes local vs remote traffic."""
+    from unittest.mock import MagicMock
+    # 1. None request
+    assert is_localhost_request(None) is False
+
+    # 2. Host: localhost
+    req_local = MagicMock()
+    req_local.headers = {"host": "localhost:8000"}
+    req_local.client.host = "127.0.0.1"
+    req_local.url.hostname = "localhost"
+    assert is_localhost_request(req_local) is True
+
+    # 3. Host: 127.0.0.1:8000
+    req_ip = MagicMock()
+    req_ip.headers = {"host": "127.0.0.1:8000"}
+    req_ip.client.host = "127.0.0.1"
+    req_ip.url.hostname = "127.0.0.1"
+    assert is_localhost_request(req_ip) is True
+
+    # 4. Production Cloud Run host
+    req_remote = MagicMock()
+    req_remote.headers = {"host": "tts-studio-716595821548.us-central1.run.app"}
+    req_remote.client.host = "35.192.0.1"
+    req_remote.url.hostname = "tts-studio-716595821548.us-central1.run.app"
+    assert is_localhost_request(req_remote) is False
+
+
+def test_get_current_user_localhost_bypass():
+    """Verify get_current_user automatically bypasses auth on localhost and binds active persona."""
+    from unittest.mock import MagicMock
+    req_local = MagicMock()
+    req_local.headers = {"host": "localhost:8000"}
+    req_local.client.host = "127.0.0.1"
+    req_local.url.hostname = "localhost"
+
+    # Default creator persona
+    user_creator = get_current_user(request=req_local)
+    assert user_creator["email"] == "local-dev@apexbank.com"
+    assert user_creator["name"] == "Sarah Jenkins"
+    assert user_creator["persona_type"] == "creator"
+    assert user_creator["is_localhost"] is True
+
+    # Switched auditor persona
+    user_auditor = get_current_user(request=req_local, x_apex_persona="auditor")
+    assert user_auditor["email"] == "local-dev@apexbank.com"
+    assert user_auditor["name"] == "David Chen"
+    assert user_auditor["persona_type"] == "auditor"
+    assert user_auditor["is_localhost"] is True
+
+
+def test_get_current_user_local_dev_token_bypass():
+    """Verify get_current_user bypasses auth when local-dev-token is presented."""
+    user = get_current_user(authorization="Bearer local-dev-token")
+    assert user["email"] == "local-dev@apexbank.com"
+    assert user["is_localhost"] is True
 
 def test_verify_gcip_token_valid():
     """Verify valid GCIP Firebase token returns claims dictionary."""
