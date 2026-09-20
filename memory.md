@@ -132,6 +132,7 @@
   - **Zero Node/npm Overhead**: Kept lightweight Jinja2 server-side rendering while preserving modern ES6 modular structure, native browser execution, and 100% test compatibility.
   - **Updated FastAPI Handler**: Wired `fastapi.templating.Jinja2Templates` into `app.get("/")`.
   - **Clean Single Source of Truth**: Removed obsolete `src/ui/static/index.html`.
+  - **Full-Screen Responsive Layout Optimization**: Replaced `max-w-7xl mx-auto` (which artificially constrained layout width to 1280px / 80rem) with `w-full` in `index.html`. Expanded title truncation widths from `max-w-xs` (320px) to `max-w-md lg:max-w-xl`, eliminating column squeezing across the 8-column Jobs Table and Chart.js dashboards.
   - All **90 out of 90 automated tests passing**.
 
 ---
