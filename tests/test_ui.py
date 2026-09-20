@@ -542,7 +542,7 @@ def test_auditor_full_page_dashboard_and_charts(client):
     assert 'id="fullFoPersonaTableBody"' in html
     assert 'id="fullFoCostPerMin"' in html
     assert 'id="fullFoCostPerJob"' in html
-    assert 'id="fullFoJudgeCostRatio"' in html
+    assert 'id="fullFoAuditorOverhead"' in html
     assert 'id="fullFoFlaggedContainer"' in html
     assert 'id="fullFoFlaggedHeaderCount"' in html
 
