@@ -48,17 +48,18 @@ class BaseJobRepository(ABC):
         pass
 
     @abstractmethod
-    def get_user_tour_status(self, google_email: str) -> bool:
-        """Returns True if the authenticated Google user identity has completed or dismissed the onboarding tour, False otherwise.
-        Note: Tour tracking is strictly keyed by the user's authenticated Google Identity, NOT by workspace persona.
-        """
+    def get_user_tour_status(self, google_email: str, persona: str = "creator") -> bool:
+        """Returns True if the authenticated Google user identity has completed or dismissed the onboarding tour for the given persona, False otherwise."""
         pass
 
     @abstractmethod
-    def set_user_tour_dismissed(self, google_email: str, dismissed: bool = True) -> None:
-        """Persists onboarding tour completion / dismissal state for the authenticated Google identity.
-        Note: Tour tracking is strictly keyed by the user's authenticated Google Identity, NOT by workspace persona.
-        """
+    def set_user_tour_dismissed(self, google_email: str, persona: str = "creator", dismissed: bool = True) -> None:
+        """Persists onboarding tour completion / dismissal state for the (google_email, persona) pair."""
+        pass
+
+    @abstractmethod
+    def reset_all_tour_tracking(self) -> None:
+        """Resets all onboarding tour tracking records so all users will see the tour on their next visit."""
         pass
 
 
@@ -129,10 +130,12 @@ class SQLiteJobRepository(BaseJobRepository):
             conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs (created_at DESC)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_persona ON jobs (persona)")
             conn.execute("""
-                CREATE TABLE IF NOT EXISTS user_preferences (
-                    user_email TEXT PRIMARY KEY,
+                CREATE TABLE IF NOT EXISTS user_tour_preferences (
+                    google_email TEXT NOT NULL,
+                    persona TEXT NOT NULL,
                     has_seen_tour INTEGER DEFAULT 0,
-                    tour_dismissed_at TEXT
+                    tour_dismissed_at TEXT,
+                    PRIMARY KEY (google_email, persona)
                 )
             """)
             conn.commit()
@@ -263,29 +266,37 @@ class SQLiteJobRepository(BaseJobRepository):
             source_url=source_url
         )
 
-    def get_user_tour_status(self, google_email: str) -> bool:
+    def get_user_tour_status(self, google_email: str, persona: str = "creator") -> bool:
         clean_email = google_email.lower().strip()
+        clean_persona = persona.lower().strip() if persona else "creator"
         with self._get_conn() as conn:
             row = conn.execute(
-                "SELECT has_seen_tour FROM user_preferences WHERE user_email = ?",
-                (clean_email,)
+                "SELECT has_seen_tour FROM user_tour_preferences WHERE google_email = ? AND persona = ?",
+                (clean_email, clean_persona)
             ).fetchone()
             if row:
                 return bool(row["has_seen_tour"])
         return False
 
-    def set_user_tour_dismissed(self, google_email: str, dismissed: bool = True) -> None:
+    def set_user_tour_dismissed(self, google_email: str, persona: str = "creator", dismissed: bool = True) -> None:
         clean_email = google_email.lower().strip()
+        clean_persona = persona.lower().strip() if persona else "creator"
         now_iso = datetime.now(timezone.utc).isoformat() if dismissed else None
         has_seen = 1 if dismissed else 0
         with self._get_conn() as conn:
             conn.execute("""
-                INSERT INTO user_preferences (user_email, has_seen_tour, tour_dismissed_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(user_email) DO UPDATE SET
+                INSERT INTO user_tour_preferences (google_email, persona, has_seen_tour, tour_dismissed_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(google_email, persona) DO UPDATE SET
                     has_seen_tour = excluded.has_seen_tour,
                     tour_dismissed_at = excluded.tour_dismissed_at
-            """, (clean_email, has_seen, now_iso))
+            """, (clean_email, clean_persona, has_seen, now_iso))
+            conn.commit()
+
+    def reset_all_tour_tracking(self) -> None:
+        with self._get_conn() as conn:
+            conn.execute("DELETE FROM user_tour_preferences")
+            conn.execute("DROP TABLE IF EXISTS user_preferences")
             conn.commit()
 
 
@@ -354,10 +365,12 @@ class FirestoreJobRepository(BaseJobRepository):
             "total_turns": total_turns,
         })
 
-    def get_user_tour_status(self, google_email: str) -> bool:
+    def get_user_tour_status(self, google_email: str, persona: str = "creator") -> bool:
         clean_email = google_email.lower().strip()
+        clean_persona = persona.lower().strip() if persona else "creator"
+        doc_id = f"{clean_email}__{clean_persona}"
         try:
-            doc_ref = self.client.collection("user_preferences").document(clean_email)
+            doc_ref = self.client.collection("user_tour_preferences").document(doc_id)
             doc = doc_ref.get()
             if doc.exists:
                 data = doc.to_dict() or {}
@@ -366,19 +379,29 @@ class FirestoreJobRepository(BaseJobRepository):
             logger.warning(f"Failed to fetch user tour status from Firestore: {e}")
         return False
 
-    def set_user_tour_dismissed(self, google_email: str, dismissed: bool = True) -> None:
+    def set_user_tour_dismissed(self, google_email: str, persona: str = "creator", dismissed: bool = True) -> None:
         clean_email = google_email.lower().strip()
+        clean_persona = persona.lower().strip() if persona else "creator"
+        doc_id = f"{clean_email}__{clean_persona}"
         now_iso = datetime.now(timezone.utc).isoformat() if dismissed else None
         try:
-            doc_ref = self.client.collection("user_preferences").document(clean_email)
+            doc_ref = self.client.collection("user_tour_preferences").document(doc_id)
             doc_ref.set({
                 "google_email": clean_email,
-                "user_email": clean_email,
+                "persona": clean_persona,
                 "has_seen_tour": dismissed,
                 "tour_dismissed_at": now_iso,
             }, merge=True)
         except Exception as e:
             logger.warning(f"Failed to set user tour dismissal in Firestore: {e}")
+
+    def reset_all_tour_tracking(self) -> None:
+        try:
+            docs = self.client.collection("user_tour_preferences").stream()
+            for d in docs:
+                d.reference.delete()
+        except Exception as e:
+            logger.warning(f"Failed to reset tour tracking in Firestore: {e}")
 
 
 _active_repo: Optional[BaseJobRepository] = None
