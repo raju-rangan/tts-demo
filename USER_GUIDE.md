@@ -42,8 +42,8 @@ The platform is designed around two core banking stakeholders:
 
 | User Persona | Enterprise Role | Department | Workspace Focus |
 | :--- | :--- | :--- | :--- |
-| **Sarah Jenkins** | Chief Communications Officer | Digital Wealth & Customer Experience | **Content Creator Studio**: Ingest articles, customize voice personas, configure director notes, run multi-turn synthesis, and review audio players. |
-| **David Chen** | VP Regulatory Compliance | Bank Secrecy & AML Oversight | **Compliance & Governance Console**: Full-page executive dashboard, 4 interactive Chart.js visualizations, persona governance matrix, and flagged disclosures review. |
+| **Sarah Jenkins** | Senior Digital Communications Specialist | Digital Wealth Communications & Publishing | **Content Creator Studio**: Ingest articles, customize voice personas, configure director notes, run multi-turn synthesis, and review audio players. |
+| **David Chen** | Senior Regulatory Compliance Analyst | Communications Compliance & Disclosure Oversight | **Compliance & Governance Console**: Full-page executive dashboard, 4 interactive Chart.js visualizations, persona governance matrix, and flagged disclosures review. |
 
 #### Instant Workspace Switching
 You can switch between **Sarah Jenkins** (Creator) and **David Chen** (Auditor) at any time without logging out or losing work:
@@ -195,7 +195,7 @@ The scorecard provides verbatim rationale and specific, actionable recommendatio
 
 ## Step 7: Executive Compliance & Governance Dashboard (David Chen Persona)
 
-When switching to **David Chen** (VP Regulatory Compliance), the application unlocks a dedicated, full-page **Executive Governance Dashboard**:
+When switching to **David Chen** (Senior Regulatory Compliance Analyst), the application unlocks a dedicated, full-page **Executive Governance Dashboard**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -330,8 +330,8 @@ All speech synthesis jobs, audio GCS references, token telemetry, and quality sc
 │ How do I launch the app locally?  │ make ui-dev (or make ui)                                    │
 │ What is the local URL?            │ http://127.0.0.1:8000 (Localhost Auth Bypass auto-active)   │
 │ How do I switch personas?         │ Click "Switch Workspace" in the top navbar                  │
-│ Who is the Content Creator?       │ Sarah Jenkins (Chief Communications Officer)                │
-│ Who is the Compliance Auditor?    │ David Chen (VP Regulatory Compliance)                       │
+│ Who is the Content Creator?       │ Sarah Jenkins (Senior Digital Communications Specialist)    │
+│ Who is the Compliance Auditor?    │ David Chen (Senior Regulatory Compliance Analyst)           │
 │ Where is job data persisted?      │ Google Cloud Firestore Native (tts-jobs database)           │
 │ How do I migrate local SQLite?    │ make migrate-data                                           │
 │ Where is audio stored?            │ Google Cloud Storage (gs://[BUCKET]/[prefix]/[job_id].mp3)   │

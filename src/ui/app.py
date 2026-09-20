@@ -65,15 +65,15 @@ ACTIVE_SESSIONS: Dict[str, Dict[str, Any]] = {}
 PERSONA_PROFILES: Dict[str, Dict[str, str]] = {
     "creator": {
         "name": "Sarah Jenkins",
-        "role": "Chief Communications Officer",
-        "department": "Digital Wealth & Customer Experience",
+        "role": "Senior Digital Communications Specialist",
+        "department": "Digital Wealth Communications & Publishing",
         "avatar": "/static/avatars/creator_sarah.jpg",
         "persona_type": "creator"
     },
     "auditor": {
         "name": "David Chen",
-        "role": "VP Regulatory Compliance",
-        "department": "Bank Secrecy & AML Oversight",
+        "role": "Senior Regulatory Compliance Analyst",
+        "department": "Communications Compliance & Disclosure Oversight",
         "avatar": "/static/avatars/auditor_david.jpg",
         "persona_type": "auditor"
     }
@@ -83,16 +83,16 @@ DEMO_USERS = {
     "admin@apexbank.com": {
         "password": "demo1234",
         "name": "Sarah Jenkins",
-        "role": "Chief Communications Officer",
-        "department": "Digital Wealth & Customer Experience",
+        "role": "Senior Digital Communications Specialist",
+        "department": "Digital Wealth Communications & Publishing",
         "avatar": "/static/avatars/creator_sarah.jpg",
         "persona_type": "creator"
     },
     "auditor@apexbank.com": {
         "password": "demo1234",
         "name": "David Chen",
-        "role": "VP Regulatory Compliance",
-        "department": "Bank Secrecy & AML Oversight",
+        "role": "Senior Regulatory Compliance Analyst",
+        "department": "Communications Compliance & Disclosure Oversight",
         "avatar": "/static/avatars/auditor_david.jpg",
         "persona_type": "auditor"
     }
@@ -280,8 +280,8 @@ def create_google_session(req: GoogleSessionRequest):
         "picture": None,
         "uid": f"g_{secrets.token_hex(8)}",
         "name": "Sarah Jenkins",
-        "role": "Chief Communications Officer",
-        "department": "Digital Wealth & Customer Experience",
+        "role": "Senior Digital Communications Specialist",
+        "department": "Digital Wealth Communications & Publishing",
         "avatar": "/static/avatars/creator_sarah.jpg",
         "persona_type": "creator"
     }
@@ -344,8 +344,8 @@ def google_login(req: GoogleLoginRequest):
             "picture": idinfo.get("picture"),
             "uid": idinfo.get("sub") or f"g_{secrets.token_hex(8)}",
             "name": "Sarah Jenkins",
-            "role": "Chief Communications Officer",
-            "department": "Digital Wealth & Customer Experience",
+            "role": "Senior Digital Communications Specialist",
+            "department": "Digital Wealth Communications & Publishing",
             "avatar": "/static/avatars/creator_sarah.jpg",
             "persona_type": "creator"
         }

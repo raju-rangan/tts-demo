@@ -16,7 +16,7 @@ The **Apex Bank Knowledge-to-Speech Studio** solves these challenges using **Goo
 5. **Multimodal LLM-as-a-Judge Quality Audit**: Automated evaluation of the synthesized audio directly from its GCS URI pointer (`types.Part.from_uri()`) against a strict 6-dimension rubric, with zero audio download or streaming into the worker.
 6. **Executive FinOps & Compliance Governance**: Full-page interactive **Chart.js** dashboard for compliance auditors featuring Rubric Radars, FinOps spend allocations, persona volume comparisons, and token utilization breakdowns.
 7. **Cloud Firestore Serverless Persistence**: Enterprise persistence using **Google Cloud Firestore Native Mode** (`tts-jobs` database), ensuring job history and audit records persist seamlessly across Cloud Run container deployments with automatic SQLite fallback for isolated offline testing.
-8. **Dual-Persona Workspace Hub**: Seamless top-navigation switching between **Sarah Jenkins** (Chief Communications Officer - Content Creator) and **David Chen** (VP Regulatory Compliance - Compliance Auditor).
+8. **Dual-Persona Workspace Hub**: Seamless top-navigation switching between **Sarah Jenkins** (Senior Digital Communications Specialist - Content Creator) and **David Chen** (Senior Regulatory Compliance Analyst - Compliance Auditor).
 9. **Zero-Config Localhost Auth Bypass**: Automatic loopback detection (`127.0.0.1` / `localhost`) bypassing Google OAuth origin restrictions for instant local developer access while strictly enforcing GCIP JWT cryptographic verification on Google Cloud Run.
 10. **Resilient Real-Time Progress UX**: Instant state unshift, self-healing job details fetch, 5-stage live stepper (`CHUNKING` → `SYNTHESIZING` → `STITCHING` → `UPLOADING` → `EVALUATING`), and sample disclosures director tuning.
 
@@ -523,7 +523,7 @@ class FirestoreJobRepository(BaseJobRepository):
 ### Step 10: Executive Auditor Dashboard & Interactive Chart.js Telemetry
 **File**: [`src/ui/static/index.html`](file:///Users/rrangan/Documents/customers/tts-demo/src/ui/static/index.html)
 
-For compliance officers and VP Regulatory Compliance (**David Chen**), the platform provides a dedicated full-page **Executive Governance Dashboard** powered by Chart.js:
+For compliance officers and Senior Regulatory Compliance Analyst (**David Chen**), the platform provides a dedicated full-page **Executive Governance Dashboard** powered by Chart.js:
 
 1. **Top-Line KPI Metric Cards**:
    - Total FinOps Spend (USD split between Speech Generation and Multimodal Auditing).

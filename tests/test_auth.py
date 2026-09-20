@@ -159,7 +159,7 @@ def test_get_current_user_with_valid_gcip_token():
         assert user["email"] == "admin@altostrat.com"
         assert user["google_name"] == "Admin Specialist"
         assert user["name"] == "Sarah Jenkins"
-        assert user["role"] == "Chief Communications Officer"
+        assert user["role"] == "Senior Digital Communications Specialist"
         assert user["avatar"] == "/static/avatars/creator_sarah.jpg"
         assert user["persona_type"] == "creator"
 
@@ -177,7 +177,7 @@ def test_get_current_user_with_auditor_persona():
         user = get_current_user(authorization="Bearer valid-token-123", x_apex_persona="auditor")
         assert user["email"] == "admin@altostrat.com"
         assert user["name"] == "David Chen"
-        assert user["role"] == "VP Regulatory Compliance"
+        assert user["role"] == "Senior Regulatory Compliance Analyst"
         assert user["avatar"] == "/static/avatars/auditor_david.jpg"
         assert user["persona_type"] == "auditor"
 
@@ -205,7 +205,7 @@ def test_get_current_user_demo_auth_success():
         "user": {
             "email": "admin@apexbank.com",
             "name": "Sarah Jenkins",
-            "role": "Chief Communications Officer",
+            "role": "Senior Digital Communications Specialist",
             "department": "Digital Wealth"
         },
         "created_at": 123456789.0
@@ -240,7 +240,7 @@ def test_create_google_session_success():
         assert me_resp.status_code == 200
         me_data = me_resp.json()
         assert me_data["user"]["name"] == "David Chen"
-        assert me_data["user"]["role"] == "VP Regulatory Compliance"
+        assert me_data["user"]["role"] == "Senior Regulatory Compliance Analyst"
         assert me_data["user"]["persona_type"] == "auditor"
 
 

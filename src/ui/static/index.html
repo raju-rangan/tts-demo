@@ -214,8 +214,8 @@
               <div>
                 <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Creator View</span>
                 <h3 class="text-base font-bold text-white mt-1 group-hover:text-emerald-300 transition">Sarah Jenkins</h3>
-                <p class="text-xs text-zinc-400">Chief Communications Officer</p>
-                <p class="text-[10px] text-zinc-500">Digital Wealth & Customer Exp.</p>
+                <p class="text-xs text-zinc-400">Senior Digital Communications Specialist</p>
+                <p class="text-[10px] text-zinc-500">Digital Wealth Communications & Publishing</p>
               </div>
             </div>
             <p class="text-xs text-zinc-300 leading-relaxed mb-4">
@@ -236,8 +236,8 @@
               <div>
                 <span class="px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-[10px] text-purple-400 font-bold uppercase tracking-wider">Auditor View</span>
                 <h3 class="text-base font-bold text-white mt-1 group-hover:text-purple-300 transition">David Chen</h3>
-                <p class="text-xs text-zinc-400">VP Regulatory Compliance</p>
-                <p class="text-[10px] text-zinc-500">Bank Secrecy & AML Oversight</p>
+                <p class="text-xs text-zinc-400">Senior Regulatory Compliance Analyst</p>
+                <p class="text-[10px] text-zinc-500">Communications Compliance & Disclosure Oversight</p>
               </div>
             </div>
             <p class="text-xs text-zinc-300 leading-relaxed mb-4">
@@ -341,7 +341,7 @@
           </div>
           <div class="hidden md:block text-left">
             <div id="userName" class="text-xs font-bold text-zinc-200">Sarah Jenkins</div>
-            <div id="userRole" class="text-[10px] text-zinc-400">Chief Communications Officer</div>
+            <div id="userRole" class="text-[10px] text-zinc-400">Senior Digital Communications Specialist</div>
             <div id="userGoogleEmail" class="text-[9px] text-zinc-500 font-mono hidden truncate max-w-[140px]"></div>
           </div>
           <button onclick="handleLogout()" title="Sign Out from Platform" class="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-zinc-800 rounded-lg transition ml-1">
@@ -366,7 +366,7 @@
                 <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-medium">Creator Mode</span>
               </div>
               <p class="text-xs text-zinc-300 mt-1 max-w-2xl leading-relaxed">
-                Operating as <strong>Sarah Jenkins</strong> (Chief Communications Officer). Convert wealth advisories, regulatory disclosures, and customer articles into natural spoken speech using <strong>Gemini 3.1 Flash TTS</strong>.
+                Operating as <strong>Sarah Jenkins</strong> (Senior Digital Communications Specialist). Convert wealth advisories, regulatory disclosures, and customer articles into natural spoken speech using <strong>Gemini 3.1 Flash TTS</strong>.
               </p>
             </div>
           </div>
@@ -446,7 +446,7 @@
                 <span class="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-[10px] text-purple-300 font-medium">Auditor Mode Active</span>
               </div>
               <p class="text-xs text-zinc-300 mt-1 max-w-2xl leading-relaxed">
-                Operating as <strong>David Chen</strong> (VP Regulatory Compliance). Overseeing <strong>Gemini 3.8 Flash Multimodal Quality Scorecards</strong>, disclosure clarity, Truth in Lending verification, and FinOps governance.
+                Operating as <strong>David Chen</strong> (Senior Regulatory Compliance Analyst). Overseeing <strong>Gemini 3.8 Flash Multimodal Quality Scorecards</strong>, disclosure clarity, Truth in Lending verification, and FinOps governance.
               </p>
             </div>
           </div>
@@ -1807,8 +1807,8 @@
           email: 'local-dev@apexbank.com',
           google_email: 'local-dev@apexbank.com',
           name: activePersona === 'auditor' ? 'David Chen' : 'Sarah Jenkins',
-          role: activePersona === 'auditor' ? 'VP Regulatory Compliance' : 'Chief Communications Officer',
-          department: activePersona === 'auditor' ? 'Bank Secrecy & AML Oversight' : 'Digital Wealth & Customer Experience',
+          role: activePersona === 'auditor' ? 'Senior Regulatory Compliance Analyst' : 'Senior Digital Communications Specialist',
+          department: activePersona === 'auditor' ? 'Communications Compliance & Disclosure Oversight' : 'Digital Wealth Communications & Publishing',
           persona_type: activePersona,
           avatar: activePersona === 'auditor' ? '/static/avatars/auditor_david.jpg' : '/static/avatars/creator_sarah.jpg'
         };
@@ -1891,8 +1891,8 @@
         email: 'local-dev@apexbank.com',
         google_email: 'local-dev@apexbank.com',
         name: activePersona === 'auditor' ? 'David Chen' : 'Sarah Jenkins',
-        role: activePersona === 'auditor' ? 'VP Regulatory Compliance' : 'Chief Communications Officer',
-        department: activePersona === 'auditor' ? 'Bank Secrecy & AML Oversight' : 'Digital Wealth & Customer Experience',
+        role: activePersona === 'auditor' ? 'Senior Regulatory Compliance Analyst' : 'Senior Digital Communications Specialist',
+        department: activePersona === 'auditor' ? 'Communications Compliance & Disclosure Oversight' : 'Digital Wealth Communications & Publishing',
         persona_type: activePersona,
         avatar: activePersona === 'auditor' ? '/static/avatars/auditor_david.jpg' : '/static/avatars/creator_sarah.jpg'
       };
@@ -2076,7 +2076,7 @@
 
     function setUserHeader(user) {
       document.getElementById('userName').textContent = user.name || 'Sarah Jenkins';
-      document.getElementById('userRole').textContent = user.role || 'Chief Communications Officer';
+      document.getElementById('userRole').textContent = user.role || 'Senior Digital Communications Specialist';
       
       const emailEl = document.getElementById('userGoogleEmail');
       const googleEmail = user.google_email || (user.email && !user.email.includes('apexbank.com') ? user.email : null);
@@ -4012,7 +4012,7 @@
           element: '#btnSwitchPersona',
           popover: {
             title: '1. Workspace Persona Hub',
-            description: 'Switch between <strong>David Chen</strong> (VP Regulatory Compliance) and <strong>Sarah Jenkins</strong> (Chief Communications Officer).',
+            description: 'Switch between <strong>David Chen</strong> (Senior Regulatory Compliance Analyst) and <strong>Sarah Jenkins</strong> (Senior Digital Communications Specialist).',
             side: 'bottom',
             align: 'start'
           }
