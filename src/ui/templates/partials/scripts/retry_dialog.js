@@ -31,6 +31,8 @@
     function closeRetryModal() {
       const modal = document.getElementById('modalRetryDialog');
       if (modal) modal.classList.add('hidden');
+      const loadingOverlay = document.getElementById('retryModalLoading');
+      if (loadingOverlay) loadingOverlay.classList.add('hidden');
       ACTIVE_RETRY_JOB_ID = null;
     }
 
@@ -45,6 +47,14 @@
       const modal = document.getElementById('modalRetryDialog');
       if (modal) modal.classList.remove('hidden');
 
+      const loadingOverlay = document.getElementById('retryModalLoading');
+      const submitBtn = document.getElementById('confirmRetrySubmitBtn');
+      if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+
       const takeBadge = document.getElementById('retryTakeBadge');
       const prevScoreBadge = document.getElementById('retryPrevScoreBadge');
       const prevGateBadge = document.getElementById('retryPrevGateBadge');
@@ -55,6 +65,21 @@
       const voiceCustInput = document.getElementById('retryVoiceCustomization');
       const speedSlider = document.getElementById('retrySpeed');
       const includeCritiqueCb = document.getElementById('retryIncludeCritique');
+
+      // Reset stale fields while loading
+      if (takeBadge) takeBadge.textContent = '...';
+      if (prevScoreBadge) {
+        prevScoreBadge.textContent = '--';
+        prevScoreBadge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400';
+      }
+      if (prevGateBadge) {
+        prevGateBadge.textContent = 'Fetching...';
+        prevGateBadge.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400';
+      }
+      if (prevReasoning) prevReasoning.textContent = '';
+      if (flaggedContainer) flaggedContainer.classList.add('hidden');
+      if (flaggedList) flaggedList.innerHTML = '';
+      if (critiqueText) critiqueText.value = '';
 
       if (includeCritiqueCb) includeCritiqueCb.checked = true;
       toggleRetryCritiqueInput(true);
@@ -135,9 +160,14 @@
         DEFAULT_RETRY_CRITIQUE = '';
         if (critiqueText) critiqueText.value = '';
         if (prevReasoning) prevReasoning.textContent = 'Unable to fetch prior evaluation preview.';
+      } finally {
+        if (loadingOverlay) loadingOverlay.classList.add('hidden');
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+        lucide.createIcons();
       }
-
-      lucide.createIcons();
     }
 
     async function confirmAndExecuteRetry() {

@@ -943,6 +943,7 @@ def test_html_critic_retry_dialog_elements(client):
 
     # Modal Elements
     assert 'id="modalRetryDialog"' in html
+    assert 'id="retryModalLoading"' in html
     assert 'id="retryCritiqueText"' in html
     assert 'id="retryIncludeCritique"' in html
     assert 'id="retryPrevScoreBadge"' in html
