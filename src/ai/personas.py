@@ -28,14 +28,19 @@ FINANCIAL PRONUNCIATION & TERMINOLOGY GUIDELINES:
   * "OCC" -> "O-C-C"
   * "CRA" -> "C-R-A"
 - Retail & Lending Terminology:
+  * "High-Yield" -> "high yield" (STRICT: NEVER substitute with "high quality" or other adjectives)
+  * "HYSA" -> "H-Y-S-A" or "high-yield savings account"
+  * "HYSAs" -> "H-Y-S-As" or "high-yield savings accounts"
   * "APR" -> "A-P-R" (Annual Percentage Rate)
-  * "APY" -> "A-P-Y" (Annual Percentage Yield)
+  * "APY" -> "A-P-Y" (Annual Percentage Yield) (Speak acronyms following the exact order in script: "Annual Percentage Yield (APY)" -> "Annual Percentage Yield, A-P-Y")
+  * "Certificates of Deposit" -> "Certificates of Deposit" (Singular 'Deposit', NOT 'Deposits')
   * "HELOC" -> "hee-lock" (Home Equity Line of Credit)
   * "ARM" -> "A-R-M" (Adjustable Rate Mortgage)
   * "LTV" -> "L-T-V" (Loan to Value)
   * "DTI" -> "D-T-I" (Debt to Income)
   * "PMI" -> "P-M-I" (Private Mortgage Insurance)
   * "CD" -> "C-D" (Certificate of Deposit)
+  * "CDs" -> "C-D-s" (Certificates of Deposit)
   * "P&I" -> "P and I" (Principal and Interest)
 - Payments & Transactions:
   * "ACH" -> "A-C-H" (Automated Clearing House)

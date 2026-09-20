@@ -252,11 +252,15 @@ class GeminiAudioGenerator:
 
         script_adherence_block = (
             "VERBATIM SCRIPT ADHERENCE DIRECTIVE:\n"
-            "- 100% Word-for-Word Fidelity: You MUST read the reference text exactly as written. Do NOT omit, skip, summarize, paraphrase, or add any words.\n"
+            "- Teleprompter Mode: You are reading from an electronic broadcast teleprompter. Read ONLY the text enclosed inside <teleprompter_script> tags aloud from beginning to end.\n"
+            "- 100% Word-for-Word Fidelity: You MUST read the reference text enclosed inside <teleprompter_script> tags exactly as written. Do NOT omit, skip, summarize, paraphrase, or add any words.\n"
             "- Titles & Headlines: If the text begins with a title or headline (including markdown '#' or article titles), you MUST clearly read the title aloud before narrating the body text.\n"
             "- Section Headers & Bullet Points: Speak every section header and every numbered or bulleted list item completely in sequence. Do not skip list items.\n"
-            "- Parenthetical Expressions: Read all parenthetical expressions, acronyms, and expansions (e.g., '(CDs)', '(FDIC)', '(APR)') out loud as part of the natural spoken narrative.\n"
-            "- No Unscripted Additions: Do not add conversational lead-ins (e.g., 'Welcome to...', 'Sure, here is...'), improvised transitions, or unscripted concluding remarks.\n\n"
+            "- Exact Left-to-Right Word Order: Speak words and acronyms in the exact sequence they appear in the text. For example, 'Annual Percentage Yield (APY)' must be read in that exact left-to-right order ('Annual Percentage Yield, A-P-Y'). NEVER invert the order (e.g. do NOT say 'APY, Annual Percentage Yield').\n"
+            "- Parenthetical Expressions: Read all parenthetical expressions, acronyms, and expansions (e.g., '(CDs)', '(HYSA)', '(FDIC)', '(APR)') out loud as part of the natural spoken narrative.\n"
+            "- No Retroactive or Unscripted Injections: NEVER add abbreviations or terms into headers or sentences where they are not written (e.g. if a header says 'Certificates of Deposit', do NOT insert 'CDs' unless '(CDs)' is explicitly written in that header).\n"
+            "- Exact Product Names & Singular/Plural Integrity: Never substitute compound terms (e.g. 'High-Yield' must be read as 'high yield', NEVER 'high quality'). Preserve singular vs plural forms precisely ('Certificates of Deposit', not 'Deposits'; 'HYSAs', not 'HYSA').\n"
+            "- No Conversational Additions: Do not add conversational lead-ins (e.g., 'Welcome to...', 'Sure, here is...'), improvised transitions, or unscripted concluding remarks.\n\n"
         )
 
         customization_block = ""
@@ -285,8 +289,8 @@ class GeminiAudioGenerator:
             f"{customization_block}"
             f"{remediation_block}"
             f"{turn_context}"
-            f"INSTRUCTION:\nPlease read the following financial guidance article aloud adhering strictly to your assigned persona, "
-            f"pacing pauses, verbatim adherence, and financial pronunciation directives:\n\n{chunk_text}"
+            f"INSTRUCTION:\nYou are reading from an electronic broadcast teleprompter. Read ONLY the text enclosed inside <teleprompter_script> tags aloud from beginning to end with 100% exact word-for-word accuracy. Adhere strictly to your assigned persona, tempo, and financial pronunciation directives:\n\n"
+            f"<teleprompter_script>\n{chunk_text}\n</teleprompter_script>"
         )
 
         max_attempts = 2
