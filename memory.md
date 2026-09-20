@@ -122,6 +122,18 @@
   - **Full-Page Auditor Governance Dashboard**: Integrated interactive Chart.js visualizations (Radar, Donut, Bar, Token breakdown) and FinOps metrics for David Chen.
   - **Resilient Job Creation & Progress Tracking**: Eliminated race condition on `submitNewJob` by immediately unshifting `data.job` into memory, adding direct `GET /api/jobs/{id}` fetch fallback to `openJobDetail`, parsing error responses cleanly, and adding director note guidance to `loadSampleText()`.
 
+- **2026-09-20 14:00** - Speech Speed Control & Critic-Guided Retry Optimization:
+  - **Speech Speed Control**: Added `speed` parameter (0.25 to 4.0, default 1.0) according to Cloud TTS / Gemini TTS specifications. Integrated into `JobRecord`, API request models, and injected into Gemini TTS delivery instructions. Added slider control `#inputSpeed` in New Voice Synthesis modal.
+  - **Critic-Guided Retry & Observations Injection**: Implemented `POST /api/jobs/{id}/retry/preview` and updated `POST /api/jobs/{id}/retry` with `include_critique` and `additional_instructions` parameters. Automatically injects judge observations and low-scoring rubric feedback into retry prompts as remediation instructions.
+  - **Interactive Retry Modal**: Built modal dialog (`#modalRetryDialog`) showing previous scores, judge critique, and editable instructions before re-running synthesis.
+  - **Tour Onboarding**: Implemented Driver.js interactive guided tour for new users across Creator and Auditor personas, with persistent state per Google identity.
+- **2026-09-20 16:55** - Frontend Architecture Refactoring:
+  - **Decomposed Monolithic `index.html`**: Split 4,586-line monolith into modular Jinja2 components (`src/ui/templates/partials/`) and discrete vanilla JS feature modules (`src/ui/templates/partials/scripts/`).
+  - **Zero Node/npm Overhead**: Kept lightweight Jinja2 server-side rendering while preserving modern ES6 modular structure, native browser execution, and 100% test compatibility.
+  - **Updated FastAPI Handler**: Wired `fastapi.templating.Jinja2Templates` into `app.get("/")`.
+  - **Clean Single Source of Truth**: Removed obsolete `src/ui/static/index.html`.
+  - All **90 out of 90 automated tests passing**.
+
 ---
 
 ## 5. Active State & Pending Next Steps
@@ -129,13 +141,14 @@
 ### Current State
 - Local development server running on `http://127.0.0.1:8000`.
 - Auth bypass active on localhost, strict GCIP token validation active on Google Cloud Run.
+- Modular Jinja2 frontend template architecture deployed and verified.
 - Full-page Auditor dashboard with Chart.js charts active.
-- End-to-end synthesis verified on sample banking disclosures text (`job_b53ab63c`).
-- All 75 automated tests passing.
+- Critic-guided retry preview and speed control enabled.
+- All 90 automated tests passing.
 
 ### Verification Commands
 ```bash
-# Run test suite (75 tests)
+# Run test suite (90 tests)
 USE_FIRESTORE=false ./.venv/bin/pytest tests/ -v
 
 # Run app locally
