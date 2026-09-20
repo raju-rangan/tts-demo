@@ -78,6 +78,20 @@
       </div>
 
       <div id="loginError" class="hidden mt-4 text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 p-3 rounded-xl"></div>
+
+      <!-- Localhost Dev Bypass Card -->
+      <div id="localBypassCard" class="hidden mt-5 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-2">
+        <div class="flex items-center space-x-2 font-bold text-xs">
+          <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+          <span>Localhost Environment Detected</span>
+        </div>
+        <p class="text-[11px] text-zinc-400">Google Sign-In is bypassed for local development. Click below to enter the studio directly.</p>
+        <button type="button" onclick="bypassAuthLocal()"
+          class="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold rounded-xl text-xs transition shadow-md shadow-amber-500/10 flex items-center justify-center space-x-2">
+          <i data-lucide="arrow-right-circle" class="w-4 h-4"></i>
+          <span>Continue as Local Developer (Bypass Auth)</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -191,6 +205,10 @@
           </span>
           <span class="px-2 py-1 bg-zinc-800/80 rounded text-zinc-400">Voice: <span class="text-emerald-400">gemini-3.1-flash-tts-preview</span></span>
           <span class="px-2 py-1 bg-zinc-800/80 rounded text-zinc-400">Judge: <span class="text-purple-400">gemini-3.8-flash</span></span>
+          <span id="navLocalDevBadge" class="hidden px-2 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded font-mono text-[11px] items-center space-x-1">
+            <i data-lucide="laptop" class="w-3 h-3 text-amber-400"></i>
+            <span>Localhost Dev</span>
+          </span>
         </div>
       </div>
 
