@@ -544,7 +544,7 @@ def test_auditor_full_page_dashboard_and_charts(client):
     assert 'id="fullFoCostPerJob"' in html
     assert 'id="fullFoAuditorOverhead"' in html
     assert 'id="fullFoFlaggedContainer"' in html
-    assert 'id="fullFoFlaggedHeaderCount"' in html
+    assert 'id="fullFoFlaggedBadge"' in html
 
     # 7. JavaScript controller & chart rendering logic
     assert "function switchAuditorSubView(" in html
