@@ -117,33 +117,29 @@
   - **WAF Scraper Hardening**: Enhanced `src/utils/extractor.py` with standard browser headers (`Sec-Ch-Ua`, `Sec-Fetch-*`, `Upgrade-Insecure-Requests`) and an automatic fallback identifying user agent (`ApexBankKnowledgeVoice/1.0`), eliminating 403 Forbidden errors on government and educational pages.
   - **Gemini TTS Backoff & Retry**: Implemented automatic 2-attempt retry with 3.0s exponential backoff in `src/ai/generator.py` for `_generate_single_chunk` when transient empty audio parts or quota bursts occur. Added detailed `finish_reason` and safety ratings diagnostic extraction in `_extract_audio_from_response`.
   - **Inter-Turn Pacing Buffer**: Added 1.0s sleep between consecutive turns in multi-turn synthesis to prevent rapid TPM bursting against Vertex AI preview limits.
-  - All **52 out of 52 automated tests passing**.
+  - All **75 out of 75 automated tests passing**.
+  - **Localhost Auth Bypass**: Implemented seamless development bypass on `127.0.0.1` and `localhost` with zero Google OAuth prompt errors.
+  - **Full-Page Auditor Governance Dashboard**: Integrated interactive Chart.js visualizations (Radar, Donut, Bar, Token breakdown) and FinOps metrics for David Chen.
+  - **Resilient Job Creation & Progress Tracking**: Eliminated race condition on `submitNewJob` by immediately unshifting `data.job` into memory, adding direct `GET /api/jobs/{id}` fetch fallback to `openJobDetail`, parsing error responses cleanly, and adding director note guidance to `loadSampleText()`.
 
 ---
 
 ## 5. Active State & Pending Next Steps
 
 ### Current State
-- Bulk URL processing fully resilient against 404s and anti-bot 403s.
-- Automatic backoff retry and inter-turn pacing active in speech generator.
-- All 52 automated tests passing.
-
-### Immediate Next Steps
-1. **Test Bulk URL Processing in Web Studio**:
-   - Open Web Studio (`http://127.0.0.1:8000`), open "Bulk Process URLs", click "Load Sample Financial URLs", and click "Start Bulk Processing".
-   - Confirm sequential extraction and synthesis progress cleanly without errors.
+- Local development server running on `http://127.0.0.1:8000`.
+- Auth bypass active on localhost, strict GCIP token validation active on Google Cloud Run.
+- Full-page Auditor dashboard with Chart.js charts active.
+- End-to-end synthesis verified on sample banking disclosures text (`job_b53ab63c`).
+- All 75 automated tests passing.
 
 ### Verification Commands
 ```bash
-# Run test suite (52 tests)
-./.venv/bin/pytest tests/ -v
+# Run test suite (75 tests)
+USE_FIRESTORE=false ./.venv/bin/pytest tests/ -v
 
-# Test updated sample URLs extraction
-./.venv/bin/python -c '
-from src.utils.extractor import extract_article_from_url
-for u in ["https://www.federalreserve.gov/newsevents/pressreleases/monetary20240918a.htm", "https://www.fdic.gov/news/press-releases/2024/pr24012.html"]:
-    print(extract_article_from_url(u).title)
-'
+# Run app locally
+make ui
 ```
 
 
