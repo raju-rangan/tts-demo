@@ -6,12 +6,12 @@ from src.db.models import TokenUsageDetails, CostBreakdown
 # Reference: https://ai.google.dev/pricing
 PRICING = {
     "gemini-3.1-flash-tts-preview": {
-        "text_input_per_1m": 0.10,     # $0.10 / 1M text input tokens
-        "audio_output_per_1m": 2.00,   # $2.00 / 1M audio output tokens
+        "text_input_per_1m": 1.00,     # $1.00 / 1M text input tokens
+        "audio_output_per_1m": 20.00,   # $20.00 / 1M audio output tokens
     },
     "gemini-3.8-flash": {
-        "input_per_1m": 0.15,          # $0.15 / 1M input tokens (text + multimodal audio)
-        "output_per_1m": 0.60,         # $0.60 / 1M output tokens
+        "input_per_1m": 0.75,          # $0.75 / 1M input tokens (text + multimodal audio)
+        "output_per_1m": 3.750,         # $3.750 / 1M output tokens
     },
     "gemini-2.5-pro": {
         "input_per_1m": 1.25,          # $1.25 / 1M input tokens
