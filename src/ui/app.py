@@ -684,15 +684,15 @@ def get_dashboard_stats(user: Dict[str, Any] = Depends(get_current_user)):
     tts_out = audio_output_tokens
     tts_tot = tts_in + tts_out
     tts_spend = round(tts_cost, 4)
-    tts_pricing = PRICING.get(tts_model_name, {"text_input_per_1m": 0.10, "audio_output_per_1m": 2.00})
+    tts_pricing = PRICING.get(tts_model_name, {"text_input_per_1m": 1.00, "audio_output_per_1m": 20.00})
 
     model_matrix[tts_model_name] = {
         "model": tts_model_name,
         "display_name": "Gemini 3.1 Flash Speech",
         "role": "Generative Speech Synthesis (TTS)",
         "modality": "Text In → Audio Out (24kHz MP3)",
-        "input_pricing": f"${tts_pricing.get('text_input_per_1m', 0.10):.2f} / 1M",
-        "output_pricing": f"${tts_pricing.get('audio_output_per_1m', 2.00):.2f} / 1M",
+        "input_pricing": f"${tts_pricing.get('text_input_per_1m', 1.00):.2f} / 1M",
+        "output_pricing": f"${tts_pricing.get('audio_output_per_1m', 20.00):.2f} / 1M",
         "input_tokens": tts_in,
         "output_tokens": tts_out,
         "total_tokens": tts_tot,
@@ -707,15 +707,15 @@ def get_dashboard_stats(user: Dict[str, Any] = Depends(get_current_user)):
     judge_out = judge_output_tokens
     judge_tot = judge_in + judge_out
     judge_spend = round(judge_cost, 4)
-    judge_pricing = PRICING.get(judge_model_name, {"input_per_1m": 0.15, "output_per_1m": 0.60})
+    judge_pricing = PRICING.get(judge_model_name, {"input_per_1m": 0.75, "output_per_1m": 3.750})
 
     model_matrix[judge_model_name] = {
         "model": judge_model_name,
         "display_name": "Gemini 3.8 Flash Multimodal",
         "role": "Multimodal Regulatory Quality Judge",
         "modality": "Audio+Text In → JSON Scorecard Out",
-        "input_pricing": f"${judge_pricing.get('input_per_1m', 0.15):.2f} / 1M",
-        "output_pricing": f"${judge_pricing.get('output_per_1m', 0.60):.2f} / 1M",
+        "input_pricing": f"${judge_pricing.get('input_per_1m', 0.75):.2f} / 1M",
+        "output_pricing": f"${judge_pricing.get('output_per_1m', 3.750):.2f} / 1M",
         "input_tokens": judge_in,
         "output_tokens": judge_out,
         "total_tokens": judge_tot,
