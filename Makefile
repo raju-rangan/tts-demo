@@ -225,9 +225,9 @@ deploy: ## Deploy application directly to Google Cloud Run via Cloud Build
 		--no-invoker-iam-check \
 		--set-env-vars '^##^GCP_PROJECT_ID=$(GCP_PROJECT)##GCP_LOCATION=$(GCP_REGION)##GCS_BUCKET_NAME=$(subst ",,$(GCS_BUCKET_NAME))##GEMINI_VOICE_MODEL=$(or $(subst ",,$(GEMINI_VOICE_MODEL)),gemini-3.1-flash-tts-preview)##GEMINI_JUDGE_MODEL=$(or $(subst ",,$(GEMINI_JUDGE_MODEL)),gemini-3.8-flash)##GEMINI_JUDGE_LOCATION=$(or $(subst ",,$(GEMINI_JUDGE_LOCATION)),global)##DEFAULT_VOICE_PERSONA=$(or $(subst ",,$(DEFAULT_VOICE_PERSONA)),Retail Banking Guide)##AUDIO_BITRATE=$(or $(subst ",,$(AUDIO_BITRATE)),320k)##GOOGLE_CLIENT_ID=$(or $(subst ",,$(GOOGLE_CLIENT_ID)),716595821548-mmgp3ivk20bboapvlsru7kh08dp0n7c7.apps.googleusercontent.com)##GCIP_API_KEY=$(subst ",,$(GCIP_API_KEY))##GCIP_AUTH_DOMAIN=$(or $(subst ",,$(GCIP_AUTH_DOMAIN)),$(GCP_PROJECT).firebaseapp.com)##ALLOWED_DOMAINS=$(subst ",,$(ALLOWED_DOMAINS))##ALLOWED_USERS=$(subst ",,$(ALLOWED_USERS))##ENABLE_DEMO_AUTH=$(or $(subst ",,$(ENABLE_DEMO_AUTH)),false)##USE_FIRESTORE=$(or $(subst ",,$(USE_FIRESTORE)),true)##FIRESTORE_DATABASE=$(or $(subst ",,$(FIRESTORE_DATABASE)),tts-jobs)##FIRESTORE_COLLECTION=$(or $(subst ",,$(FIRESTORE_COLLECTION)),tts_jobs)'
 
-migrate-data: ## Migrate local SQLite jobs to Cloud Firestore Native database
-	@echo "📦 Migrating local SQLite jobs to Google Cloud Firestore..."
-	@$(UV) run python scripts/migrate_sqlite_to_firestore.py
+update-firestore-costs: ## Recalculate historical job costs in Cloud Firestore
+	@echo "📊 Recalculating historical job costs in Google Cloud Firestore..."
+	@$(UV) run python scripts/recalculate_firestore_costs.py
 
 cloud-run-proxy: ## Launch local authenticated proxy tunnel to the Cloud Run service
 	@echo "🌐 Starting authenticated Cloud Run proxy for $(SERVICE_NAME) on http://localhost:8080..."

@@ -2,13 +2,12 @@
 import os
 import pytest
 from src.db.models import JobRecord, TokenUsageDetails, CostBreakdown
-from src.db.repository import SQLiteJobRepository, get_job_repository
+from src.db.repository import InMemoryJobRepository, get_job_repository
 from src.ai.cost_calculator import TokenCostCalculator
 
 @pytest.fixture
-def temp_repo(tmp_path):
-    db_file = os.path.join(tmp_path, "test_jobs.db")
-    return SQLiteJobRepository(db_path=db_file)
+def temp_repo():
+    return InMemoryJobRepository()
 
 def test_save_and_retrieve_job(temp_repo):
     job = JobRecord(
@@ -130,10 +129,10 @@ def test_firestore_repository_mock_operations(monkeypatch):
         persona="Retail Banking Guide",
         audience="External Customers",
         voice_name="Sulafat",
-        transcript="FS test transcript",
-        word_count=3,
-        char_count=18,
-        gcs_uri="gs://test-bucket/external/audio/fs_test_1.mp3"
+        transcript="Firestore test",
+        word_count=2,
+        char_count=14,
+        gcs_uri="gs://test-bucket/audio.mp3"
     )
 
     # Test save
@@ -141,11 +140,11 @@ def test_firestore_repository_mock_operations(monkeypatch):
     mock_collection.document.assert_called_with("fs_test_1")
     mock_doc_ref.set.assert_called_once()
 
-    # Test get existing
-    mock_snapshot = MagicMock()
-    mock_snapshot.exists = True
-    mock_snapshot.to_dict.return_value = job.model_dump()
-    mock_doc_ref.get.return_value = mock_snapshot
+    # Test get
+    mock_doc_snapshot = MagicMock()
+    mock_doc_snapshot.exists = True
+    mock_doc_snapshot.to_dict.return_value = job.model_dump()
+    mock_doc_ref.get.return_value = mock_doc_snapshot
 
     retrieved = repo.get_job("fs_test_1")
     assert retrieved is not None
@@ -157,8 +156,8 @@ def test_firestore_repository_mock_operations(monkeypatch):
     mock_doc_ref.delete.assert_called_once()
 
 
-def test_sqlite_user_tour_status_lifecycle(temp_repo):
-    """Verify SQLite tracking of onboarding tour keyed per Google identity per persona (google_email, persona)."""
+def test_in_memory_user_tour_status_lifecycle(temp_repo):
+    """Verify in-memory tracking of onboarding tour keyed per Google identity per persona (google_email, persona)."""
     google_user_1 = "alex.morgan@apexbank.com"
     # 1. New Google user has not seen tour for either creator or auditor
     assert temp_repo.get_user_tour_status(google_user_1, "creator") is False
@@ -272,7 +271,7 @@ def test_job_speed_persistence_and_defaults(temp_repo):
 
 
 def test_job_retry_telemetry_persistence(temp_repo):
-    """Verify retry_count, remediation_prompt, and previous_attempt_score roundtrip through SQLite."""
+    """Verify retry_count, remediation_prompt, and previous_attempt_score roundtrip through repository."""
     # 1. Job with retry metadata
     job_retried = JobRecord(
         job_id="job_retry_001",
@@ -313,5 +312,3 @@ def test_job_retry_telemetry_persistence(temp_repo):
     assert retrieved_fresh.retry_count == 0
     assert retrieved_fresh.remediation_prompt is None
     assert retrieved_fresh.previous_attempt_score is None
-
-

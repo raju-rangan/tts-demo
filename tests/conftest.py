@@ -1,7 +1,7 @@
 import os
 import pytest
 
-# Force offline local SQLite repository backend for all tests
+# Force isolated in-memory repository backend for all tests
 os.environ["USE_FIRESTORE"] = "false"
 
 from src.config import Settings
@@ -12,8 +12,8 @@ from src.db.repository import reset_job_repository
 reset_job_repository()
 
 @pytest.fixture(autouse=True)
-def force_sqlite_repo():
-    """Ensure every test runs isolated against SQLite backend without Firestore calls."""
+def force_in_memory_repo():
+    """Ensure every test runs isolated against in-memory backend without external calls."""
     os.environ["USE_FIRESTORE"] = "false"
     src.config.settings = Settings(use_firestore=False)
     reset_job_repository()

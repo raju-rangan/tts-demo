@@ -157,7 +157,7 @@
       if (backendRepoEl && stats.gcp_environment) {
         backendRepoEl.textContent = stats.gcp_environment.repository_type === 'FirestoreJobRepository' 
           ? 'Firestore Native (tts-jobs)' 
-          : 'SQLite (Local Test Mode)';
+          : 'InMemory (Local Test Mode)';
       }
 
       const bucketNameEl = document.getElementById('foBucketName');

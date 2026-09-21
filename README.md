@@ -15,7 +15,7 @@ The **Apex Bank Knowledge-to-Speech Studio** solves these challenges using **Goo
 4. **Google Cloud Storage Audience Prefix Routing**: Automatic partitioning into `external/audio/`, `internal/audio/`, and `shared/audio/` prefixes for IAM CEL Condition access control.
 5. **Multimodal LLM-as-a-Judge Quality Audit**: Automated evaluation of the synthesized audio directly from its GCS URI pointer (`types.Part.from_uri()`) against a strict 6-dimension rubric, with zero audio download or streaming into the worker.
 6. **Executive FinOps & Compliance Governance**: Full-page interactive **Chart.js** dashboard for compliance auditors featuring Rubric Radars, FinOps spend allocations, persona volume comparisons, and token utilization breakdowns.
-7. **Cloud Firestore Serverless Persistence**: Enterprise persistence using **Google Cloud Firestore Native Mode** (`tts-jobs` database), ensuring job history and audit records persist seamlessly across Cloud Run container deployments with automatic SQLite fallback for isolated offline testing.
+7. **Cloud Firestore Serverless Persistence**: Enterprise persistence using **Google Cloud Firestore Native Mode** (`tts-jobs` database), ensuring job history and audit records persist seamlessly across Cloud Run container deployments with in-memory test isolation for fast unit testing.
 8. **Dual-Persona Workspace Hub**: Seamless top-navigation switching between **Sarah Jenkins** (Senior Digital Communications Specialist - Content Creator) and **David Chen** (Senior Regulatory Compliance Analyst - Compliance Auditor).
 9. **Zero-Config Localhost Auth Bypass**: Automatic loopback detection (`127.0.0.1` / `localhost`) bypassing Google OAuth origin restrictions for instant local developer access while strictly enforcing GCIP JWT cryptographic verification on Google Cloud Run.
 10. **Resilient Real-Time Progress UX**: Instant state unshift, self-healing job details fetch, 5-stage live stepper (`CHUNKING` → `SYNTHESIZING` → `STITCHING` → `UPLOADING` → `EVALUATING`), and sample disclosures director tuning.
@@ -48,7 +48,7 @@ flowchart TD
 
     subgraph PERSISTENCE["5. Google Cloud Storage & Firestore"]
         GCS[("📦 Cloud Storage Bucket<br/>Prefix: external/ | internal/ | shared/")]
-        FIRESTORE[("🔥 Cloud Firestore Native Database<br/>Database: tts-jobs | Collection: tts_jobs<br/>(Offline Fallback: Local SQLite)")]
+        FIRESTORE[("🔥 Cloud Firestore Native Database<br/>Database: tts-jobs | Collection: tts_jobs<br/>(Testing: InMemory Isolation)")]
     end
 
     subgraph AI_JUDGE["6. Multimodal Quality Auditor"]
@@ -167,9 +167,9 @@ Follow these steps using the `Makefile`:
    make bucket-info  # Inspects existing bucket configuration, lifecycle rules, and IAM prefix policies
    ```
 
-5. **Migrate Historical Jobs to Cloud Firestore**:
+5. **Recalculate Past Job Costs in Cloud Firestore**:
    ```bash
-   make migrate-data # Migrates local SQLite jobs (data/tts_jobs.db) into Cloud Firestore Native
+   make update-firestore-costs # Recalculates job costs in Cloud Firestore with latest pricing
    ```
 
 ---
@@ -484,7 +484,7 @@ judge_cost = (
 
 ---
 
-### Step 9: Serverless Cloud Firestore Persistence & Offline SQLite Fallback
+### Step 9: Serverless Cloud Firestore Persistence & InMemory Test Isolation
 **File**: [`src/db/repository.py`](file:///Users/rrangan/Documents/customers/tts-demo/src/db/repository.py)
 
 In containerized serverless deployments like Google Cloud Run, local container disk storage is ephemeral and is discarded on every revision deployment or scaling event. To guarantee total persistence for historical audio records, telemetry, and multimodal evaluations, the platform uses **Google Cloud Firestore Native Mode**:
@@ -493,8 +493,7 @@ In containerized serverless deployments like Google Cloud Run, local container d
 - **Collection**: `tts_jobs` (or configured via `FIRESTORE_COLLECTION`).
 - **Atomic Progress Updates**: Real-time progress updates (`CHUNKING` $\to$ `SYNTHESIZING` $\to$ `STITCHING` $\to$ `UPLOADING` $\to$ `EVALUATING`) update the document directly without re-writing full payloads.
 - **Index Optimization & Fallback**: Standard descending query by `created_at` with composite persona filtering, falling back gracefully to in-memory filtering if cloud index creation is pending.
-- **Offline SQLite Resiliency**: When `USE_FIRESTORE=false` (e.g., during offline pytest execution or airgapped testing), the factory seamlessly instantiates `SQLiteJobRepository` at `data/tts_jobs.db`, ensuring 100% test isolation and zero network dependencies.
-- **Automated Data Migration**: `sync_sqlite_to_firestore_if_empty()` automatically checks Firestore upon startup; if empty, it migrates historical records from SQLite into Firestore Native. Standalone migrations can also be triggered at any time via `make migrate-data`.
+- **InMemory Test Isolation**: When `USE_FIRESTORE=false` (e.g., during offline pytest execution or airgapped testing), the factory instantiates `InMemoryJobRepository`, ensuring 100% test isolation and zero network dependencies.
 
 ```python
 # From src/db/repository.py
@@ -591,7 +590,7 @@ tts-demo/
 │   ├── run_quickstart.py         # Rich CLI runner for quickstart synthesis
 │   ├── setup_bucket.py           # GCS bucket provisioning & lifecycle configuration
 │   ├── verify_gcp_auth.py        # GCP authentication & ADC inspection tool
-│   ├── migrate_sqlite_to_firestore.py # SQLite to Cloud Firestore Native batch migration
+│   ├── recalculate_firestore_costs.py # Firestore job cost recalculation script
 │   └── samples/                  # Sample markdown articles & cached MP3 output
 ├── src/
 │   ├── config.py                 # Pydantic Settings & environment loader
@@ -602,7 +601,7 @@ tts-demo/
 │   │   └── cost_calculator.py    # Token usage & FinOps billing engine
 │   ├── db/
 │   │   ├── models.py             # Pydantic models (JobRecord, Scorecards, CostBreakdown)
-│   │   └── repository.py         # Hybrid persistence: Cloud Firestore Native + SQLite fallback
+│   │   └── repository.py         # Serverless persistence: Cloud Firestore Native + InMemory test isolation
 │   ├── storage/
 │   │   └── gcs_client.py         # GCS Client with audience prefix routing & signed URLs
 │   ├── ui/
@@ -637,7 +636,7 @@ tts-demo/
 The platform includes a robust automated test suite comprising **75 pytest tests** that execute in ~3 seconds. The test suite guarantees end-to-end reliability across all audio, AI, persistence, and security layers:
 
 ```bash
-# Execute the full automated test suite (with offline SQLite isolation)
+# Execute the full automated test suite (with in-memory isolation)
 make test
 # Or directly via uv:
 USE_FIRESTORE=false uv run pytest tests/ -v
@@ -653,7 +652,7 @@ USE_FIRESTORE=false uv run pytest tests/ -v
 - **Multimodal LLM-as-a-Judge (`tests/test_judge.py` — 5 tests)**:
   Verifies zero-download GCS URI evaluation (`types.Part.from_uri()`), JSON schema parsing, and rubric dimension weighting.
 - **Job Repository & Persistence (`tests/test_repository.py` — 7 tests)**:
-  Verifies SQLite operations, Firestore repository models, progress updates, seeding, and auto-migration logic.
+  Verifies in-memory operations, Firestore repository models, progress updates, and seeding logic.
 - **Cloud Storage Client (`tests/test_gcs.py` — 4 tests)**:
   Tests audience prefix key generation (`external/`, `internal/`, `shared/`) and signed URL generation.
 - **FinOps Cost Accounting & Article Extractor (`tests/test_cost.py`, `tests/test_extractor.py`, `tests/test_personas.py` — 10 tests)**:
