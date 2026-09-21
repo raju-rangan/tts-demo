@@ -92,8 +92,8 @@ class TokenCostCalculator:
 
         judge_pricing = PRICING.get(judge_model, PRICING["gemini-3.8-flash"])
         judge_cost = (
-            (judge_input_tokens / 1_000_000.0) * judge_pricing.get("input_per_1m", 0.15) +
-            (judge_output_tokens / 1_000_000.0) * judge_pricing.get("output_per_1m", 0.60)
+            (judge_input_tokens / 1_000_000.0) * judge_pricing.get("input_per_1m", 0.75) +
+            (judge_output_tokens / 1_000_000.0) * judge_pricing.get("output_per_1m", 3.750)
         )
 
         cost_breakdown = CostBreakdown(
