@@ -190,7 +190,7 @@ class GeminiAudioGenerator:
         self.location = location or settings.location
         # Default to official Gemini TTS model if not explicitly overridden
         self.model = model or os.getenv("GEMINI_VOICE_MODEL", "gemini-3.1-flash-tts-preview")
-        self.multi_speaker_model = os.getenv("GEMINI_MULTI_SPEAKER_VOICE_MODEL", "gemini-3.8-flash-tts")
+        self.multi_speaker_model = os.getenv("GEMINI_MULTI_SPEAKER_VOICE_MODEL", self.model)
         self.podcast_script_model = os.getenv("GEMINI_PODCAST_SCRIPT_MODEL", settings.judge_model)
         self._client: Optional[genai.Client] = None
 

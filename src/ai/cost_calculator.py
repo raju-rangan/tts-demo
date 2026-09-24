@@ -9,10 +9,6 @@ PRICING = {
         "text_input_per_1m": 1.00,     # $1.00 / 1M text input tokens
         "audio_output_per_1m": 20.00,   # $20.00 / 1M audio output tokens
     },
-    "gemini-3.8-flash-tts": {
-        "text_input_per_1m": 1.00,     # $1.00 / 1M text input tokens
-        "audio_output_per_1m": 20.00,   # $20.00 / 1M audio output tokens
-    },
     "gemini-3.8-flash": {
         "input_per_1m": 0.75,          # $0.75 / 1M input tokens (text + multimodal audio)
         "output_per_1m": 3.750,         # $3.750 / 1M output tokens

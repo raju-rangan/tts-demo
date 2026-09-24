@@ -627,7 +627,7 @@ def test_generate_speech_routes_podcast_pipeline():
         audio_format="audio/mpeg",
         duration_seconds=12.5,
         persona_used="Podcast: Co-Hosts (Man & Man)",
-        model_used="gemini-3.8-flash-tts",
+        model_used="gemini-3.1-flash-tts-preview",
         transcript="# Podcast Title\n\n**Joe**: Turn 1\n\n**Alex**: Turn 2",
         title="Podcast Title"
     )
@@ -646,5 +646,5 @@ def test_generate_speech_routes_podcast_pipeline():
         assert mock_multi_synth.call_count == 1
         assert res.title == "Podcast Title"
         assert res.duration_seconds == 12.5
-        assert res.model_used == "gemini-3.8-flash-tts"
+        assert res.model_used == "gemini-3.1-flash-tts-preview"
 
