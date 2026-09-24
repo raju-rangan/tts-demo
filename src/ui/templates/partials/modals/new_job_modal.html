@@ -125,6 +125,12 @@
               <span class="text-zinc-500 font-normal">(Enriches dialogue with fresh real-world facts)</span>
             </label>
 
+            <!-- Co-hosts indicator badge -->
+            <div id="podcastCohostsBadge" class="flex items-center space-x-1.5 text-[11px] font-medium text-purple-300 bg-purple-950/60 border border-purple-800/50 px-2.5 py-1 rounded-lg">
+              <i data-lucide="users" class="w-3.5 h-3.5 text-purple-400"></i>
+              <span id="podcastCohostsBadgeText">Co-Hosts: Joe (Puck) & Jane (Kore)</span>
+            </div>
+
             <button type="button" id="btnDraftPodcastScript" onclick="draftPodcastScript()" class="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-lg transition shadow-md shadow-purple-900/20 flex items-center space-x-1.5 cursor-pointer">
               <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
               <span id="btnDraftPodcastScriptText">Draft ~10-Min Script</span>
@@ -136,14 +142,37 @@
             <span id="podcastDraftStatusText">Researching online facts & drafting 10-minute dialogue with Gemini 3.8 Flash...</span>
           </div>
 
-          <!-- Editable Podcast Script Textarea -->
-          <div class="space-y-1.5">
-            <div class="flex items-center justify-between text-[11px]">
-              <span class="font-semibold text-zinc-300 uppercase tracking-wider text-[10px]">Editable Dialogue Script</span>
-              <span class="text-zinc-500 font-mono text-[10px]">Format: **Speaker** (style): Spoken text [laughs]</span>
+          <!-- Dual-Tab Switcher & Script Editor (Dialogue View vs Structured JSON View) -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+              <div class="flex items-center space-x-1 bg-zinc-900/90 p-0.5 rounded-lg border border-zinc-800">
+                <button type="button" id="tabPodcastDialogue" onclick="switchPodcastEditorTab('dialogue')"
+                  class="px-2.5 py-1 text-xs font-medium rounded-md transition bg-purple-600 text-white shadow-sm flex items-center space-x-1.5 cursor-pointer">
+                  <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+                  <span>Dialogue View</span>
+                </button>
+                <button type="button" id="tabPodcastJson" onclick="switchPodcastEditorTab('json')"
+                  class="px-2.5 py-1 text-xs font-medium rounded-md transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 flex items-center space-x-1.5 cursor-pointer">
+                  <i data-lucide="code-2" class="w-3.5 h-3.5"></i>
+                  <span>Structured JSON View</span>
+                </button>
+              </div>
+              <span id="podcastFormatHint" class="text-zinc-500 font-mono text-[10px]">
+                Format: **Speaker** (style): Spoken text [laughs]
+              </span>
             </div>
-            <textarea id="inputPodcastScript" rows="8" oninput="updatePodcastScriptStats()" placeholder="Click 'Draft ~10-Min Script' above to generate with web grounding, or type/paste your own 2-speaker dialogue here..."
-              class="w-full p-3 bg-zinc-900/90 border border-zinc-700 rounded-xl text-xs font-mono text-zinc-100 focus:outline-none focus:border-purple-500 transition leading-relaxed"></textarea>
+
+            <!-- Dialogue View Textarea -->
+            <div id="containerPodcastDialogue">
+              <textarea id="inputPodcastScript" rows="8" oninput="updatePodcastScriptStats()" placeholder="Click 'Draft ~10-Min Script' above to generate with web grounding, or type/paste your own 2-speaker dialogue here..."
+                class="w-full p-3 bg-zinc-900/90 border border-zinc-700 rounded-xl text-xs font-mono text-zinc-100 focus:outline-none focus:border-purple-500 transition leading-relaxed"></textarea>
+            </div>
+
+            <!-- Structured JSON View Textarea -->
+            <div id="containerPodcastJson" class="hidden">
+              <textarea id="inputPodcastScriptJson" rows="8" oninput="updatePodcastScriptJsonStats()" placeholder='{"title": "Episode Title", "turns": [{"speaker": "Joe", "style": "curious and energetic", "text": "Welcome to the show! [laughs]"}]}'
+                class="w-full p-3 bg-zinc-900/90 border border-zinc-700 rounded-xl text-xs font-mono text-purple-200 focus:outline-none focus:border-purple-500 transition leading-relaxed"></textarea>
+            </div>
           </div>
 
           <!-- Natural Human Expression Markers Guidance Callout -->

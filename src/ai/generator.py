@@ -3,6 +3,7 @@ import io
 import os
 import re
 import time
+import json
 import uuid
 import wave
 import logging
@@ -44,91 +45,197 @@ class PodcastScript(BaseModel):
     turns: List[PodcastTurn] = Field(..., min_length=2, description="Ordered dialogue turns between the two co-hosts")
 
 
+def align_and_alternate_turns(
+    turns: List[PodcastTurn],
+    default_speakers: Optional[Any] = None
+) -> List[PodcastTurn]:
+    """
+    Normalizes a list of PodcastTurns ensuring:
+    1. Every turn's speaker is mapped to one of the two active persona co-hosts.
+    2. Cross-persona speaker names are remapped to the active persona (e.g. Jane -> Alex or Joe -> Jane).
+    3. Consecutive turns strictly alternate between Host 1 and Host 2 without duplicates.
+    4. Vocal cues in parentheses () are converted to square brackets [].
+    5. Minimum of 2 turns is guaranteed for PodcastScript schema compliance.
+    """
+    if not turns:
+        return []
+
+    def _extract_name(spk_item, fallback: str) -> str:
+        if isinstance(spk_item, dict):
+            return spk_item.get("speaker", fallback)
+        return getattr(spk_item, "speaker", fallback)
+
+    host1_name = "Joe"
+    host2_name = "Jane"
+    if default_speakers and len(default_speakers) >= 2:
+        host1_name = _extract_name(default_speakers[0], "Joe")
+        host2_name = _extract_name(default_speakers[1], "Jane")
+    elif default_speakers and len(default_speakers) == 1:
+        host1_name = _extract_name(default_speakers[0], "Joe")
+        host2_name = "Jane" if host1_name.lower() != "jane" else "Maya"
+
+    aligned: List[PodcastTurn] = []
+    for idx, turn in enumerate(turns):
+        spk_orig = turn.speaker.strip() if turn.speaker else ""
+        spk_lower = spk_orig.lower()
+
+        # 1. Match against active persona hosts
+        if spk_lower == host1_name.lower() or spk_lower in ("host 1", "host", "speaker 1"):
+            target_spk = host1_name
+        elif spk_lower == host2_name.lower() or spk_lower in ("host 2", "co-host", "cohost", "speaker 2"):
+            target_spk = host2_name
+        # 2. Known cross-persona mapping (handles switches between Man-Woman, Man-Man, Woman-Woman)
+        elif spk_lower in ("joe",):
+            target_spk = host1_name
+        elif spk_lower in ("alex", "maya"):
+            target_spk = host2_name
+        elif spk_lower in ("jane",):
+            # If Jane is host 1 (in Woman & Woman), she is host 1.
+            # If Jane was host 2 (in Man & Woman), and active persona is Man & Man, she maps to Alex (host2_name).
+            if host1_name.lower() == "jane":
+                target_spk = host1_name
+            else:
+                target_spk = host2_name
+        else:
+            # Unrecognized speaker name: fallback to index parity
+            target_spk = host1_name if idx % 2 == 0 else host2_name
+
+        # 3. Strict alternation guarantee: adjacent turns MUST alternate co-hosts
+        if aligned:
+            prev_spk = aligned[-1].speaker
+            if target_spk == prev_spk:
+                target_spk = host2_name if prev_spk == host1_name else host1_name
+
+        # 4. Normalize vocal cues into square brackets []
+        clean_text = re.sub(
+            r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
+            r"[\1]",
+            turn.text,
+            flags=re.IGNORECASE
+        )
+
+        # 5. Default style if missing
+        turn_style = turn.style
+        if not turn_style:
+            turn_style = "curious and energetic" if target_spk == host1_name else "analytical and measured"
+
+        aligned.append(PodcastTurn(
+            speaker=target_spk,
+            text=clean_text,
+            style=turn_style
+        ))
+
+    # Defensive guarantee for schema requirement (min_length=2)
+    if len(aligned) == 1:
+        only_turn = aligned[0]
+        other_host = host2_name if only_turn.speaker == host1_name else host1_name
+        aligned.append(PodcastTurn(
+            speaker=other_host,
+            text=f"[laughs] Absolutely, {only_turn.speaker}. That is a crucial insight for our listeners.",
+            style="analytical and measured"
+        ))
+
+    return aligned
+
+
 def parse_markdown_script_to_turns(
     script_text: str,
     default_speakers: Optional[Tuple[Any, ...]] = None
 ) -> PodcastScript:
     """
-    Parses user-edited markdown podcast script into a strongly typed PodcastScript.
-    Recognizes lines formatted like:
-      # Episode Title
-      **Joe** (upbeat): Welcome to the show! [laughs]
-      **Jane**: [sighs] Thanks Joe, today we have a massive topic.
+    Parses user-edited podcast script (formatted dialogue or structured JSON)
+    into a strongly typed PodcastScript with guaranteed speaker alternation
+    and persona voice alignment.
     """
     lines = script_text.strip().split("\n")
     title = "Podcast Episode"
+    summary = None
     turns: List[PodcastTurn] = []
 
-    current_speaker: Optional[str] = None
-    current_style: Optional[str] = None
-    current_text_parts: List[str] = []
+    # Check if script_text is structured JSON
+    stripped = script_text.strip()
+    if stripped.startswith("{") or stripped.startswith("["):
+        try:
+            parsed = json.loads(stripped)
+            raw_turns_list = []
+            if isinstance(parsed, dict):
+                title = parsed.get("title", title)
+                summary = parsed.get("summary")
+                turns_data = parsed.get("turns", [])
+            elif isinstance(parsed, list):
+                turns_data = parsed
+            else:
+                turns_data = []
 
-    speaker_regex = re.compile(r"^\*{0,2}([\w\s]+?)\*{0,2}(?:\s*\(([^)]+)\))?\s*:\s*(.+)$")
+            for item in turns_data:
+                if isinstance(item, dict):
+                    raw_turns_list.append(PodcastTurn(
+                        speaker=item.get("speaker", "Joe"),
+                        text=item.get("text", ""),
+                        style=item.get("style")
+                    ))
+            if raw_turns_list:
+                turns = raw_turns_list
+        except Exception as e:
+            logger.debug(f"Input text appeared to be JSON but failed parsing: {e}, falling back to dialogue parser")
 
-    def flush():
-        nonlocal current_speaker, current_style, current_text_parts
-        if current_speaker and current_text_parts:
-            text = " ".join(current_text_parts).strip()
-            if text:
-                # Normalize any emotional/vocal cues in parentheses (...) into square brackets [...]
-                clean_text = re.sub(
-                    r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
-                    r"[\1]",
-                    text,
-                    flags=re.IGNORECASE
-                )
-                turn_idx = len(turns)
-                fallback_style = "curious and energetic" if turn_idx % 2 == 0 else "analytical and measured"
-                turns.append(PodcastTurn(
-                    speaker=current_speaker,
-                    text=clean_text,
-                    style=current_style or fallback_style
-                ))
-        current_speaker = None
-        current_style = None
-        current_text_parts = []
-
-    for line in lines:
-        line_clean = line.strip()
-        if not line_clean:
-            continue
-        if line_clean.startswith("# "):
-            title = line_clean[2:].strip()
-            continue
-        m = speaker_regex.match(line_clean)
-        if m:
-            flush()
-            current_speaker = m.group(1).strip()
-            current_style = m.group(2).strip() if m.group(2) else None
-            current_text_parts = [m.group(3).strip()]
-        else:
-            if current_speaker:
-                current_text_parts.append(line_clean)
-    flush()
-
+    # If not JSON or JSON parsing yielded no turns, parse formatted dialogue
     if not turns:
-        s1 = default_speakers[0]["speaker"] if default_speakers and len(default_speakers) > 0 else "Joe"
-        s2 = default_speakers[1]["speaker"] if default_speakers and len(default_speakers) > 1 else "Jane"
+        current_speaker: Optional[str] = None
+        current_style: Optional[str] = None
+        current_text_parts: List[str] = []
+
+        speaker_regex = re.compile(r"^\*{0,2}([\w\s]+?)\*{0,2}(?:\s*\(([^)]+)\))?\s*:\s*(.+)$")
+
+        def flush():
+            nonlocal current_speaker, current_style, current_text_parts
+            if current_speaker and current_text_parts:
+                text = " ".join(current_text_parts).strip()
+                if text:
+                    turns.append(PodcastTurn(
+                        speaker=current_speaker,
+                        text=text,
+                        style=current_style
+                    ))
+            current_speaker = None
+            current_style = None
+            current_text_parts = []
+
+        for line in lines:
+            line_clean = line.strip()
+            if not line_clean:
+                continue
+            if line_clean.startswith("# "):
+                title = line_clean[2:].strip()
+                continue
+            m = speaker_regex.match(line_clean)
+            if m:
+                flush()
+                current_speaker = m.group(1).strip()
+                current_style = m.group(2).strip() if m.group(2) else None
+                current_text_parts = [m.group(3).strip()]
+            else:
+                if current_speaker:
+                    current_text_parts.append(line_clean)
+        flush()
+
+    # Paragraph fallback if neither speaker lines nor JSON were found
+    if not turns:
         paras = [p.strip() for p in script_text.split("\n\n") if p.strip()]
         for idx, p in enumerate(paras):
-            spk = s1 if idx % 2 == 0 else s2
-            clean_p = re.sub(
-                r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
-                r"[\1]",
-                p,
-                flags=re.IGNORECASE
-            )
-            st = "curious and energetic" if idx % 2 == 0 else "analytical and measured"
             turns.append(PodcastTurn(
-                speaker=spk,
-                text=clean_p,
-                style=st
+                speaker="Joe" if idx % 2 == 0 else "Jane",
+                text=p,
+                style=None
             ))
+
+    # Apply strict alternation, cross-persona remapping, and vocal cue normalization
+    final_turns = align_and_alternate_turns(turns, default_speakers)
 
     return PodcastScript(
         title=title,
-        summary=f"Podcast episode with {len(turns)} dialogue turns",
-        turns=turns
+        summary=summary or f"Podcast episode with {len(final_turns)} dialogue turns",
+        turns=final_turns
     )
 
 
@@ -647,6 +754,7 @@ SOURCE DOCUMENT TO COVER:
             )
             raw_text = response.text or ""
             script = PodcastScript.model_validate_json(raw_text)
+            script.turns = align_and_alternate_turns(script.turns, persona.speakers)
             logger.info(f"✓ {job_label}Generated podcast script '{script.title}' with {len(script.turns)} turns")
             return script
         except Exception as e:
@@ -654,10 +762,10 @@ SOURCE DOCUMENT TO COVER:
             # Resilient fallback: construct basic 2-turn script if model call fails
             return PodcastScript(
                 title="Financial Insights Podcast",
-                turns=[
+                turns=align_and_alternate_turns([
                     PodcastTurn(speaker=s1['speaker'], text=f"Welcome to today's financial briefing! [laughs] Let's discuss this article: {text[:200]}...", style="cheerful and friendly"),
                     PodcastTurn(speaker=s2['speaker'], text=f"[sighs] Thanks {s1['speaker']}. That's a critical topic for banking customers and investors to understand.", style="thoughtful and measured"),
-                ]
+                ], persona.speakers)
             )
 
 
@@ -678,6 +786,8 @@ SOURCE DOCUMENT TO COVER:
             {"speaker": "Joe", "voice_name": "Puck", "gender": "male", "role": "Host"},
             {"speaker": "Jane", "voice_name": "Kore", "gender": "female", "role": "Co-host"},
         )
+        # Ensure strict speaker alternation and persona alignment across all turns
+        script.turns = align_and_alternate_turns(script.turns, speakers)
         total_turns = len(script.turns)
         logger.info(f"▶ [{job_id}] Synthesizing multi-speaker podcast audio ({total_turns} turns) using {speakers[0]['speaker']} ({speakers[0]['voice_name']}) and {speakers[1]['speaker']} ({speakers[1]['voice_name']}) on model '{self.multi_speaker_model}'...")
 

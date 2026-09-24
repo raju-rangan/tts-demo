@@ -1042,9 +1042,16 @@ def test_html_podcast_ui_elements(client):
     assert "draftPodcastScript" in html
     assert "updatePodcastScriptStats" in html
 
+    # Dual-Tab & Co-Host UI Elements
+    assert 'id="podcastCohostsBadge"' in html
+    assert 'id="tabPodcastDialogue"' in html
+    assert 'id="tabPodcastJson"' in html
+    assert 'id="inputPodcastScriptJson"' in html
+    assert "switchPodcastEditorTab" in html
+
 
 def test_draft_podcast_script_api_success(client, monkeypatch):
-    """Verify /api/podcast/draft-script endpoint drafts a grounded script with stats."""
+    """Verify /api/podcast/draft-script endpoint drafts a grounded script with dual markdown/JSON payload."""
     from src.ai.generator import PodcastScript, PodcastTurn
 
     login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
@@ -1082,6 +1089,11 @@ def test_draft_podcast_script_api_success(client, monkeypatch):
     assert data["turn_count"] == 2
     assert "**Joe** (cheerful): Welcome everyone! [laughs] Let's dive in." in data["markdown_script"]
     assert "**Jane** (measured): [sighs] It's a complicated debate, Joe." in data["markdown_script"]
+    assert "json_script" in data
+    assert "turns" in data
+    assert len(data["turns"]) == 2
+    assert data["turns"][0]["speaker"] == "Joe"
+    assert data["turns"][1]["speaker"] == "Jane"
     assert data["word_count"] > 0
     assert "estimated_duration_mins" in data
     assert len(data["speakers"]) == 2
@@ -1139,6 +1151,52 @@ def test_create_job_with_custom_podcast_script(client, monkeypatch):
         assert data["job"]["persona"] == "Podcast: Co-Hosts (Man & Woman)"
         assert data["job"]["transcript"] == custom_script
         assert executed_args["podcast_script"] == custom_script
+    finally:
+        repo.delete_job(job_id)
+
+
+def test_create_job_with_custom_podcast_script_json(client, monkeypatch):
+    """Verify create_job handles structured JSON podcast script submitted from JSON view tab."""
+    import json
+    from src.db.repository import get_job_repository
+    repo = get_job_repository()
+
+    login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
+    assert login_resp.status_code == 200
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    executed_args = {}
+    def mock_execute(job_id, text, persona_name, run_judge, title, voice_customization=None, podcast_script=None, **kwargs):
+        executed_args["job_id"] = job_id
+        executed_args["persona_name"] = persona_name
+        executed_args["podcast_script"] = podcast_script
+
+    monkeypatch.setattr("src.ui.app._execute_async_synthesis", mock_execute)
+
+    json_script = json.dumps({
+        "title": "JSON Podcast Episode",
+        "turns": [
+            {"speaker": "Joe", "style": "curious and energetic", "text": "Turn 1 JSON [laughs]"},
+            {"speaker": "Jane", "style": "analytical and measured", "text": "Turn 2 JSON [sighs]"}
+        ]
+    })
+
+    payload = {
+        "text": "Source article for context",
+        "persona": "Podcast: Co-Hosts (Man & Woman)",
+        "title": "JSON Mode Podcast Show",
+        "podcast_script": json_script
+    }
+
+    resp = client.post("/api/jobs", json=payload, headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    job_id = data["job_id"]
+
+    try:
+        assert data["job"]["persona"] == "Podcast: Co-Hosts (Man & Woman)"
+        assert executed_args["podcast_script"] == json_script
     finally:
         repo.delete_job(job_id)
 

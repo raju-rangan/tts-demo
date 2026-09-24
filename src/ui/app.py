@@ -2,6 +2,7 @@
 import os
 import io
 import time
+import json
 import secrets
 import logging
 from typing import Optional, List, Dict, Any
@@ -1267,9 +1268,21 @@ def draft_podcast_script(
             dialogue_lines.append(f"**{t.speaker}**{style_part}: {t.text}\n")
         markdown_script = "\n".join(dialogue_lines)
 
+        turns_data = [t.model_dump() for t in script.turns]
+        json_script = json.dumps(
+            {
+                "title": script.title,
+                "summary": script.summary,
+                "turns": turns_data
+            },
+            indent=2
+        )
+
         return {
             "title": script.title,
             "markdown_script": markdown_script,
+            "json_script": json_script,
+            "turns": turns_data,
             "turn_count": len(script.turns),
             "word_count": total_words,
             "estimated_duration_mins": est_duration_mins,

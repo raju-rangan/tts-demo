@@ -873,4 +873,77 @@ def test_reasoning_client_location_isolation():
         assert call_kwargs["project"] == "test-vertex-project"
 
 
+def test_parse_script_from_json():
+    """Verify parse_markdown_script_to_turns seamlessly parses structured JSON scripts."""
+    import json
+    from src.ai.generator import parse_markdown_script_to_turns
+
+    json_script = json.dumps({
+        "title": "Tech & Liquidity Overview",
+        "summary": "Co-hosts explore capital requirements",
+        "turns": [
+            {"speaker": "Joe", "style": "curious and energetic", "text": "Welcome everyone! [laughs] Let's break down liquidity buffers."},
+            {"speaker": "Jane", "style": "analytical and measured", "text": "[sighs] Thanks Joe, bank reserves are critical right now."},
+            {"speaker": "Joe", "style": "inquisitive", "text": "What about the yield spread? [chuckles]"}
+        ]
+    })
+
+    script = parse_markdown_script_to_turns(json_script)
+    assert script.title == "Tech & Liquidity Overview"
+    assert len(script.turns) == 3
+    assert script.turns[0].speaker == "Joe"
+    assert script.turns[1].speaker == "Jane"
+    assert script.turns[2].speaker == "Joe"
+    assert "[laughs]" in script.turns[0].text
+    assert "[sighs]" in script.turns[1].text
+
+
+def test_strict_speaker_alternation_guarantee():
+    """Verify consecutive turns with the same speaker are automatically flipped to guarantee strict alternation."""
+    from src.ai.generator import parse_markdown_script_to_turns
+
+    # A script with 3 consecutive Joe turns followed by 2 consecutive Jane turns
+    consecutive_script = """# Consecutive Speakers Test
+**Joe**: Point one.
+**Joe**: Point two.
+**Joe**: Point three.
+**Jane**: Point four.
+**Jane**: Point five.
+"""
+    script = parse_markdown_script_to_turns(consecutive_script)
+    assert len(script.turns) == 5
+
+    # Check strict alternation across all adjacent turns
+    speakers = [t.speaker for t in script.turns]
+    assert speakers == ["Joe", "Jane", "Joe", "Jane", "Joe"]
+    for i in range(1, len(speakers)):
+        assert speakers[i] != speakers[i - 1], f"Turn {i} ({speakers[i]}) did not alternate with turn {i-1} ({speakers[i-1]})"
+
+
+def test_persona_voice_remapping_cross_cohosts():
+    """Verify scripts drafted with Joe & Jane are properly remapped when switched to other personas."""
+    from src.ai.generator import parse_markdown_script_to_turns
+    from src.ai.personas import get_persona
+
+    script_joe_jane = """# Market Briefing
+**Joe**: Welcome to the market briefing!
+**Jane**: Thanks Joe, checking bond yields today.
+**Joe**: Yields look inverted.
+**Jane**: That usually signals caution.
+"""
+
+    # Test remapping for "Podcast: Co-Hosts (Man & Man)" (Joe & Alex)
+    man_man_persona = get_persona("Podcast: Co-Hosts (Man & Man)")
+    res_man_man = parse_markdown_script_to_turns(script_joe_jane, man_man_persona.speakers)
+    speakers_mm = [t.speaker for t in res_man_man.turns]
+    assert speakers_mm == ["Joe", "Alex", "Joe", "Alex"]
+
+    # Test remapping for "Podcast: Co-Hosts (Woman & Woman)" (Jane & Maya)
+    woman_woman_persona = get_persona("Podcast: Co-Hosts (Woman & Woman)")
+    res_ww = parse_markdown_script_to_turns(script_joe_jane, woman_woman_persona.speakers)
+    speakers_ww = [t.speaker for t in res_ww.turns]
+    assert speakers_ww == ["Jane", "Maya", "Jane", "Maya"]
+
+
+
 

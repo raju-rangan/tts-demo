@@ -96,6 +96,11 @@
       if (voiceInput) voiceInput.value = '';
       const scriptInput = document.getElementById('inputPodcastScript');
       if (scriptInput) scriptInput.value = '';
+      const scriptJsonInput = document.getElementById('inputPodcastScriptJson');
+      if (scriptJsonInput) scriptJsonInput.value = '';
+      if (typeof switchPodcastEditorTab === 'function') {
+        switchPodcastEditorTab('dialogue');
+      }
       const draftStatus = document.getElementById('podcastDraftStatus');
       if (draftStatus) draftStatus.classList.add('hidden');
       updatePodcastScriptStats();
@@ -123,6 +128,200 @@
       }
     }
 
+    let currentPodcastTab = 'dialogue';
+
+    const PODCAST_PERSONA_COHOSTS = {
+      'Podcast: Co-Hosts (Man & Woman)': {
+        host1: 'Joe', voice1: 'Puck',
+        host2: 'Jane', voice2: 'Kore',
+        label: 'Co-Hosts: Joe (Puck) & Jane (Kore)'
+      },
+      'Podcast: Co-Hosts (Man & Man)': {
+        host1: 'Joe', voice1: 'Puck',
+        host2: 'Alex', voice2: 'Charon',
+        label: 'Co-Hosts: Joe (Puck) & Alex (Charon)'
+      },
+      'Podcast: Co-Hosts (Woman & Woman)': {
+        host1: 'Jane', voice1: 'Kore',
+        host2: 'Maya', voice2: 'Sulafat',
+        label: 'Co-Hosts: Jane (Kore) & Maya (Sulafat)'
+      }
+    };
+
+    function parseMarkdownToPodcastJson(mdText) {
+      if (!mdText || !mdText.trim()) {
+        return { title: 'Podcast Episode', summary: 'Episode dialogue', turns: [] };
+      }
+      const lines = mdText.trim().split('\n');
+      let title = 'Podcast Episode';
+      const turns = [];
+      const speakerRegex = /^\*{0,2}([\w\s]+?)\*{0,2}(?:\s*\(([^)]+)\))?\s*:\s*(.+)$/;
+
+      let currentSpeaker = null;
+      let currentStyle = null;
+      let currentParts = [];
+
+      function flush() {
+        if (currentSpeaker && currentParts.length > 0) {
+          const text = currentParts.join(' ').trim();
+          if (text) {
+            turns.push({
+              speaker: currentSpeaker,
+              style: currentStyle || (turns.length % 2 === 0 ? 'curious and energetic' : 'analytical and measured'),
+              text: text
+            });
+          }
+        }
+        currentSpeaker = null;
+        currentStyle = null;
+        currentParts = [];
+      }
+
+      for (const line of lines) {
+        const clean = line.trim();
+        if (!clean) continue;
+        if (clean.startsWith('# ')) {
+          title = clean.substring(2).trim();
+          continue;
+        }
+        const m = clean.match(speakerRegex);
+        if (m) {
+          flush();
+          currentSpeaker = m[1].trim();
+          currentStyle = m[2] ? m[2].trim() : null;
+          currentParts = [m[3].trim()];
+        } else if (currentSpeaker) {
+          currentParts.push(clean);
+        }
+      }
+      flush();
+
+      return {
+        title: title,
+        summary: `Podcast episode with ${turns.length} dialogue turns`,
+        turns: turns
+      };
+    }
+
+    function parsePodcastJsonToMarkdown(jsonText) {
+      if (!jsonText || !jsonText.trim()) return '';
+      const parsed = JSON.parse(jsonText.trim());
+      let title = 'Podcast Episode';
+      let turns = [];
+      if (Array.isArray(parsed)) {
+        turns = parsed;
+      } else if (typeof parsed === 'object' && parsed !== null) {
+        title = parsed.title || title;
+        turns = Array.isArray(parsed.turns) ? parsed.turns : [];
+      }
+
+      const lines = [`# ${title}\n`];
+      for (const t of turns) {
+        const spk = t.speaker || 'Host';
+        const stylePart = t.style ? ` (${t.style})` : '';
+        const txt = t.text || '';
+        lines.push(`**${spk}**${stylePart}: ${txt}\n`);
+      }
+      return lines.join('\n');
+    }
+
+    function switchPodcastEditorTab(targetTab) {
+      const tabDialogue = document.getElementById('tabPodcastDialogue');
+      const tabJson = document.getElementById('tabPodcastJson');
+      const containerDialogue = document.getElementById('containerPodcastDialogue');
+      const containerJson = document.getElementById('containerPodcastJson');
+      const formatHint = document.getElementById('podcastFormatHint');
+      const areaDialogue = document.getElementById('inputPodcastScript');
+      const areaJson = document.getElementById('inputPodcastScriptJson');
+
+      if (targetTab === 'json') {
+        if (areaDialogue && areaJson) {
+          const mdText = areaDialogue.value.trim();
+          if (mdText) {
+            if (mdText.startsWith('{') || mdText.startsWith('[')) {
+              try {
+                const parsed = JSON.parse(mdText);
+                areaJson.value = JSON.stringify(parsed, null, 2);
+              } catch {
+                const jsonObj = parseMarkdownToPodcastJson(mdText);
+                areaJson.value = JSON.stringify(jsonObj, null, 2);
+              }
+            } else {
+              const jsonObj = parseMarkdownToPodcastJson(mdText);
+              areaJson.value = JSON.stringify(jsonObj, null, 2);
+            }
+          }
+        }
+
+        if (containerDialogue) containerDialogue.classList.add('hidden');
+        if (containerJson) containerJson.classList.remove('hidden');
+
+        if (tabDialogue) {
+          tabDialogue.className = 'px-2.5 py-1 text-xs font-medium rounded-md transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 flex items-center space-x-1.5 cursor-pointer';
+        }
+        if (tabJson) {
+          tabJson.className = 'px-2.5 py-1 text-xs font-medium rounded-md transition bg-purple-600 text-white shadow-sm flex items-center space-x-1.5 cursor-pointer';
+        }
+        if (formatHint) formatHint.textContent = 'Format: JSON with title and alternating turns array';
+
+        currentPodcastTab = 'json';
+        updatePodcastScriptJsonStats();
+      } else {
+        if (areaJson && areaDialogue) {
+          const jsonText = areaJson.value.trim();
+          if (jsonText) {
+            try {
+              const mdText = parsePodcastJsonToMarkdown(jsonText);
+              areaDialogue.value = mdText;
+            } catch (err) {
+              alert(`Invalid JSON format: ${err.message}. Please correct the JSON syntax before switching to Dialogue View.`);
+              return;
+            }
+          }
+        }
+
+        if (containerJson) containerJson.classList.add('hidden');
+        if (containerDialogue) containerDialogue.classList.remove('hidden');
+
+        if (tabDialogue) {
+          tabDialogue.className = 'px-2.5 py-1 text-xs font-medium rounded-md transition bg-purple-600 text-white shadow-sm flex items-center space-x-1.5 cursor-pointer';
+        }
+        if (tabJson) {
+          tabJson.className = 'px-2.5 py-1 text-xs font-medium rounded-md transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 flex items-center space-x-1.5 cursor-pointer';
+        }
+        if (formatHint) formatHint.textContent = 'Format: **Speaker** (style): Spoken text [laughs]';
+
+        currentPodcastTab = 'dialogue';
+        updatePodcastScriptStats();
+      }
+      lucide.createIcons();
+    }
+
+    function updatePodcastScriptJsonStats() {
+      const statsEl = document.getElementById('podcastScriptStats');
+      if (!statsEl) return;
+      const jsonText = document.getElementById('inputPodcastScriptJson')?.value?.trim() || '';
+      if (!jsonText) {
+        statsEl.textContent = '0 words • ~0.0 mins';
+        return;
+      }
+      try {
+        const parsed = JSON.parse(jsonText);
+        const turns = Array.isArray(parsed) ? parsed : (parsed.turns || []);
+        let totalWords = 0;
+        for (const t of turns) {
+          if (t.text) totalWords += t.text.split(/\s+/).filter(Boolean).length;
+        }
+        const mins = (totalWords / 150.0).toFixed(1);
+        const turnLabel = turns.length > 0 ? ` • ${turns.length} turns` : '';
+        statsEl.textContent = `${totalWords.toLocaleString()} words${turnLabel} • ~${mins} mins`;
+      } catch {
+        const words = jsonText.split(/\s+/).filter(Boolean).length;
+        const mins = (words / 150.0).toFixed(1);
+        statsEl.textContent = `${words.toLocaleString()} words (raw) • ~${mins} mins`;
+      }
+    }
+
     function updatePodcastScriptStats() {
       const scriptText = document.getElementById('inputPodcastScript')?.value?.trim() || '';
       const statsEl = document.getElementById('podcastScriptStats');
@@ -136,6 +335,65 @@
       const turns = (scriptText.match(/^\s*\*\*[^*]+\*\*/gm) || []).length;
       const turnLabel = turns > 0 ? ` • ${turns} turns` : '';
       statsEl.textContent = `${words.toLocaleString()} words${turnLabel} • ~${mins} mins`;
+    }
+
+    function remapScriptSpeakersForPersona(newPersona) {
+      const config = PODCAST_PERSONA_COHOSTS[newPersona];
+      if (!config) return;
+      const targetH1 = config.host1;
+      const targetH2 = config.host2;
+
+      const areaDialogue = document.getElementById('inputPodcastScript');
+      const areaJson = document.getElementById('inputPodcastScriptJson');
+
+      function remapName(name) {
+        const n = (name || '').trim();
+        const nl = n.toLowerCase();
+        if (nl === targetH1.toLowerCase()) return targetH1;
+        if (nl === targetH2.toLowerCase()) return targetH2;
+        if (targetH1 === 'Jane') {
+          // Woman & Woman: Jane & Maya
+          if (nl === 'joe') return 'Jane';
+          if (nl === 'alex') return 'Maya';
+        } else if (targetH2 === 'Alex') {
+          // Man & Man: Joe & Alex
+          if (nl === 'jane' || nl === 'maya') return 'Alex';
+        } else if (targetH2 === 'Jane') {
+          // Man & Woman: Joe & Jane
+          if (nl === 'alex' || nl === 'maya') return 'Jane';
+        }
+        return name;
+      }
+
+      if (areaDialogue && areaDialogue.value.trim()) {
+        const lines = areaDialogue.value.split('\n');
+        const remappedLines = lines.map(line => {
+          return line.replace(/^(\*{0,2})([\w\s]+?)(\*{0,2})(?=\s*(?:\([^)]+\))?\s*:)/, (match, p1, speaker, p3) => {
+            const newSpk = remapName(speaker);
+            return `${p1}${newSpk}${p3}`;
+          });
+        });
+        areaDialogue.value = remappedLines.join('\n');
+      }
+
+      if (areaJson && areaJson.value.trim()) {
+        try {
+          const parsed = JSON.parse(areaJson.value.trim());
+          const turns = Array.isArray(parsed) ? parsed : (parsed.turns || []);
+          for (const t of turns) {
+            if (t.speaker) t.speaker = remapName(t.speaker);
+          }
+          areaJson.value = JSON.stringify(parsed, null, 2);
+        } catch {
+          // ignore parse error during typing
+        }
+      }
+
+      if (currentPodcastTab === 'json') {
+        updatePodcastScriptJsonStats();
+      } else {
+        updatePodcastScriptStats();
+      }
     }
 
     function handlePersonaChange(personaName) {
@@ -154,6 +412,14 @@
         if (inputCustom) inputCustom.placeholder = "e.g. Unpack interest rate risks, have Host 1 play the skeptical saver, and debate liquidity vs. yield...";
         if (helpText) helpText.textContent = "Guides Gemini 3.8 Flash to write a 2-person podcast dialogue focused on these directions before multi-speaker synthesis.";
         if (studioCard) studioCard.classList.remove('hidden');
+
+        // Update co-host badge and auto-remap co-host names in script
+        const cohostConfig = PODCAST_PERSONA_COHOSTS[personaName];
+        const badgeEl = document.getElementById('podcastCohostsBadgeText');
+        if (badgeEl && cohostConfig) {
+          badgeEl.textContent = cohostConfig.label;
+        }
+        remapScriptSpeakersForPersona(personaName);
       } else {
         if (labelText) labelText.textContent = "Voice Customization & Delivery Directives";
         if (badgeTag) badgeTag.textContent = "Director's Notes (Optional)";
@@ -181,6 +447,7 @@
       const statusBox = document.getElementById('podcastDraftStatus');
       const statusText = document.getElementById('podcastDraftStatusText');
       const scriptArea = document.getElementById('inputPodcastScript');
+      const scriptAreaJson = document.getElementById('inputPodcastScriptJson');
 
       if (btn) btn.disabled = true;
       if (btnText) btnText.textContent = 'Drafting Script...';
@@ -215,6 +482,14 @@
 
         if (scriptArea && data.markdown_script) {
           scriptArea.value = data.markdown_script;
+        }
+        if (scriptAreaJson && data.json_script) {
+          scriptAreaJson.value = data.json_script;
+        }
+
+        if (currentPodcastTab === 'json') {
+          updatePodcastScriptJsonStats();
+        } else {
           updatePodcastScriptStats();
         }
 
@@ -275,9 +550,12 @@
       const voice_customization = document.getElementById('inputVoiceCustomization')?.value?.trim() || null;
       const speed = parseFloat(document.getElementById('inputSpeed')?.value || '1.0');
       const run_judge = document.getElementById('inputRunJudge').checked;
-      const podcast_script = persona.startsWith('Podcast:')
-        ? (document.getElementById('inputPodcastScript')?.value?.trim() || null)
-        : null;
+      let podcast_script = null;
+      if (persona.startsWith('Podcast:')) {
+        const dVal = document.getElementById('inputPodcastScript')?.value?.trim();
+        const jVal = document.getElementById('inputPodcastScriptJson')?.value?.trim();
+        podcast_script = currentPodcastTab === 'json' ? (jVal || dVal || null) : (dVal || jVal || null);
+      }
       
       const statusBox = document.getElementById('newJobStatus');
       const submitBtn = document.getElementById('submitJobBtn');
