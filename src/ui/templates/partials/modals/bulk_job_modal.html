@@ -20,11 +20,18 @@
         <div>
           <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Financial Voice Persona</label>
           <select id="inputBulkPersona" required class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-teal-500 transition">
-            <option value="Retail Banking Guide">Retail Banking Guide (External Customers | Voice: Sulafat)</option>
-            <option value="Wealth & Market Advisor">Wealth & Market Advisor (External Customers | Voice: Charon)</option>
-            <option value="Regulatory & Policy Officer">Regulatory & Policy Officer (Internal Employees | Voice: Kore)</option>
-            <option value="Employee Enablement & Operations">Employee Enablement & Operations (Internal Employees | Voice: Puck)</option>
-            <option value="Fraud & Security Alert">Fraud & Security Alert (Shared / Universal | Voice: Schedar)</option>
+            <optgroup label="Solo Financial Narrator Personas">
+              <option value="Retail Banking Guide">Retail Banking Guide (External Customers | Voice: Sulafat)</option>
+              <option value="Wealth & Market Advisor">Wealth & Market Advisor (External Customers | Voice: Charon)</option>
+              <option value="Regulatory & Policy Officer">Regulatory & Policy Officer (Internal Employees | Voice: Kore)</option>
+              <option value="Employee Enablement & Operations">Employee Enablement & Operations (Internal Employees | Voice: Puck)</option>
+              <option value="Fraud & Security Alert">Fraud & Security Alert (Shared / Universal | Voice: Schedar)</option>
+            </optgroup>
+            <optgroup label="2-Person Podcast Co-Hosts (Gemini Multi-Speaker)">
+              <option value="Podcast: Co-Hosts (Man & Woman)">Podcast: Co-Hosts (Man & Woman) (Puck & Kore)</option>
+              <option value="Podcast: Co-Hosts (Man & Man)">Podcast: Co-Hosts (Man & Man) (Puck & Charon)</option>
+              <option value="Podcast: Co-Hosts (Woman & Woman)">Podcast: Co-Hosts (Woman & Woman) (Kore & Sulafat)</option>
+            </optgroup>
           </select>
         </div>
 

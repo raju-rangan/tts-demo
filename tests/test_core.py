@@ -458,3 +458,193 @@ def test_critique_feedback_prompt_injection():
     assert "WHAT YOU DID INCORRECTLY:" in prompt
     assert "You omitted the title 'Investment Guide'" in prompt
     assert "Read the title clearly aloud before reading paragraph 1" in prompt
+
+
+def test_podcast_personas():
+    """Verify the 3 podcast personas: Man-Woman, Man-Man, Woman-Woman with correct voices and speaker pairs."""
+    from src.ai.personas import get_persona, PERSONAS
+
+    podcast_personas = [
+        ("Podcast: Co-Hosts (Man & Woman)", ("Puck", "Kore"), ("male", "female")),
+        ("Podcast: Co-Hosts (Man & Man)", ("Puck", "Charon"), ("male", "male")),
+        ("Podcast: Co-Hosts (Woman & Woman)", ("Kore", "Sulafat"), ("female", "female")),
+    ]
+
+    for persona_name, expected_voices, expected_genders in podcast_personas:
+        assert persona_name in PERSONAS
+        p = get_persona(persona_name)
+        assert p.is_podcast is True
+        assert p.speakers is not None
+        assert len(p.speakers) == 2
+
+        voices = (p.speakers[0]["voice_name"], p.speakers[1]["voice_name"])
+        assert voices == expected_voices
+
+        genders = (p.speakers[0]["gender"], p.speakers[1]["gender"])
+        assert genders == expected_genders
+
+        assert "CO-HOST PROFILES:" in p.system_instruction
+        assert "FINANCIAL PRONUNCIATION & TERMINOLOGY GUIDELINES:" in p.system_instruction
+
+
+def test_podcast_script_generation():
+    """Verify GeminiAudioGenerator.generate_podcast_script prompts Gemini and parses structured dialogue turns."""
+    from unittest.mock import MagicMock
+    from src.ai.generator import GeminiAudioGenerator, PodcastScript, PodcastTurn
+    from src.ai.personas import get_persona
+
+    gen = GeminiAudioGenerator()
+    mock_client = MagicMock()
+    gen._client = mock_client
+
+    # Mock structured response
+    expected_script = PodcastScript(
+        title="High-Yield vs CDs: The Liquidity Debate",
+        summary="A lively conversation contrasting liquidity vs guaranteed yields.",
+        turns=[
+            PodcastTurn(speaker="Joe", text="Welcome back! Today we are looking at where to park your cash.", style="upbeat and welcoming"),
+            PodcastTurn(speaker="Jane", text="That's right Joe, especially looking at HYSAs versus CDs.", style="articulate and measured"),
+            PodcastTurn(speaker="Joe", text="So what's the big trade-off for savers?", style="curious and engaging"),
+            PodcastTurn(speaker="Jane", text="It really boils down to liquidity versus fixed APY.", style="clear and reassuring"),
+        ]
+    )
+
+    mock_resp = MagicMock()
+    mock_resp.text = expected_script.model_dump_json()
+    mock_resp.parsed = expected_script
+    mock_client.models.generate_content.return_value = mock_resp
+
+    persona = get_persona("Podcast: Co-Hosts (Man & Woman)")
+    article_text = "Article text on HYSAs vs CDs."
+    director_notes = "Focus on the liquidity penalty and make Joe ask relatable questions."
+
+    script = gen.generate_podcast_script(
+        text=article_text,
+        persona=persona,
+        director_notes=director_notes,
+        job_id="test_pod_script"
+    )
+
+    assert script.title == "High-Yield vs CDs: The Liquidity Debate"
+    assert len(script.turns) == 4
+    assert script.turns[0].speaker == "Joe"
+    assert script.turns[1].speaker == "Jane"
+
+    # Verify prompt arguments
+    call_args = mock_client.models.generate_content.call_args.kwargs
+    prompt = call_args["contents"]
+    assert "Focus on the liquidity penalty and make Joe ask relatable questions." in prompt
+    assert "Article text on HYSAs vs CDs." in prompt
+    assert "Host 1: Joe (male, Voice: Puck)" in prompt
+    assert "Host 2: Jane (female, Voice: Kore)" in prompt
+
+
+def test_multi_speaker_speech_synthesis_payload():
+    """Verify GeminiAudioGenerator._generate_multi_speaker_speech builds Google Multi-Speaker config."""
+    from unittest.mock import MagicMock
+    from src.ai.generator import GeminiAudioGenerator, PodcastScript, PodcastTurn
+    from src.ai.personas import get_persona
+    import base64
+
+    gen = GeminiAudioGenerator()
+    mock_client = MagicMock()
+    gen._client = mock_client
+
+    # Mock audio response (2400 bytes PCM = 0.05s)
+    mock_resp = MagicMock()
+    mock_resp.usage_metadata = MagicMock(prompt_token_count=350, candidates_token_count=1800)
+    mock_resp.candidates = [MagicMock()]
+    mock_part = MagicMock()
+    # Provide dummy PCM audio in inline_data
+    mock_part.inline_data = MagicMock(mime_type="audio/wav", data=base64.b64encode(b"\x05\x00" * 1200).decode("utf-8"))
+    mock_resp.candidates[0].content.parts = [mock_part]
+    mock_client.models.generate_content.return_value = mock_resp
+
+    script = PodcastScript(
+        title="Banking Podcast Demo",
+        summary="Summary of banking podcast",
+        turns=[
+            PodcastTurn(speaker="Joe", text="Welcome to the show!", style="cheerful"),
+            PodcastTurn(speaker="Jane", text="Great to be here!", style="friendly"),
+        ]
+    )
+    persona = get_persona("Podcast: Co-Hosts (Man & Woman)")
+
+    result = gen._generate_multi_speaker_speech(
+        script=script,
+        persona=persona,
+        job_id="test_multi_speaker",
+        speed=1.0
+    )
+
+    assert result.job_id == "test_multi_speaker"
+    assert result.audio_bytes is not None
+    assert len(result.audio_bytes) > 0
+    assert result.title == "Banking Podcast Demo"
+    assert "**Joe**: Welcome to the show!" in result.transcript
+    assert "**Jane**: Great to be here!" in result.transcript
+
+    # Inspect call args for multi-speaker schema
+    call_args = mock_client.models.generate_content.call_args.kwargs
+    config = call_args["config"]
+    assert config.speech_config is not None
+    assert config.speech_config.multi_speaker_voice_config is not None
+    speaker_configs = config.speech_config.multi_speaker_voice_config.speaker_voice_configs
+    assert len(speaker_configs) == 2
+    assert speaker_configs[0].speaker == "Joe"
+    assert speaker_configs[0].voice_config.prebuilt_voice_config.voice_name == "Puck"
+    assert speaker_configs[1].speaker == "Jane"
+    assert speaker_configs[1].voice_config.prebuilt_voice_config.voice_name == "Kore"
+
+    contents = call_args["contents"]
+    parts = contents[0]["parts"]
+    assert len(parts) == 2
+    assert parts[0]["text"] == "Welcome to the show!"
+    assert parts[0]["speech_metadata"]["speaker"] == "Joe"
+    assert parts[1]["text"] == "Great to be here!"
+    assert parts[1]["speech_metadata"]["speaker"] == "Jane"
+
+
+def test_generate_speech_routes_podcast_pipeline():
+    """Verify generate_speech() automatically routes podcast personas through script & multi-speaker pipeline."""
+    from unittest.mock import patch, MagicMock
+    from src.ai.generator import GeminiAudioGenerator, PodcastScript, PodcastTurn, GenerationResult
+
+    gen = GeminiAudioGenerator()
+
+    fake_script = PodcastScript(
+        title="Podcast Title",
+        summary="Podcast Summary",
+        turns=[
+            PodcastTurn(speaker="Joe", text="Turn 1", style="natural"),
+            PodcastTurn(speaker="Alex", text="Turn 2", style="analytical"),
+        ]
+    )
+
+    fake_result = GenerationResult(
+        job_id="job_pod_route",
+        audio_bytes=b"fake_mp3_data",
+        audio_format="audio/mpeg",
+        duration_seconds=12.5,
+        persona_used="Podcast: Co-Hosts (Man & Man)",
+        model_used="gemini-3.8-flash-tts",
+        transcript="# Podcast Title\n\n**Joe**: Turn 1\n\n**Alex**: Turn 2",
+        title="Podcast Title"
+    )
+
+    with patch.object(gen, "generate_podcast_script", return_value=fake_script) as mock_script_gen, \
+         patch.object(gen, "_generate_multi_speaker_speech", return_value=fake_result) as mock_multi_synth:
+
+        res = gen.generate_speech(
+            text="Source article for podcast conversion",
+            persona_name="Podcast: Co-Hosts (Man & Man)",
+            job_id="job_pod_route",
+            voice_customization="Emphasize commercial lending terms"
+        )
+
+        assert mock_script_gen.call_count == 1
+        assert mock_multi_synth.call_count == 1
+        assert res.title == "Podcast Title"
+        assert res.duration_seconds == 12.5
+        assert res.model_used == "gemini-3.8-flash-tts"
+

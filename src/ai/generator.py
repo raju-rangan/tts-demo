@@ -761,6 +761,16 @@ SOURCE DOCUMENT TO COVER:
 
     def _transcode_pcm_to_mp3(self, raw_pcm_bytes: bytes, rate: int = 24000) -> Tuple[bytes, float]:
         """Transcodes raw 24kHz 16-bit mono PCM into broadcast MP3 @ 320kbps (or fallback WAV container)."""
+        if raw_pcm_bytes.startswith(b"RIFF"):
+            try:
+                with wave.open(io.BytesIO(raw_pcm_bytes), "rb") as wf:
+                    rate = wf.getframerate()
+                    raw_pcm_bytes = wf.readframes(wf.getnframes())
+            except Exception as we:
+                logger.warning(f"Could not read WAV header in _transcode_pcm_to_mp3: {we}")
+                if len(raw_pcm_bytes) > 44:
+                    raw_pcm_bytes = raw_pcm_bytes[44:]
+
         duration_sec = len(raw_pcm_bytes) / (rate * 2.0)
 
         # 1. Preferred & Cloud Run Optimized: In-memory pure Python C-extension (lameenc)

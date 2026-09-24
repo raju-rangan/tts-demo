@@ -19,23 +19,33 @@
       <form id="newJobForm" onsubmit="submitNewJob(event)" class="space-y-4 pt-4">
         <div>
           <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Financial Voice Persona</label>
-          <select id="inputPersona" required class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition">
-            <option value="Retail Banking Guide">Retail Banking Guide (External Customers | Voice: Sulafat)</option>
-            <option value="Wealth & Market Advisor">Wealth & Market Advisor (External Customers | Voice: Charon)</option>
-            <option value="Regulatory & Policy Officer">Regulatory & Policy Officer (Internal Employees | Voice: Kore)</option>
-            <option value="Employee Enablement & Operations">Employee Enablement & Operations (Internal Employees | Voice: Puck)</option>
-            <option value="Fraud & Security Alert">Fraud & Security Alert (Shared / Universal | Voice: Schedar)</option>
+          <select id="inputPersona" required onchange="handlePersonaChange(this.value)" class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition">
+            <optgroup label="Solo Financial Narrator Personas">
+              <option value="Retail Banking Guide">Retail Banking Guide (External Customers | Voice: Sulafat)</option>
+              <option value="Wealth & Market Advisor">Wealth & Market Advisor (External Customers | Voice: Charon)</option>
+              <option value="Regulatory & Policy Officer">Regulatory & Policy Officer (Internal Employees | Voice: Kore)</option>
+              <option value="Employee Enablement & Operations">Employee Enablement & Operations (Internal Employees | Voice: Puck)</option>
+              <option value="Fraud & Security Alert">Fraud & Security Alert (Shared / Universal | Voice: Schedar)</option>
+            </optgroup>
+            <optgroup label="2-Person Podcast Co-Hosts (Gemini Multi-Speaker)">
+              <option value="Podcast: Co-Hosts (Man & Woman)">Podcast: Co-Hosts (Man & Woman) (Puck & Kore)</option>
+              <option value="Podcast: Co-Hosts (Man & Man)">Podcast: Co-Hosts (Man & Man) (Puck & Charon)</option>
+              <option value="Podcast: Co-Hosts (Woman & Woman)">Podcast: Co-Hosts (Woman & Woman) (Kore & Sulafat)</option>
+            </optgroup>
           </select>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1 flex items-center justify-between">
-            <span>Voice Customization & Delivery Directives</span>
-            <span class="text-[11px] text-zinc-400 font-normal">Director's Notes (Optional)</span>
+          <label id="labelVoiceCustomization" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <span id="textVoiceCustomizationLabel">Voice Customization & Delivery Directives</span>
+            <div class="flex items-center space-x-2">
+              <button type="button" id="btnSampleDirectives" onclick="loadSamplePodcastDirectives()" class="hidden text-xs text-emerald-400 hover:underline">Load Sample Directives</button>
+              <span id="badgeVoiceCustomizationTag" class="text-[11px] text-zinc-400 font-normal">Director's Notes (Optional)</span>
+            </div>
           </label>
           <input type="text" id="inputVoiceCustomization" placeholder="e.g. Speak with an empathetic, reassuring tone and slightly slower cadence on regulatory disclosures..."
             class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition">
-          <p class="text-[11px] text-zinc-500 mt-1">Directly guides pacing, vocal warmth, emphasis, or emotional nuance in Gemini TTS generation.</p>
+          <p id="helpVoiceCustomization" class="text-[11px] text-zinc-500 mt-1">Directly guides pacing, vocal warmth, emphasis, or emotional nuance in Gemini TTS generation.</p>
         </div>
 
         <!-- Speech Speed Control (Gemini TTS) -->

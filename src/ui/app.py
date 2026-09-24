@@ -556,7 +556,7 @@ def reset_all_tours_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
 
 @app.get("/api/personas")
 def list_personas():
-    """Returns all 5 banking voice personas with metadata and pronunciation rules."""
+    """Returns all available voice personas with metadata, speaker definitions, and pronunciation rules."""
     result = []
     for name, p in PERSONAS.items():
         result.append({
@@ -564,7 +564,9 @@ def list_personas():
             "voice_name": p.voice_name,
             "audience": p.audience,
             "description": p.description,
-            "sample_pause_guidance": "Adheres to federal banking acronym guidelines (FDIC, APY, ACH, KYC)."
+            "sample_pause_guidance": "Adheres to federal banking acronym guidelines (FDIC, APY, ACH, KYC).",
+            "is_podcast": getattr(p, "is_podcast", False),
+            "speakers": getattr(p, "speakers", None)
         })
     return result
 
@@ -1045,6 +1047,12 @@ def _execute_async_synthesis(
         with open("scripts/samples/latest_generated.mp3", "wb") as f:
             f.write(gen_result.audio_bytes)
 
+        # Determine effective transcript & title (supporting podcast-generated scripts)
+        effective_transcript = gen_result.transcript if gen_result.transcript else text
+        effective_title = title or gen_result.title or text.split("\n")[0][:80].strip("#* ")
+        effective_words = len(effective_transcript.split())
+        effective_chars = len(effective_transcript)
+
         # Step 3: Multimodal Quality Audit
         eval_result = None
         judge_time = 0.0
@@ -1059,7 +1067,7 @@ def _execute_async_synthesis(
             try:
                 eval_result = judge.evaluate_audio_gcs(
                     gcs_audio_uri=gcs_uri,
-                    reference_text=text,
+                    reference_text=effective_transcript,
                     persona_name=persona_name
                 )
                 judge_time = time.time() - t1
@@ -1071,11 +1079,11 @@ def _execute_async_synthesis(
         # Step 4: Token & Cost Calculations
         eval_usage = getattr(eval_result, "usage_metadata", None) if eval_result else None
         token_usage, cost = TokenCostCalculator.calculate_pipeline_cost(
-            text=text,
+            text=effective_transcript,
             duration_seconds=gen_result.duration_seconds,
             tts_usage_metadata=getattr(gen_result, "usage_metadata", None),
             judge_usage_metadata=eval_usage,
-            tts_model=settings.voice_model,
+            tts_model=gen_result.model_used or settings.voice_model,
             judge_model=settings.judge_model if judge else ""
         )
 
@@ -1086,10 +1094,10 @@ def _execute_async_synthesis(
             persona=persona_name,
             audience=persona_obj.audience,
             voice_name=persona_obj.voice_name,
-            article_title=title or text.split("\n")[0][:80].strip("#* "),
-            transcript=text,
-            word_count=words,
-            char_count=chars,
+            article_title=effective_title,
+            transcript=effective_transcript,
+            word_count=effective_words,
+            char_count=effective_chars,
             gcs_uri=gcs_uri,
             signed_url=signed_url,
             audio_format="MP3 24kHz @ 320kbps",

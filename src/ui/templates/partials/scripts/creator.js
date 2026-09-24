@@ -118,11 +118,58 @@
       }
     }
 
-    function loadSampleText() {
-      document.getElementById('inputText').value = `High-Yield Savings Accounts vs. Certificates of Deposit (CDs): A Financial Guide for Retail Banking Customers.\n\nWhen planning your short-to-medium-term savings strategy, two of the most secure instruments available are High-Yield Savings Accounts (HYSA) and Certificates of Deposit (CDs). Both products are FDIC-insured up to $250,000 per depositor, per institution, offering principal protection alongside competitive yields.\n\n1. High-Yield Savings Accounts: Flexibility & Liquidity. A high-yield savings account is an interest-bearing deposit account that typically offers an Annual Percentage Yield (APY) significantly higher than traditional brick-and-mortar savings accounts. The defining advantage is liquidity: funds can be deposited or withdrawn at any time via electronic funds transfers (EFT) or Automated Clearing House (ACH) withdrawals, subject to standard federal and bank transaction limits. These accounts are ideal for emergency funds or near-term expenses.\n\n2. Certificates of Deposit: Guaranteed Rate Certainty. A CD is a time-deposit account where you commit a lump sum for a fixed term—ranging from 3 months to 5 years—in exchange for a guaranteed APY that remains locked regardless of Federal Reserve interest rate fluctuations. However, withdrawing funds prior to the maturity date triggers an early withdrawal penalty, typically calculated as several months of interest.\n\n3. Regulatory & Compliance Safeguards. Both HYSAs and CDs require standard Customer Identification Programs (CIP) and Know Your Customer (KYC) verification in accordance with the Bank Secrecy Act (BSA) and anti-money laundering (AML) regulations.`;
+    function handlePersonaChange(personaName) {
+      const isPodcast = personaName && personaName.startsWith('Podcast:');
+      const labelText = document.getElementById('textVoiceCustomizationLabel');
+      const badgeTag = document.getElementById('badgeVoiceCustomizationTag');
+      const sampleBtn = document.getElementById('btnSampleDirectives');
+      const inputCustom = document.getElementById('inputVoiceCustomization');
+      const helpText = document.getElementById('helpVoiceCustomization');
+
+      if (isPodcast) {
+        if (labelText) labelText.textContent = "Podcast Content Directives & Host Dynamics";
+        if (badgeTag) badgeTag.textContent = "Director's Notes (Podcast Required/Recommended)";
+        if (sampleBtn) sampleBtn.classList.remove('hidden');
+        if (inputCustom) inputCustom.placeholder = "e.g. Unpack interest rate risks, have Host 1 play the skeptical saver, and debate liquidity vs. yield...";
+        if (helpText) helpText.textContent = "Guides Gemini 3.8 Flash to write a 2-person podcast dialogue focused on these directions before multi-speaker synthesis.";
+      } else {
+        if (labelText) labelText.textContent = "Voice Customization & Delivery Directives";
+        if (badgeTag) badgeTag.textContent = "Director's Notes (Optional)";
+        if (sampleBtn) sampleBtn.classList.add('hidden');
+        if (inputCustom) inputCustom.placeholder = "e.g. Speak with an empathetic, reassuring tone and slightly slower cadence on regulatory disclosures...";
+        if (helpText) helpText.textContent = "Directly guides pacing, vocal warmth, emphasis, or emotional nuance in Gemini TTS generation.";
+      }
+    }
+
+    function loadSamplePodcastDirectives() {
       const voiceCust = document.getElementById('inputVoiceCustomization');
       if (voiceCust) {
-        voiceCust.value = "Speak with an articulate, reassuring retail banking demeanor. Enunciate 'High-Yield' and acronyms FDIC, APY, CD with precision.";
+        voiceCust.value = "Have the hosts break down the trade-offs between liquid high-yield savings and locked-in CD yields. Host 1 should ask relatable customer questions about emergency fund access, while Host 2 explains rate protection and penalties in an engaging, approachable style.";
+      }
+    }
+
+    function loadSampleDirectives() {
+      const persona = document.getElementById('inputPersona')?.value || '';
+      if (persona.startsWith('Podcast:')) {
+        loadSamplePodcastDirectives();
+      } else {
+        const voiceCust = document.getElementById('inputVoiceCustomization');
+        if (voiceCust) {
+          voiceCust.value = "Speak with an articulate, reassuring retail banking demeanor. Enunciate 'High-Yield' and acronyms FDIC, APY, CD with precision.";
+        }
+      }
+    }
+
+    function loadSampleText() {
+      document.getElementById('inputText').value = `High-Yield Savings Accounts vs. Certificates of Deposit (CDs): A Financial Guide for Retail Banking Customers.\n\nWhen planning your short-to-medium-term savings strategy, two of the most secure instruments available are High-Yield Savings Accounts (HYSA) and Certificates of Deposit (CDs). Both products are FDIC-insured up to $250,000 per depositor, per institution, offering principal protection alongside competitive yields.\n\n1. High-Yield Savings Accounts: Flexibility & Liquidity. A high-yield savings account is an interest-bearing deposit account that typically offers an Annual Percentage Yield (APY) significantly higher than traditional brick-and-mortar savings accounts. The defining advantage is liquidity: funds can be deposited or withdrawn at any time via electronic funds transfers (EFT) or Automated Clearing House (ACH) withdrawals, subject to standard federal and bank transaction limits. These accounts are ideal for emergency funds or near-term expenses.\n\n2. Certificates of Deposit: Guaranteed Rate Certainty. A CD is a time-deposit account where you commit a lump sum for a fixed term—ranging from 3 months to 5 years—in exchange for a guaranteed APY that remains locked regardless of Federal Reserve interest rate fluctuations. However, withdrawing funds prior to the maturity date triggers an early withdrawal penalty, typically calculated as several months of interest.\n\n3. Regulatory & Compliance Safeguards. Both HYSAs and CDs require standard Customer Identification Programs (CIP) and Know Your Customer (KYC) verification in accordance with the Bank Secrecy Act (BSA) and anti-money laundering (AML) regulations.`;
+      const persona = document.getElementById('inputPersona')?.value || '';
+      if (persona.startsWith('Podcast:')) {
+        loadSamplePodcastDirectives();
+      } else {
+        const voiceCust = document.getElementById('inputVoiceCustomization');
+        if (voiceCust) {
+          voiceCust.value = "Speak with an articulate, reassuring retail banking demeanor. Enunciate 'High-Yield' and acronyms FDIC, APY, CD with precision.";
+        }
       }
       updateInputStats();
     }

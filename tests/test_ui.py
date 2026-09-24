@@ -36,14 +36,22 @@ def test_auth_login_invalid(client):
     assert response.status_code == 401
 
 def test_get_personas_public(client):
-    """Verify personas endpoint returns all 5 banking personas."""
+    """Verify personas endpoint returns all banking and podcast personas."""
     response = client.get("/api/personas")
     assert response.status_code == 200
     personas = response.json()
-    assert len(personas) == 5
+    assert len(personas) >= 8
     names = [p["name"] for p in personas]
     assert "Retail Banking Guide" in names
     assert "Fraud & Security Alert" in names
+    assert "Podcast: Co-Hosts (Man & Woman)" in names
+    assert "Podcast: Co-Hosts (Man & Man)" in names
+    assert "Podcast: Co-Hosts (Woman & Woman)" in names
+
+    # Verify podcast metadata
+    podcast = next(p for p in personas if p["name"] == "Podcast: Co-Hosts (Man & Woman)")
+    assert podcast["is_podcast"] is True
+    assert len(podcast["speakers"]) == 2
 
 def test_protected_endpoints_require_auth(client):
     """Verify /api/jobs and /api/stats reject unauthenticated requests."""
@@ -961,6 +969,69 @@ def test_html_critic_retry_dialog_elements(client):
     assert "openRetryModal" in html
     assert "confirmAndExecuteRetry" in html
     assert "setRetrySpeedPreset" in html
+
+
+def test_create_podcast_job_api(client, monkeypatch):
+    """Verify POST /api/jobs succeeds with podcast personas and director notes."""
+    from src.db.repository import get_job_repository
+    repo = get_job_repository()
+
+    login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    executed_args = {}
+    def mock_execute(job_id, text, persona_name, run_judge, title, voice_customization=None, **kwargs):
+        executed_args["job_id"] = job_id
+        executed_args["persona_name"] = persona_name
+        executed_args["voice_customization"] = voice_customization
+
+    monkeypatch.setattr("src.ui.app._execute_async_synthesis", mock_execute)
+
+    payload = {
+        "text": "High-Yield Savings vs CDs comparison article.",
+        "persona": "Podcast: Co-Hosts (Man & Woman)",
+        "title": "Cash Strategy Podcast",
+        "voice_customization": "Have Joe focus on emergency fund liquidity while Jane explains CD term penalties."
+    }
+
+    resp = client.post("/api/jobs", json=payload, headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    job_id = data["job_id"]
+
+    try:
+        assert data["job"]["persona"] == "Podcast: Co-Hosts (Man & Woman)"
+        assert data["job"]["voice_customization"] == "Have Joe focus on emergency fund liquidity while Jane explains CD term penalties."
+        assert executed_args["persona_name"] == "Podcast: Co-Hosts (Man & Woman)"
+        assert executed_args["voice_customization"] == "Have Joe focus on emergency fund liquidity while Jane explains CD term penalties."
+    finally:
+        repo.delete_job(job_id)
+
+
+def test_html_podcast_ui_elements(client):
+    """Verify HTML templates contain podcast options, directives controls, and script formatting."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # New Job Modal Options & Optgroups
+    assert "2-Person Podcast Co-Hosts (Gemini Multi-Speaker)" in html
+    assert 'value="Podcast: Co-Hosts (Man & Woman)"' in html
+    assert 'value="Podcast: Co-Hosts (Man & Man)"' in html
+    assert 'value="Podcast: Co-Hosts (Woman & Woman)"' in html
+
+    # Auditor View Filter
+    assert 'id="personaFilter"' in html
+    assert 'Podcast: Co-Hosts (Man & Woman)' in html
+
+    # Director's Notes & Script Controls
+    assert 'id="labelVoiceCustomization"' in html
+    assert 'id="textVoiceCustomizationLabel"' in html
+    assert 'id="btnSampleDirectives"' in html
+    assert "handlePersonaChange" in html
+    assert "loadSamplePodcastDirectives" in html
+
 
 
 
