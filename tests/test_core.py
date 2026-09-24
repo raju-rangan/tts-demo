@@ -774,3 +774,103 @@ def test_generate_speech_with_custom_podcast_script():
         assert res.job_id == "job_custom_pod"
 
 
+def test_square_bracket_vocal_cue_normalization():
+    """Verify parse_markdown_script_to_turns strictly normalizes parentheses cues () into square brackets []."""
+    from src.ai.generator import parse_markdown_script_to_turns
+
+    script_with_parens = """# Episode Title
+**Joe** (curious): (laughs) Welcome to the show!
+**Jane**: (sighs) Thanks Joe, (chuckles) this is wild.
+**Joe**: Right? (pauses) Let's dive into the plumbing."""
+
+    script = parse_markdown_script_to_turns(script_with_parens)
+    assert len(script.turns) == 3
+
+    assert "[laughs]" in script.turns[0].text
+    assert "(laughs)" not in script.turns[0].text
+    assert script.turns[0].style == "curious"
+
+    assert "[sighs]" in script.turns[1].text
+    assert "[chuckles]" in script.turns[1].text
+    assert "(sighs)" not in script.turns[1].text
+    # Jane omitted style -> fallback to expressive style
+    assert script.turns[1].style == "analytical and measured"
+
+    assert "[pauses]" in script.turns[2].text
+    assert "(pauses)" not in script.turns[2].text
+    assert script.turns[2].style == "curious and energetic"
+
+
+def test_multi_speaker_pairwise_turn_batching():
+    """Verify _generate_multi_speaker_speech batches turns into 2-turn conversational pairs."""
+    from unittest.mock import MagicMock
+    from src.ai.generator import GeminiAudioGenerator, PodcastScript, PodcastTurn
+    from src.ai.personas import get_persona
+
+    gen = GeminiAudioGenerator()
+    mock_client = MagicMock()
+    gen._client = mock_client
+
+    mock_resp = MagicMock()
+    mock_part = MagicMock()
+    mock_part.inline_data.data = b"\x00\x00" * 4800  # 100ms of PCM
+    mock_resp.candidates = [MagicMock()]
+    mock_resp.candidates[0].content.parts = [mock_part]
+    mock_client.models.generate_content.return_value = mock_resp
+
+    script_4_turns = PodcastScript(
+        title="Defense & Debt 4-Turn Debate",
+        summary="Testing 4 turns",
+        turns=[
+            PodcastTurn(speaker="Joe", text="Jane, imagine proposing a 50% budget hike.", style="curious"),
+            PodcastTurn(speaker="Jane", text="[laughs] Oh Joe, you'd get laughed out.", style="amused"),
+            PodcastTurn(speaker="Joe", text="Right? Look at the dossier.", style="inquisitive"),
+            PodcastTurn(speaker="Jane", text="[sighs] It is a 1.5 trillion dilemma.", style="analytical"),
+        ]
+    )
+
+    persona = get_persona("Podcast: Co-Hosts (Man & Woman)")
+    res = gen._generate_multi_speaker_speech(
+        script=script_4_turns,
+        persona=persona,
+        job_id="job_4_turns_pairwise"
+    )
+
+    # 4 turns with batch_size=2 MUST result in exactly 2 generate_content calls
+    assert mock_client.models.generate_content.call_count == 2
+
+    # Check batch 1 payload
+    b1_call = mock_client.models.generate_content.call_args_list[0].kwargs
+    b1_parts = b1_call["contents"][0]["parts"]
+    assert len(b1_parts) == 2
+    assert b1_parts[0]["speech_metadata"]["speaker"] == "Joe"
+    assert b1_parts[1]["speech_metadata"]["speaker"] == "Jane"
+
+    # Check batch 2 payload
+    b2_call = mock_client.models.generate_content.call_args_list[1].kwargs
+    b2_parts = b2_call["contents"][0]["parts"]
+    assert len(b2_parts) == 2
+    assert b2_parts[0]["speech_metadata"]["speaker"] == "Joe"
+    assert b2_parts[1]["speech_metadata"]["speaker"] == "Jane"
+
+
+def test_reasoning_client_location_isolation():
+    """Verify reasoning_client location defaults to settings.judge_location (global) when vertexai=True."""
+    from unittest.mock import patch
+    from src.ai.generator import GeminiAudioGenerator
+
+    gen = GeminiAudioGenerator()
+    gen.project_id = "test-vertex-project"
+    gen._reasoning_client = None
+    gen._client = None
+
+    with patch("google.genai.Client") as mock_client_cls:
+        _ = gen.reasoning_client
+        mock_client_cls.assert_called_once()
+        call_kwargs = mock_client_cls.call_args.kwargs
+        assert call_kwargs["vertexai"] is True
+        assert call_kwargs["location"] == "global"
+        assert call_kwargs["project"] == "test-vertex-project"
+
+
+

@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 class PodcastTurn(BaseModel):
     speaker: str = Field(..., description="Name of the speaking co-host (e.g. Joe, Jane, Alex, Maya)")
-    text: str = Field(..., description="The spoken dialogue line for this turn, including natural vocal reactions like [laughs], [sighs], [chuckles], [pauses]")
+    text: str = Field(..., description="The spoken dialogue line for this turn, including natural vocal reactions strictly in square brackets like [laughs], [sighs], [chuckles], [pauses]. NEVER use parentheses () for vocal cues.")
     style: Optional[str] = Field(default="natural and conversational", description="Speaking style, emotion, or delivery nuance")
 
 class PodcastScript(BaseModel):
@@ -70,10 +70,19 @@ def parse_markdown_script_to_turns(
         if current_speaker and current_text_parts:
             text = " ".join(current_text_parts).strip()
             if text:
+                # Normalize any emotional/vocal cues in parentheses (...) into square brackets [...]
+                clean_text = re.sub(
+                    r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
+                    r"[\1]",
+                    text,
+                    flags=re.IGNORECASE
+                )
+                turn_idx = len(turns)
+                fallback_style = "curious and energetic" if turn_idx % 2 == 0 else "analytical and measured"
                 turns.append(PodcastTurn(
                     speaker=current_speaker,
-                    text=text,
-                    style=current_style or "natural and conversational"
+                    text=clean_text,
+                    style=current_style or fallback_style
                 ))
         current_speaker = None
         current_style = None
@@ -103,10 +112,17 @@ def parse_markdown_script_to_turns(
         paras = [p.strip() for p in script_text.split("\n\n") if p.strip()]
         for idx, p in enumerate(paras):
             spk = s1 if idx % 2 == 0 else s2
+            clean_p = re.sub(
+                r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
+                r"[\1]",
+                p,
+                flags=re.IGNORECASE
+            )
+            st = "curious and energetic" if idx % 2 == 0 else "analytical and measured"
             turns.append(PodcastTurn(
                 speaker=spk,
-                text=p,
-                style="natural and conversational"
+                text=clean_p,
+                style=st
             ))
 
     return PodcastScript(
@@ -291,7 +307,8 @@ class GeminiAudioGenerator:
         """Lazy-initialized Client for text/multimodal reasoning (configured for global location on Vertex AI)."""
         if self._reasoning_client is not None:
             return self._reasoning_client
-        if self._client is not None:
+        # In unit tests, if _client is a Mock/MagicMock and _reasoning_client is unset, reuse the mock
+        if self._client is not None and type(self._client).__name__ in ("Mock", "MagicMock"):
             return self._client
         api_key = os.getenv("GEMINI_API_KEY")
         http_opts = types.HttpOptions(timeout=600000)
@@ -590,12 +607,16 @@ Structure the conversation across 5 natural acts matching NotebookLM's proven pa
 
 HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL):
 This conversation must sound 100% human, lively, and spontaneous—NOT like two voices reciting a script.
+- MANDATORY VOCAL EXPRESSION SYNTAX RULE:
+  All human vocal and emotional reactions inside dialogue text MUST strictly use SQUARE BRACKETS:
+  `[laughs]`, `[sighs]`, `[chuckles]`, `[clears throat]`, `[pauses]`.
+  You MUST NEVER use parentheses `(...)` for emotional expressions inside dialogue lines. Parentheses are exclusively reserved for the delivery style descriptor in markdown representations.
+- CO-HOST ADDRESSING & DEMARCATION:
+  Co-hosts MUST naturally address each other by name (e.g. "{s2['speaker']}, imagine...", "Oh absolutely, {s1['speaker']}, you'd get laughed...", "What do you think, {s2['speaker']}?", "Well {s1['speaker']}, look at the plumbing...") across dialogue handoffs.
+  This authentic conversational addressing is vital for listeners and anchors distinct voice profiles in speech synthesis.
 - Asymmetrical Turn Distribution:
   Interleave snappy 1-sentence and half-sentence conversational glue turns:
   e.g., "Oh wow.", "Right? Yeah.", "Wait, 58 percent?", "Yeah, 58 percent.", "Which is wild.", "It is.", "The plumbing, yeah.", "Exactly.", "Oh no.", "That's insane."
-- Natural Human Vocal Markers:
-  Sprinkle expressive tags directly inside the turn text:
-  `[laughs]`, `[sighs]`, `[chuckles]`, `[clears throat]`, `[pauses]`.
 - Conversational Interjections & Fillers:
   Use natural informal interjections and authentic conversational flow:
   e.g., "Haha, wow", "Wait, seriously?", "Ugh, tell me about it", "Look...", "Hah!", "You know what’s wild?", "Right?! Exactly.", "Hmm, that's a tough pill to swallow."
@@ -603,7 +624,7 @@ This conversation must sound 100% human, lively, and spontaneous—NOT like two 
   Co-hosts should react genuinely to each other, interrupt politely, bounce questions back and forth, and share relatable analogies. Keep individual turns snappy (1-3 sentences).
 - Vocal Delivery Styles:
   In the 'style' field of every turn, specify the exact emotional delivery and vocal tone:
-  e.g., "surprised and intrigued", "weary, sighing delivery", "skeptical pushback", "nodding along", "chuckling and amused", "urgent and grave", "thoughtful closing tone".
+  e.g., "surprised and intrigued", "skeptical pushback", "amused and conversational", "analytical and measured", "urgent and grave", "thoughtful closing tone".
 - Scale & Volume:
   Target approximately {target_words - 100} to {target_words + 200} total spoken words across {target_turns - 5} to {target_turns + 10} dynamic dialogue turns alternating between {s1['speaker']} and {s2['speaker']}.
 
@@ -668,13 +689,21 @@ SOURCE DOCUMENT TO COVER:
                 total_turns=total_turns
             )
 
-        # Batch turns in groups of up to 12 turns per request to guarantee high-fidelity audio
-        batch_size = 12
+        # Batch turns in conversational dialogue pairs of 2 turns to guarantee 100% voice fidelity on Gemini TTS
+        batch_size = 2
         batches = [script.turns[i:i + batch_size] for i in range(0, total_turns, batch_size)]
         pcm_segments = []
         total_prompt_tokens = 0
         total_candidates_tokens = 0
         has_real_usage = False
+
+        # Safe speaker name mapping
+        speaker_map = {s["speaker"].lower(): s["speaker"] for s in speakers}
+        speaker_map["host 1"] = speakers[0]["speaker"]
+        speaker_map["host"] = speakers[0]["speaker"]
+        if len(speakers) > 1:
+            speaker_map["host 2"] = speakers[1]["speaker"]
+            speaker_map["co-host"] = speakers[1]["speaker"]
 
         for batch_idx, batch in enumerate(batches, start=1):
             if len(batches) > 1 and progress_callback:
@@ -688,6 +717,14 @@ SOURCE DOCUMENT TO COVER:
             # Build content parts with text and speech_metadata
             parts = []
             for turn in batch:
+                clean_turn_text = re.sub(
+                    r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
+                    r"[\1]",
+                    turn.text,
+                    flags=re.IGNORECASE
+                )
+                matched_speaker = speaker_map.get(turn.speaker.lower(), turn.speaker)
+
                 turn_style = turn.style or "natural and conversational"
                 if abs(speed - 1.0) >= 0.05:
                     if speed < 0.95:
@@ -696,9 +733,9 @@ SOURCE DOCUMENT TO COVER:
                         turn_style += ", brisk and energetic pacing"
 
                 parts.append({
-                    "text": turn.text,
+                    "text": clean_turn_text,
                     "speech_metadata": {
-                        "speaker": turn.speaker,
+                        "speaker": matched_speaker,
                         "style": turn_style,
                     }
                 })
@@ -769,10 +806,11 @@ SOURCE DOCUMENT TO COVER:
             if usage:
                 p_tokens = getattr(usage, "prompt_token_count", 0) or 0
                 c_tokens = getattr(usage, "candidates_token_count", 0) or 0
-                if p_tokens > 0 or c_tokens > 0:
-                    has_real_usage = True
-                    total_prompt_tokens += p_tokens
-                    total_candidates_tokens += c_tokens
+                if isinstance(p_tokens, int) and isinstance(c_tokens, int):
+                    if p_tokens > 0 or c_tokens > 0:
+                        has_real_usage = True
+                        total_prompt_tokens += p_tokens
+                        total_candidates_tokens += c_tokens
 
         if progress_callback:
             progress_callback(

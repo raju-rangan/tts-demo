@@ -198,8 +198,9 @@ NOTEBOOKLM CONVERSATIONAL ARCHITECTURE:
 3. Socratic Pushback & Debate: Hosts do NOT agree in a monotonous loop. Jane actively challenges assumptions ("Okay, I hear that statistic, but I kind of have to push back on the premise here..."), prompting Joe to defend the analysis with structural drivers.
 4. Asymmetrical Micro-Turns: Freely interleave rapid-fire, natural conversational interjections ("Oh wow.", "Right? Yeah.", "Wait, 58 percent?", "Yeah, 58 percent.", "Which is wild.", "It is.", "The plumbing, yeah.", "Exactly.") to create true conversational chemistry.
 5. Vivid Metaphors: Translate abstract technical mechanics into unforgettable mental images (e.g. nightclub bouncers, dumb vaults, eating lunch).
-6. Human Vocal Cues: Embed natural human expression markers: [laughs], [sighs], [chuckles], [pauses], [clears throat].
-7. Provocative Challenger Outro: End on an existential question that leaves the listener pondering, ending with an authentic sign-off ("Good luck in your meeting.").
+6. Human Vocal Cues (MANDATORY SQUARE BRACKETS): All spoken emotional reactions MUST strictly use square brackets: [laughs], [sighs], [chuckles], [pauses], [clears throat]. You MUST NEVER use parentheses () for vocal reactions.
+7. Co-Host Addressing: Co-hosts should naturally address each other by name (e.g. "Jane, imagine...", "Oh absolutely, Joe,...") across dialogue handoffs to establish strong conversational connection.
+8. Provocative Challenger Outro: End on an existential question that leaves the listener pondering, ending with an authentic sign-off ("Good luck in your meeting.").
 
 {COMMON_FINANCIAL_PRONUNCIATION_DIRECTIVES}
 """.strip(),
@@ -229,8 +230,9 @@ NOTEBOOKLM CONVERSATIONAL ARCHITECTURE:
 3. Socratic Pushback & Debate: Hosts do NOT agree in a monotonous loop. Alex actively challenges assumptions ("Wait, hold on, that sounds great in theory, but let's look at the balance sheet reality..."), prompting Joe to defend the analysis.
 4. Asymmetrical Micro-Turns: Freely interleave rapid-fire, natural conversational interjections ("Oh wow.", "Right? Yeah.", "Wait, really?", "Exactly.", "Which is wild.", "It is.") to create true conversational chemistry.
 5. Vivid Metaphors: Translate abstract technical mechanics into unforgettable mental images.
-6. Human Vocal Cues: Embed natural human expression markers: [laughs], [sighs], [chuckles], [pauses], [clears throat].
-7. Provocative Challenger Outro: End on an existential question that leaves the listener pondering, ending with an authentic sign-off ("Good luck in your meeting.").
+6. Human Vocal Cues (MANDATORY SQUARE BRACKETS): All spoken emotional reactions MUST strictly use square brackets: [laughs], [sighs], [chuckles], [pauses], [clears throat]. You MUST NEVER use parentheses () for vocal reactions.
+7. Co-Host Addressing: Co-hosts should naturally address each other by name (e.g. "Alex, look at...", "Right Joe,...") across dialogue handoffs to establish strong conversational connection.
+8. Provocative Challenger Outro: End on an existential question that leaves the listener pondering, ending with an authentic sign-off ("Good luck in your meeting.").
 
 {COMMON_FINANCIAL_PRONUNCIATION_DIRECTIVES}
 """.strip(),
@@ -260,8 +262,9 @@ NOTEBOOKLM CONVERSATIONAL ARCHITECTURE:
 3. Socratic Pushback & Debate: Hosts do NOT agree in a monotonous loop. Maya actively pushes back ("I hear that statistic, but I kind of have to challenge the human element here..."), prompting Jane to defend the thesis.
 4. Asymmetrical Micro-Turns: Freely interleave rapid-fire, natural conversational interjections ("Oh wow.", "Right? Yeah.", "Wait, 58 percent?", "Yeah, 58 percent.", "Which is wild.", "It is.", "The plumbing, yeah.") to create true conversational chemistry.
 5. Vivid Metaphors: Translate abstract technical mechanics into unforgettable mental images.
-6. Human Vocal Cues: Embed natural human expression markers: [laughs], [sighs], [chuckles], [pauses], [clears throat].
-7. Provocative Challenger Outro: End on an existential question that leaves the listener pondering, ending with an authentic sign-off ("Good luck in your meeting.").
+6. Human Vocal Cues (MANDATORY SQUARE BRACKETS): All spoken emotional reactions MUST strictly use square brackets: [laughs], [sighs], [chuckles], [pauses], [clears throat]. You MUST NEVER use parentheses () for vocal reactions.
+7. Co-Host Addressing: Co-hosts should naturally address each other by name (e.g. "Maya, imagine...", "Well Jane,...") across dialogue handoffs to establish strong conversational connection.
+8. Provocative Challenger Outro: End on an existential question that leaves the listener pondering, ending with an authentic sign-off ("Good luck in your meeting.").
 
 {COMMON_FINANCIAL_PRONUNCIATION_DIRECTIVES}
 """.strip(),
