@@ -720,6 +720,11 @@ def test_generate_podcast_script_10min_and_research():
         assert "~10 MINUTES" in prompt
         assert "1400 to 1700 total spoken words" in prompt
         assert "40 to 55 dynamic dialogue turns" in prompt
+        assert "NOTEBOOKLM 5-ACT NARRATIVE STORY ARC" in prompt
+        assert "THE DRAMATIC SCENARIO COLD OPEN & LISTENER ALIGNMENT" in prompt
+        assert "SOCRATIC FRICTION (MANDATORY)" in prompt
+        assert "VIVID METAPHORS (MANDATORY)" in prompt
+        assert "THE CHALLENGER OUTRO & PROVOCATIVE TAKEAWAY" in prompt
         assert "HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL)" in prompt
         assert "[laughs]" in prompt
         assert "[sighs]" in prompt

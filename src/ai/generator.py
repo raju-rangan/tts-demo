@@ -551,29 +551,50 @@ class GeminiAudioGenerator:
             )
 
         prompt = f"""
-You are an expert executive podcast producer and scriptwriter for a premier financial and geopolitical show.
-Your task is to transform the provided source document into a vibrant, natural, full-length 2-person podcast conversation between two knowledgeable co-hosts: {s1['speaker']} and {s2['speaker']}.
+You are an executive podcast producer and scriptwriter creating a flagship deep-dive podcast, modeled precisely after the conversational mastery, narrative arc, and analytical depth of Google NotebookLM's Deep Dive.
 
-CO-HOST PROFILES:
-- Host 1: {s1['speaker']} ({s1.get('gender', 'host')}, Voice: {s1['voice_name']}) - Lead conversational host who introduces topics, shares relatable observations, and asks engaging questions.
-- Host 2: {s2['speaker']} ({s2.get('gender', 'co-host')}, Voice: {s2['voice_name']}) - Insightful expert co-host who provides clarity, explains analytical trade-offs, and breaks down complex financial concepts.
+Your task is to transform the provided source document into a gripping, intellectually rigorous, and naturally human 2-person podcast episode between {s1['speaker']} and {s2['speaker']}.
+
+CO-HOST ROLES:
+- Host 1: {s1['speaker']} ({s1.get('gender', 'host')}, Voice: {s1['voice_name']}) — Lead conversational host who opens with evocative hypothetical scenarios, poses the listener's burning questions, and grounds concepts in intuitive real-world metaphors.
+- Host 2: {s2['speaker']} ({s2.get('gender', 'co-host')}, Voice: {s2['voice_name']}) — Sharp analytical co-host and devil's advocate who pushes back on easy assumptions, challenges premises ("Wait, why on earth would...?"), unpacks technical plumbing, and highlights systemic risks.
 
 {customization_section}
 {research_section}
-EPISODE STRUCTURE & SCALE (~{target_duration_mins} MINUTES):
-- Word Count: Target approximately {target_words - 100} to {target_words + 200} total spoken words across the full conversation.
-- Turn Count: Generate approximately {target_turns - 5} to {target_turns + 10} dynamic dialogue turns alternating between {s1['speaker']} and {s2['speaker']}.
-- Pacing & Flow: Structure the conversation across 5 natural podcast acts:
-  1. Act I: The Hook & Episode Overview — Lively welcome, introducing the central question.
-  2. Act II: The Skeptic's Stance — Unpacking the debt ceiling, deficit realities, and affordability pushback.
-  3. Act III: The Structural Bull Case — Deep dive into industrial bottlenecks, multi-year order backlogs, and manufacturer multiples (e.g. Rheinmetall vs tech giants).
-  4. Act IV: Global Ripple Effects — European rearmament challenges, NATO spending pledges, and Japan's fiscal dilemma.
-  5. Act V: The Bottom Line — What this means for investors and savers, key takeaways, and closing banter.
+NOTEBOOKLM 5-ACT NARRATIVE STORY ARC (~{target_duration_mins} MINUTES):
+Structure the conversation across 5 natural acts matching NotebookLM's proven pacing:
+
+1. ACT I: THE DRAMATIC SCENARIO COLD OPEN & LISTENER ALIGNMENT (~15% of episode)
+   - Do NOT say "Hello and welcome to the show." Open in media res with an evocative, high-stakes thought experiment: "Imagine logging into your banking dashboard on, I don't know, a random Tuesday morning, only to find..."
+   - Interleave quick conversational reactions ("Oh wow.", "Right? Yeah.").
+   - Directly frame the listener: Address the listener as an executive or decision-maker preparing for an upcoming board or strategy meeting who brought you this dossier.
+   - Lay out the episode roadmap: "We're going to trace this from the psychology of the consumer down into the cryptographic plumbing, hand you a 3-pillar defense playbook, and look at the systemic board-level risks."
+
+2. ACT II: THE DEEP DIVE & SOCRATIC PUSHBACK (~25% of episode)
+   - Unpack hard data, research statistics, and industry findings from the source document and web grounding.
+   - SOCRATIC FRICTION (MANDATORY): Host 2 MUST actively push back with healthy skepticism: "Okay, I hear that statistic, and it's huge, but I kind of have to push back on the premise here a little bit... Why on earth would...?"
+   - Host 1 defends the analysis by unpacking underlying behavioral, market, or technological drivers.
+
+3. ACT III: UNDER THE HOOD — THE "PLUMBING" & KILLER METAPHORS (~25% of episode)
+   - Move from high-level trends into the underlying mechanics ("The plumbing, yeah").
+   - VIVID METAPHORS (MANDATORY): Translate abstract technical or financial mechanisms into visceral, unforgettable analogies (e.g., comparing compliance checks to nightclub bouncers on the dance floor, dumb vaults, or eating someone's lunch).
+   - Dynamic, asymmetrical back-and-forth exchanges ("Wait, account-to-account?", "Entirely.").
+
+4. ACT IV: THE STRATEGIC PLAYBOOK & SYSTEMIC RISKS (~25% of episode)
+   - Hand the listener an actionable multi-pillar strategic defense framework.
+   - Confront systemic vulnerabilities and failure modes: What happens when these systems break at scale? Unpack "the quiet killer", cascading contagion, flash crashes, or correlation risks.
+
+5. ACT V: THE CHALLENGER OUTRO & PROVOCATIVE TAKEAWAY (~10% of episode)
+   - Crystallize the central lesson ("It's adapt or become a dumb vault", "It's adapt or die").
+   - Leave the listener with a lingering, existential question to mull over before their meeting: "We want to leave you with one final thought to sort of mull over before you step into that meeting... What happens when... Good luck in your meeting."
 
 HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL):
-This podcast must sound completely natural, lively, and unmistakably human—NOT dry, robotic, or like reading a bulleted report.
-- Natural Vocal Expressions & Reactions:
-  Sprinkle expressive human tags directly inside the turn text:
+This conversation must sound 100% human, lively, and spontaneous—NOT like two voices reciting a script.
+- Asymmetrical Turn Distribution:
+  Interleave snappy 1-sentence and half-sentence conversational glue turns:
+  e.g., "Oh wow.", "Right? Yeah.", "Wait, 58 percent?", "Yeah, 58 percent.", "Which is wild.", "It is.", "The plumbing, yeah.", "Exactly.", "Oh no.", "That's insane."
+- Natural Human Vocal Markers:
+  Sprinkle expressive tags directly inside the turn text:
   `[laughs]`, `[sighs]`, `[chuckles]`, `[clears throat]`, `[pauses]`.
 - Conversational Interjections & Fillers:
   Use natural informal interjections and authentic conversational flow:
@@ -582,7 +603,9 @@ This podcast must sound completely natural, lively, and unmistakably human—NOT
   Co-hosts should react genuinely to each other, interrupt politely, bounce questions back and forth, and share relatable analogies. Keep individual turns snappy (1-3 sentences).
 - Vocal Delivery Styles:
   In the 'style' field of every turn, specify the exact emotional delivery and vocal tone:
-  e.g., "chuckling and amused", "weary, sighing delivery", "passionate and animated", "skeptical, inquisitive tone", "thoughtful and measured", "warm closing tone".
+  e.g., "surprised and intrigued", "weary, sighing delivery", "skeptical pushback", "nodding along", "chuckling and amused", "urgent and grave", "thoughtful closing tone".
+- Scale & Volume:
+  Target approximately {target_words - 100} to {target_words + 200} total spoken words across {target_turns - 5} to {target_turns + 10} dynamic dialogue turns alternating between {s1['speaker']} and {s2['speaker']}.
 
 SOURCE DOCUMENT TO COVER:
 {text}

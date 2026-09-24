@@ -238,7 +238,7 @@
     function loadSamplePodcastDirectives() {
       const voiceCust = document.getElementById('inputVoiceCustomization');
       if (voiceCust) {
-        voiceCust.value = "Have the hosts break down the trade-offs between liquid high-yield savings and locked-in CD yields. Host 1 should ask relatable customer questions about emergency fund access, while Host 2 explains rate protection and penalties in an engaging, approachable style.";
+        voiceCust.value = "Follow the NotebookLM style: open with an evocative thought-experiment ('Imagine logging into your banking dashboard on a random Tuesday...'), have Host 2 push back with healthy skepticism, use vivid real-world analogies (nightclub bouncer, dumb vault), and end with a provocative cliffhanger question for the executive listener.";
       }
     }
 
