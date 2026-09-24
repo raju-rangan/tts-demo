@@ -622,7 +622,7 @@ class GeminiAudioGenerator:
         logger.info(f"▶ {job_label}Generating {target_duration_mins}-min podcast script for persona '{persona.name}' using model '{self.podcast_script_model}'...")
 
         speakers = persona.speakers or (
-            {"speaker": "Joe", "voice_name": "Puck", "gender": "male", "role": "Host"},
+            {"speaker": "Joe", "voice_name": "Enceladus", "gender": "male", "role": "Host"},
             {"speaker": "Jane", "voice_name": "Kore", "gender": "female", "role": "Co-host"},
         )
         s1 = speakers[0]
@@ -675,13 +675,13 @@ class GeminiAudioGenerator:
             )
 
         prompt = f"""
-You are the scriptwriter and producer for a lively, lighthearted, entertaining, and highly engaging 2-person podcast, modeled after the spontaneous human chemistry and natural flow of Google NotebookLM's Deep Dive.
+You are the scriptwriter and producer for a lively, impromptu, fast-paced, and highly engaging 2-person podcast, modeled after the spontaneous human chemistry and natural flow of Google NotebookLM's Deep Dive.
 
 Your task is to transform the provided source document into a fun, relatable, and authentic conversation between two good friends and co-hosts: {s1['speaker']} and {s2['speaker']}.
 
 CO-HOST ROLES:
 - Host 1: {s1['speaker']} ({s1.get('gender', 'host')}, Voice: {s1['voice_name']}) — Enthusiastic, curious, relatable host who hooks the listener with funny hypotheticals, asks piercing questions, and grounds ideas in everyday analogies.
-- Host 2: {s2['speaker']} ({s2.get('gender', 'co-host')}, Voice: {s2['voice_name']}) — Warm, amused, quick-witted partner who laughs easily, playfully pushes back on assumptions with common sense, and brings practical takeaways with a smile.
+- Host 2: {s2['speaker']} ({s2.get('gender', 'co-host')}, Voice: {s2['voice_name']}) — Warm, quick-witted partner who playfully pushes back on assumptions with common sense, and brings practical takeaways with clarity.
 
 {customization_section}
 {research_section}
@@ -689,43 +689,47 @@ NOTEBOOKLM 5-ACT NARRATIVE STORY ARC (~{target_duration_mins} MINUTES):
 Structure the conversation across 5 natural, entertaining acts:
 
 1. ACT I: THE FUN HOOK & "WAIT, DID YOU SEE THIS?" COLD OPEN (~15% of episode)
-   - Do NOT say "Hello and welcome to the show." Open in media res with an evocative thought experiment or wild observation: "Imagine checking your account on, I don't know, a random Tuesday, only to find..."
-   - Interleave quick conversational reactions ("Oh wow.", "Right? [laughs] Yeah.").
+   - Do NOT say "Hello and welcome to the show." NEVER open turn 1 with laughter or sighs. Open directly in media res with an evocative thought experiment or wild observation: "Imagine checking your account on, I don't know, a random Tuesday, only to find..."
+   - Interleave quick conversational reactions ("Oh wow.", "Right? Yeah.").
    - Directly frame the listener: Bring the listener into the conversation like a curious friend joining a fascinating discussion over coffee.
 
 2. ACT II: UNPACKING THE STORY WITH FUN ANALOGIES (~25% of episode)
    - Unpack the key facts, research findings, and numbers from the source document and web grounding.
    - VIVID, RELATABLE METAPHORS: Compare complex financial mechanics to everyday situations (e.g. Costco parking on a Saturday, gym memberships nobody cancels, or ordering coffee).
-   - Co-hosts react with genuine curiosity and humor.
+   - Co-hosts react with genuine curiosity and engagement.
 
 3. ACT III: THE PLAYFUL REALITY CHECK & BANTER (~25% of episode)
-   - Host 2 playfully pushes back with healthy skepticism and a laugh: "[laughs] Okay, but hold on {s1['speaker']}! Is that really how it plays out in the real world? Because if people actually tried that..."
+   - Host 2 playfully pushes back with healthy skepticism: "Okay, but hold on {s1['speaker']}! Is that really how it plays out in the real world? Because if people actually tried that..."
    - Dynamic, snappy back-and-forth exchanges ("Wait, seriously?", "Exactly!", "Which is wild.", "It really is.").
 
 4. ACT IV: PRACTICAL "SO WHAT DOES THIS MEAN FOR YOU?" TAKEAWAYS (~25% of episode)
    - Translate the big picture into actionable, relatable advice for everyday savers, investors, and listeners.
    - Focus on practical common sense, clear options, and smart habits.
 
-5. ACT V: THE LAUGHING WRAP-UP & PROVOCATIVE FOOD FOR THOUGHT (~10% of episode)
-   - Summarize the main takeaway with a warm, shared laugh.
+5. ACT V: THE WRAP-UP & PROVOCATIVE FOOD FOR THOUGHT (~10% of episode)
+   - Summarize the main takeaway with warmth and clarity.
    - Leave the listener with a thought-provoking, fun question to chew on, and an authentic casual sign-off ("Good luck out there!", "Catch you on the next one!").
 
 HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL):
-This conversation must sound 100% human, lively, and spontaneous—NOT like a formal corporate lecture or dry banking policy.
-- MANDATORY VOCAL EXPRESSION SYNTAX RULE:
-  All human vocal and emotional reactions inside dialogue text MUST strictly use SQUARE BRACKETS:
-  `[laughs]`, `[sighs]`, `[chuckles]`, `[clears throat]`, `[pauses]`.
-  You MUST NEVER use parentheses `(...)` for emotional expressions inside dialogue lines.
+This conversation must sound 100% human, lively, and spontaneous—NOT like a formal corporate lecture, and NOT like an over-rehearsed or exaggerated cartoon.
+- FAST PACING & BRISK MOMENTUM:
+  Keep the tempo nimble, brisk, and energetic. Co-hosts trade snappy thoughts without dragging, over-explaining, or awkward dead air.
+- STRICT RESTRAINT ON VOCAL EXPRESSIONS (CUT UNNECESSARY LAUGHS):
+  * DO NOT overdo laughter or sighing. Authentic impromptu discussions do NOT have laughing in every sentence.
+  * Maximum 2 to 3 total expressions (`[laughs]` or `[chuckles]`) across the ENTIRE episode, reserved strictly for moments where a genuinely witty punchline or absurd statistic occurs.
+  * NEVER open the podcast, episode, or turn 1 with laughter or sighs.
+  * If in doubt, err on the side of caution and cut the expression out completely. Most turns should simply have natural spoken delivery without any bracketed cues.
+  * All vocal cues MUST strictly use SQUARE BRACKETS: `[laughs]`, `[sighs]`, `[chuckles]`, `[pauses]`. You MUST NEVER use parentheses `(...)` for emotional expressions inside dialogue lines.
 - CO-HOST ADDRESSING & RAPPORT:
-  Co-hosts MUST naturally address each other by name (e.g. "{s2['speaker']}, imagine...", "Oh absolutely, {s1['speaker']} [laughs]...", "What do you think, {s2['speaker']}?", "Well {s1['speaker']}, look at it this way...") across dialogue handoffs.
+  Co-hosts MUST naturally address each other by name (e.g. "{s2['speaker']}, imagine...", "Oh absolutely, {s1['speaker']}...", "What do you think, {s2['speaker']}?", "Well {s1['speaker']}, look at it this way...") across dialogue handoffs.
 - Asymmetrical Micro-Turns:
   Interleave snappy 1-sentence and half-sentence conversational glue turns:
-  e.g., "Oh wow.", "Right? Yeah.", "Wait, really?", "Yeah, exactly.", "Which is wild.", "It is.", "Totally.", "Oh no [laughs].", "That's insane."
+  e.g., "Oh wow.", "Right? Yeah.", "Wait, really?", "Yeah, exactly.", "Which is wild.", "It is.", "Totally.", "That's insane."
 - Natural Fillers & Informal Flow:
-  Use natural informal interjections: "Haha, wow", "Wait, seriously?", "Ugh, tell me about it", "Look...", "Hah!", "You know what’s wild?", "Right?! Exactly."
+  Use natural informal interjections: "Wait, seriously?", "Ugh, tell me about it", "Look...", "You know what’s wild?", "Right?! Exactly."
 - Vocal Delivery Styles:
-  In the 'style' field of every turn, specify an expressive, light, and engaging vocal tone:
-  e.g., "cheerful and enthusiastic", "amused and conversational", "playful skepticism with a chuckle", "warm and relatable", "laughing and expressive", "curious and upbeat".
+  In the 'style' field of every turn, specify a brisk, natural, and engaging vocal tone:
+  e.g., "brisk and enthusiastic", "quick and conversational", "playful skepticism", "warm and relatable", "curious and upbeat".
   NEVER use dry, clinical labels like "analytical and measured", "formal", or "flat".
 - Scale & Volume:
   Target approximately {target_words - 100} to {target_words + 200} total spoken words across {target_turns - 5} to {target_turns + 10} dynamic dialogue turns alternating between {s1['speaker']} and {s2['speaker']}.
@@ -779,7 +783,7 @@ SOURCE DOCUMENT TO COVER:
         multi_speaker_voice_config and speech_metadata on parts.
         """
         speakers = persona.speakers or (
-            {"speaker": "Joe", "voice_name": "Puck", "gender": "male", "role": "Host"},
+            {"speaker": "Joe", "voice_name": "Enceladus", "gender": "male", "role": "Host"},
             {"speaker": "Jane", "voice_name": "Kore", "gender": "female", "role": "Co-host"},
         )
         # Ensure strict speaker alternation and persona alignment across all turns
@@ -803,59 +807,14 @@ SOURCE DOCUMENT TO COVER:
             speaker_map["host 2"] = speakers[1]["speaker"]
             speaker_map["co-host"] = speakers[1]["speaker"]
 
-        # Build content parts with text and speech_metadata directly from all dialogue turns
-        parts = []
-        for turn in script.turns:
-            clean_turn_text = re.sub(
-                r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
-                r"[\1]",
-                turn.text,
-                flags=re.IGNORECASE
-            )
-            matched_speaker = speaker_map.get(turn.speaker.lower(), turn.speaker)
-
-            # Logic 1: Dynamic expressive podcast style determination
-            raw_style = (turn.style or "").strip().lower()
-            clean_lower = clean_turn_text.lower()
-
-            # Emotional vocal cue detection
-            if "[laughs]" in clean_turn_text or "[chuckles]" in clean_turn_text or "haha" in clean_lower:
-                turn_style = "cheerful, amused, animated podcast delivery with genuine audible laughter"
-            elif "[sighs]" in clean_turn_text:
-                turn_style = "expressive, playful sigh, relatable and warm delivery"
-            elif "[pauses]" in clean_turn_text:
-                turn_style = "thoughtful, engaging, dynamic conversational pacing"
-            # Strip out any formal/dry legacy styles
-            elif any(dry in raw_style for dry in ("measured", "analytical", "serious", "formal", "dry", "flat", "cautious")):
-                turn_style = "lighthearted, warm, and engaging conversational podcast banter"
-            elif turn.style and turn.style.strip():
-                turn_style = f"lively podcast conversation, {turn.style.strip()}"
-            else:
-                turn_style = "warm, expressive, light and friendly conversational tone"
-
-            # Pacing adjustment
-            if abs(speed - 1.0) >= 0.05:
-                if speed < 0.95:
-                    turn_style += ", relaxed and easygoing pacing"
-                elif speed > 1.05:
-                    turn_style += ", brisk, energetic, and upbeat pacing"
-
-            # Incorporate user-specified Director's Notes / Voice Customization
-            if voice_customization and voice_customization.strip():
-                turn_style += f", {voice_customization.strip()}"
-
-            parts.append({
-                "text": clean_turn_text,
-                "speech_metadata": {
-                    "speaker": matched_speaker,
-                    "style": turn_style,
-                }
-            })
-
-        contents = [{
-            "role": "user",
-            "parts": parts,
-        }]
+        # Safe chapter chunking: Group turns into natural chapters of up to 14 turns (~3 to 3.5 mins each).
+        # Prevents Gemini neural vocoder exposure drift, metallic ringing, and amplitude decay on tracks > 4.5 mins.
+        chapter_size = 14
+        chapters = [script.turns[i:i + chapter_size] for i in range(0, total_turns, chapter_size)]
+        pcm_segments = []
+        total_prompt_tokens = 0
+        total_candidates_tokens = 0
+        has_real_usage = False
 
         speech_config = types.SpeechConfig(
             multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
@@ -879,37 +838,115 @@ SOURCE DOCUMENT TO COVER:
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
         )
 
-        max_attempts = 2
-        raw_audio = None
-        usage = None
-        for attempt in range(1, max_attempts + 1):
-            try:
-                response = self.client.models.generate_content(
-                    model=self.multi_speaker_model,
-                    contents=contents,
-                    config=config
+        for chapter_idx, chapter in enumerate(chapters, start=1):
+            if len(chapters) > 1 and progress_callback:
+                progress_callback(
+                    stage="SYNTHESIZING",
+                    message=f"Synthesizing podcast chapter {chapter_idx}/{len(chapters)} ({len(chapter)} turns)...",
+                    current_turn=chapter_idx,
+                    total_turns=len(chapters)
                 )
-                raw_audio, _ = self._extract_audio_from_response(response)
-                usage = getattr(response, "usage_metadata", None)
-                break
-            except Exception as e:
-                if attempt < max_attempts:
-                    logger.warning(f"Multi-speaker generate_content attempt {attempt}/{max_attempts} failed: {e}. Retrying in 3s...")
-                    time.sleep(3.0)
-                else:
-                    logger.error(f"Multi-speaker generate_content failed after {max_attempts} attempts: {e}", exc_info=True)
-                    raise RuntimeError(f"Could not generate multi-speaker audio using model '{self.multi_speaker_model}': {e}")
 
-        # Check if returned audio is a WAV container (starts with RIFF) or raw PCM
-        if raw_audio.startswith(b"RIFF"):
-            try:
-                with wave.open(io.BytesIO(raw_audio), "rb") as wf:
-                    raw_pcm = wf.readframes(wf.getnframes())
-            except Exception as we:
-                logger.warning(f"Could not read WAV container from response: {we}, falling back to raw bytes")
-                raw_pcm = raw_audio[44:] if len(raw_audio) > 44 else raw_audio
-        else:
-            raw_pcm = raw_audio
+            # Build content parts with text and speech_metadata directly from chapter dialogue turns
+            parts = []
+            for turn in chapter:
+                clean_turn_text = re.sub(
+                    r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
+                    r"[\1]",
+                    turn.text,
+                    flags=re.IGNORECASE
+                )
+                matched_speaker = speaker_map.get(turn.speaker.lower(), turn.speaker)
+
+                # Logic 1: Dynamic expressive podcast style determination with brisk, lively tempo
+                raw_style = (turn.style or "").strip().lower()
+                clean_lower = clean_turn_text.lower()
+
+                # Emotional vocal cue detection (understated, natural nuance without cartoonish overemphasis)
+                if "[laughs]" in clean_turn_text or "[chuckles]" in clean_turn_text:
+                    turn_style = "natural, lively podcast delivery, lightly amused"
+                elif "[sighs]" in clean_turn_text:
+                    turn_style = "relatable and warm delivery, thoughtful tone"
+                elif "[pauses]" in clean_turn_text:
+                    turn_style = "brief pause, crisp and engaging conversational pacing"
+                # Strip out any formal/dry legacy styles
+                elif any(dry in raw_style for dry in ("measured", "analytical", "serious", "formal", "dry", "flat", "cautious")):
+                    turn_style = "brisk, engaging, natural conversational podcast banter, lively tempo"
+                elif turn.style and turn.style.strip():
+                    turn_style = f"brisk podcast conversation, {turn.style.strip()}"
+                else:
+                    turn_style = "brisk, engaging, natural conversational podcast delivery, lively tempo"
+
+                # Pacing adjustment: emphasize brisk, nimble tempo
+                if abs(speed - 1.0) >= 0.05:
+                    if speed < 0.95:
+                        turn_style += ", relaxed and easygoing pacing"
+                    elif speed > 1.05:
+                        turn_style += ", brisk, energetic, and rapid tempo"
+                else:
+                    turn_style += ", brisk and nimble pacing"
+
+                # Incorporate user-specified Director's Notes / Voice Customization
+                if voice_customization and voice_customization.strip():
+                    turn_style += f", {voice_customization.strip()}"
+
+                parts.append({
+                    "text": clean_turn_text,
+                    "speech_metadata": {
+                        "speaker": matched_speaker,
+                        "style": turn_style,
+                    }
+                })
+
+            contents = [{
+                "role": "user",
+                "parts": parts,
+            }]
+
+            max_attempts = 2
+            raw_audio = None
+            usage = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    response = self.client.models.generate_content(
+                        model=self.multi_speaker_model,
+                        contents=contents,
+                        config=config
+                    )
+                    raw_audio, _ = self._extract_audio_from_response(response)
+                    usage = getattr(response, "usage_metadata", None)
+                    break
+                except Exception as e:
+                    if attempt < max_attempts:
+                        logger.warning(f"Multi-speaker generate_content attempt {attempt}/{max_attempts} failed: {e}. Retrying in 3s...")
+                        time.sleep(3.0)
+                    else:
+                        logger.error(f"Multi-speaker generate_content failed after {max_attempts} attempts: {e}", exc_info=True)
+                        raise RuntimeError(f"Could not generate multi-speaker audio using model '{self.multi_speaker_model}': {e}")
+
+            # Check if returned audio is a WAV container (starts with RIFF) or raw PCM
+            if raw_audio.startswith(b"RIFF"):
+                try:
+                    with wave.open(io.BytesIO(raw_audio), "rb") as wf:
+                        raw_pcm = wf.readframes(wf.getnframes())
+                except Exception as we:
+                    logger.warning(f"Could not read WAV container from response: {we}, falling back to raw bytes")
+                    raw_pcm = raw_audio[44:] if len(raw_audio) > 44 else raw_audio
+            else:
+                raw_pcm = raw_audio
+
+            # Apply per-chapter DSP mastering (RMS leveling + raised-cosine micro-fades)
+            mastered_pcm = apply_micro_fades(normalize_chunk_rms(raw_pcm))
+            pcm_segments.append(mastered_pcm)
+
+            if usage:
+                p_tokens = getattr(usage, "prompt_token_count", 0) or 0
+                c_tokens = getattr(usage, "candidates_token_count", 0) or 0
+                if isinstance(p_tokens, int) and isinstance(c_tokens, int):
+                    if p_tokens > 0 or c_tokens > 0:
+                        has_real_usage = True
+                        total_prompt_tokens += p_tokens
+                        total_candidates_tokens += c_tokens
 
         if progress_callback:
             progress_callback(
@@ -919,10 +956,12 @@ SOURCE DOCUMENT TO COVER:
                 total_turns=total_turns
             )
 
-        # Apply DSP mastering (RMS leveling + raised-cosine micro-fades)
-        mastered_pcm = apply_micro_fades(normalize_chunk_rms(raw_pcm))
+        # Stitch chapters together with natural 300ms pause
+        pause_samples = int(settings.sample_rate * 0.3)
+        pause_bytes = b"\x00" * (pause_samples * 2)
+        full_pcm = pause_bytes.join(pcm_segments)
 
-        mp3_bytes, duration_sec = self._transcode_pcm_to_mp3(mastered_pcm, rate=settings.sample_rate)
+        mp3_bytes, duration_sec = self._transcode_pcm_to_mp3(full_pcm, rate=settings.sample_rate)
 
         total_prompt_tokens = 0
         total_candidates_tokens = 0
