@@ -114,10 +114,10 @@ def align_and_alternate_turns(
             flags=re.IGNORECASE
         )
 
-        # 5. Default style if missing
+        # 5. Default style if missing (light, conversational, expressive)
         turn_style = turn.style
         if not turn_style:
-            turn_style = "curious and energetic" if target_spk == host1_name else "analytical and measured"
+            turn_style = "cheerful and upbeat" if target_spk == host1_name else "warm and amused"
 
         aligned.append(PodcastTurn(
             speaker=target_spk,
@@ -131,8 +131,8 @@ def align_and_alternate_turns(
         other_host = host2_name if only_turn.speaker == host1_name else host1_name
         aligned.append(PodcastTurn(
             speaker=other_host,
-            text=f"[laughs] Absolutely, {only_turn.speaker}. That is a crucial insight for our listeners.",
-            style="analytical and measured"
+            text=f"[laughs] Absolutely, {only_turn.speaker}! That's such a great point for our listeners.",
+            style="warm and conversational"
         ))
 
     return aligned
@@ -675,63 +675,58 @@ class GeminiAudioGenerator:
             )
 
         prompt = f"""
-You are an executive podcast producer and scriptwriter creating a flagship deep-dive podcast, modeled precisely after the conversational mastery, narrative arc, and analytical depth of Google NotebookLM's Deep Dive.
+You are the scriptwriter and producer for a lively, lighthearted, entertaining, and highly engaging 2-person podcast, modeled after the spontaneous human chemistry and natural flow of Google NotebookLM's Deep Dive.
 
-Your task is to transform the provided source document into a gripping, intellectually rigorous, and naturally human 2-person podcast episode between {s1['speaker']} and {s2['speaker']}.
+Your task is to transform the provided source document into a fun, relatable, and authentic conversation between two good friends and co-hosts: {s1['speaker']} and {s2['speaker']}.
 
 CO-HOST ROLES:
-- Host 1: {s1['speaker']} ({s1.get('gender', 'host')}, Voice: {s1['voice_name']}) — Lead conversational host who opens with evocative hypothetical scenarios, poses the listener's burning questions, and grounds concepts in intuitive real-world metaphors.
-- Host 2: {s2['speaker']} ({s2.get('gender', 'co-host')}, Voice: {s2['voice_name']}) — Sharp analytical co-host and devil's advocate who pushes back on easy assumptions, challenges premises ("Wait, why on earth would...?"), unpacks technical plumbing, and highlights systemic risks.
+- Host 1: {s1['speaker']} ({s1.get('gender', 'host')}, Voice: {s1['voice_name']}) — Enthusiastic, curious, relatable host who hooks the listener with funny hypotheticals, asks piercing questions, and grounds ideas in everyday analogies.
+- Host 2: {s2['speaker']} ({s2.get('gender', 'co-host')}, Voice: {s2['voice_name']}) — Warm, amused, quick-witted partner who laughs easily, playfully pushes back on assumptions with common sense, and brings practical takeaways with a smile.
 
 {customization_section}
 {research_section}
 NOTEBOOKLM 5-ACT NARRATIVE STORY ARC (~{target_duration_mins} MINUTES):
-Structure the conversation across 5 natural acts matching NotebookLM's proven pacing:
+Structure the conversation across 5 natural, entertaining acts:
 
-1. ACT I: THE DRAMATIC SCENARIO COLD OPEN & LISTENER ALIGNMENT (~15% of episode)
-   - Do NOT say "Hello and welcome to the show." Open in media res with an evocative, high-stakes thought experiment: "Imagine logging into your banking dashboard on, I don't know, a random Tuesday morning, only to find..."
-   - Interleave quick conversational reactions ("Oh wow.", "Right? Yeah.").
-   - Directly frame the listener: Address the listener as an executive or decision-maker preparing for an upcoming board or strategy meeting who brought you this dossier.
-   - Lay out the episode roadmap: "We're going to trace this from the psychology of the consumer down into the cryptographic plumbing, hand you a 3-pillar defense playbook, and look at the systemic board-level risks."
+1. ACT I: THE FUN HOOK & "WAIT, DID YOU SEE THIS?" COLD OPEN (~15% of episode)
+   - Do NOT say "Hello and welcome to the show." Open in media res with an evocative thought experiment or wild observation: "Imagine checking your account on, I don't know, a random Tuesday, only to find..."
+   - Interleave quick conversational reactions ("Oh wow.", "Right? [laughs] Yeah.").
+   - Directly frame the listener: Bring the listener into the conversation like a curious friend joining a fascinating discussion over coffee.
 
-2. ACT II: THE DEEP DIVE & SOCRATIC PUSHBACK (~25% of episode)
-   - Unpack hard data, research statistics, and industry findings from the source document and web grounding.
-   - SOCRATIC FRICTION (MANDATORY): Host 2 MUST actively push back with healthy skepticism: "Okay, I hear that statistic, and it's huge, but I kind of have to push back on the premise here a little bit... Why on earth would...?"
-   - Host 1 defends the analysis by unpacking underlying behavioral, market, or technological drivers.
+2. ACT II: UNPACKING THE STORY WITH FUN ANALOGIES (~25% of episode)
+   - Unpack the key facts, research findings, and numbers from the source document and web grounding.
+   - VIVID, RELATABLE METAPHORS: Compare complex financial mechanics to everyday situations (e.g. Costco parking on a Saturday, gym memberships nobody cancels, or ordering coffee).
+   - Co-hosts react with genuine curiosity and humor.
 
-3. ACT III: UNDER THE HOOD — THE "PLUMBING" & KILLER METAPHORS (~25% of episode)
-   - Move from high-level trends into the underlying mechanics ("The plumbing, yeah").
-   - VIVID METAPHORS (MANDATORY): Translate abstract technical or financial mechanisms into visceral, unforgettable analogies (e.g., comparing compliance checks to nightclub bouncers on the dance floor, dumb vaults, or eating someone's lunch).
-   - Dynamic, asymmetrical back-and-forth exchanges ("Wait, account-to-account?", "Entirely.").
+3. ACT III: THE PLAYFUL REALITY CHECK & BANTER (~25% of episode)
+   - Host 2 playfully pushes back with healthy skepticism and a laugh: "[laughs] Okay, but hold on {s1['speaker']}! Is that really how it plays out in the real world? Because if people actually tried that..."
+   - Dynamic, snappy back-and-forth exchanges ("Wait, seriously?", "Exactly!", "Which is wild.", "It really is.").
 
-4. ACT IV: THE STRATEGIC PLAYBOOK & SYSTEMIC RISKS (~25% of episode)
-   - Hand the listener an actionable multi-pillar strategic defense framework.
-   - Confront systemic vulnerabilities and failure modes: What happens when these systems break at scale? Unpack "the quiet killer", cascading contagion, flash crashes, or correlation risks.
+4. ACT IV: PRACTICAL "SO WHAT DOES THIS MEAN FOR YOU?" TAKEAWAYS (~25% of episode)
+   - Translate the big picture into actionable, relatable advice for everyday savers, investors, and listeners.
+   - Focus on practical common sense, clear options, and smart habits.
 
-5. ACT V: THE CHALLENGER OUTRO & PROVOCATIVE TAKEAWAY (~10% of episode)
-   - Crystallize the central lesson ("It's adapt or become a dumb vault", "It's adapt or die").
-   - Leave the listener with a lingering, existential question to mull over before their meeting: "We want to leave you with one final thought to sort of mull over before you step into that meeting... What happens when... Good luck in your meeting."
+5. ACT V: THE LAUGHING WRAP-UP & PROVOCATIVE FOOD FOR THOUGHT (~10% of episode)
+   - Summarize the main takeaway with a warm, shared laugh.
+   - Leave the listener with a thought-provoking, fun question to chew on, and an authentic casual sign-off ("Good luck out there!", "Catch you on the next one!").
 
 HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL):
-This conversation must sound 100% human, lively, and spontaneous—NOT like two voices reciting a script.
+This conversation must sound 100% human, lively, and spontaneous—NOT like a formal corporate lecture or dry banking policy.
 - MANDATORY VOCAL EXPRESSION SYNTAX RULE:
   All human vocal and emotional reactions inside dialogue text MUST strictly use SQUARE BRACKETS:
   `[laughs]`, `[sighs]`, `[chuckles]`, `[clears throat]`, `[pauses]`.
-  You MUST NEVER use parentheses `(...)` for emotional expressions inside dialogue lines. Parentheses are exclusively reserved for the delivery style descriptor in markdown representations.
-- CO-HOST ADDRESSING & DEMARCATION:
-  Co-hosts MUST naturally address each other by name (e.g. "{s2['speaker']}, imagine...", "Oh absolutely, {s1['speaker']}, you'd get laughed...", "What do you think, {s2['speaker']}?", "Well {s1['speaker']}, look at the plumbing...") across dialogue handoffs.
-  This authentic conversational addressing is vital for listeners and anchors distinct voice profiles in speech synthesis.
-- Asymmetrical Turn Distribution:
+  You MUST NEVER use parentheses `(...)` for emotional expressions inside dialogue lines.
+- CO-HOST ADDRESSING & RAPPORT:
+  Co-hosts MUST naturally address each other by name (e.g. "{s2['speaker']}, imagine...", "Oh absolutely, {s1['speaker']} [laughs]...", "What do you think, {s2['speaker']}?", "Well {s1['speaker']}, look at it this way...") across dialogue handoffs.
+- Asymmetrical Micro-Turns:
   Interleave snappy 1-sentence and half-sentence conversational glue turns:
-  e.g., "Oh wow.", "Right? Yeah.", "Wait, 58 percent?", "Yeah, 58 percent.", "Which is wild.", "It is.", "The plumbing, yeah.", "Exactly.", "Oh no.", "That's insane."
-- Conversational Interjections & Fillers:
-  Use natural informal interjections and authentic conversational flow:
-  e.g., "Haha, wow", "Wait, seriously?", "Ugh, tell me about it", "Look...", "Hah!", "You know what’s wild?", "Right?! Exactly.", "Hmm, that's a tough pill to swallow."
-- Chemistry & Banter:
-  Co-hosts should react genuinely to each other, interrupt politely, bounce questions back and forth, and share relatable analogies. Keep individual turns snappy (1-3 sentences).
+  e.g., "Oh wow.", "Right? Yeah.", "Wait, really?", "Yeah, exactly.", "Which is wild.", "It is.", "Totally.", "Oh no [laughs].", "That's insane."
+- Natural Fillers & Informal Flow:
+  Use natural informal interjections: "Haha, wow", "Wait, seriously?", "Ugh, tell me about it", "Look...", "Hah!", "You know what’s wild?", "Right?! Exactly."
 - Vocal Delivery Styles:
-  In the 'style' field of every turn, specify the exact emotional delivery and vocal tone:
-  e.g., "surprised and intrigued", "skeptical pushback", "amused and conversational", "analytical and measured", "urgent and grave", "thoughtful closing tone".
+  In the 'style' field of every turn, specify an expressive, light, and engaging vocal tone:
+  e.g., "cheerful and enthusiastic", "amused and conversational", "playful skepticism with a chuckle", "warm and relatable", "laughing and expressive", "curious and upbeat".
+  NEVER use dry, clinical labels like "analytical and measured", "formal", or "flat".
 - Scale & Volume:
   Target approximately {target_words - 100} to {target_words + 200} total spoken words across {target_turns - 5} to {target_turns + 10} dynamic dialogue turns alternating between {s1['speaker']} and {s2['speaker']}.
 
