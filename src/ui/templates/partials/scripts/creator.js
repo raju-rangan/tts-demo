@@ -132,14 +132,14 @@
 
     const PODCAST_PERSONA_COHOSTS = {
       'Podcast: Co-Hosts (Man & Woman)': {
-        host1: 'Joe', voice1: 'Puck',
+        host1: 'Joe', voice1: 'Enceladus',
         host2: 'Jane', voice2: 'Kore',
-        label: 'Co-Hosts: Joe (Puck) & Jane (Kore)'
+        label: 'Co-Hosts: Joe (Enceladus) & Jane (Kore)'
       },
       'Podcast: Co-Hosts (Man & Man)': {
-        host1: 'Joe', voice1: 'Puck',
+        host1: 'Joe', voice1: 'Enceladus',
         host2: 'Alex', voice2: 'Charon',
-        label: 'Co-Hosts: Joe (Puck) & Alex (Charon)'
+        label: 'Co-Hosts: Joe (Enceladus) & Alex (Charon)'
       },
       'Podcast: Co-Hosts (Woman & Woman)': {
         host1: 'Jane', voice1: 'Kore',

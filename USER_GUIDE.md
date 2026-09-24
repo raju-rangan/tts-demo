@@ -108,7 +108,7 @@ On the right side of the studio dashboard, select the voice persona that matches
 | **1. Retail Banking Guide** | External Customers | `Sulafat` | Mortgage explainers, CD rate guides, retail branch FAQs |
 | **2. Wealth & Market Advisor** | External Customers | `Charon` | High-net-worth briefings, market analysis, equities advisories |
 | **3. Regulatory & Policy Officer** | Internal Employees | `Kore` | BSA/AML bulletins, KYC updates, compliance SOPs |
-| **4. Employee Enablement & Ops** | Internal Employees | `Puck` | Branch teller software guides, onboarding procedures |
+| **4. Employee Enablement & Ops** | Internal Employees | `Enceladus` | Branch teller software guides, onboarding procedures |
 | **5. Fraud & Security Alert** | Both (All Audiences) | `Schedar` | Phishing advisories, urgent fraud mitigation warnings |
 
 ### Custom Director Directives

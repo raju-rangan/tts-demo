@@ -465,8 +465,8 @@ def test_podcast_personas():
     from src.ai.personas import get_persona, PERSONAS
 
     podcast_personas = [
-        ("Podcast: Co-Hosts (Man & Woman)", ("Puck", "Kore"), ("male", "female")),
-        ("Podcast: Co-Hosts (Man & Man)", ("Puck", "Charon"), ("male", "male")),
+        ("Podcast: Co-Hosts (Man & Woman)", ("Enceladus", "Kore"), ("male", "female")),
+        ("Podcast: Co-Hosts (Man & Man)", ("Enceladus", "Charon"), ("male", "male")),
         ("Podcast: Co-Hosts (Woman & Woman)", ("Kore", "Sulafat"), ("female", "female")),
     ]
 
@@ -536,7 +536,7 @@ def test_podcast_script_generation():
     prompt = call_args["contents"]
     assert "Focus on the liquidity penalty and make Joe ask relatable questions." in prompt
     assert "Article text on HYSAs vs CDs." in prompt
-    assert "Host 1: Joe (male, Voice: Puck)" in prompt
+    assert "Host 1: Joe (male, Voice: Enceladus)" in prompt
     assert "Host 2: Jane (female, Voice: Kore)" in prompt
 
 
@@ -593,7 +593,7 @@ def test_multi_speaker_speech_synthesis_payload():
     speaker_configs = config.speech_config.multi_speaker_voice_config.speaker_voice_configs
     assert len(speaker_configs) == 2
     assert speaker_configs[0].speaker == "Joe"
-    assert speaker_configs[0].voice_config.prebuilt_voice_config.voice_name == "Puck"
+    assert speaker_configs[0].voice_config.prebuilt_voice_config.voice_name == "Enceladus"
     assert speaker_configs[1].speaker == "Jane"
     assert speaker_configs[1].voice_config.prebuilt_voice_config.voice_name == "Kore"
 
@@ -655,7 +655,7 @@ def test_parse_markdown_script_to_turns():
     from src.ai.generator import parse_markdown_script_to_turns
 
     default_speakers = [
-        {"speaker": "Joe", "voice_name": "Puck", "gender": "man"},
+        {"speaker": "Joe", "voice_name": "Enceladus", "gender": "man"},
         {"speaker": "Jane", "voice_name": "Kore", "gender": "woman"}
     ]
 
@@ -726,7 +726,7 @@ def test_generate_podcast_script_10min_and_research():
         assert "ACT II: UNPACKING THE STORY WITH FUN ANALOGIES" in prompt
         assert "ACT III: THE PLAYFUL REALITY CHECK & BANTER" in prompt
         assert "ACT IV: PRACTICAL" in prompt
-        assert "ACT V: THE LAUGHING WRAP-UP" in prompt
+        assert "ACT V: THE WRAP-UP" in prompt
         assert "HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL)" in prompt
         assert "[laughs]" in prompt
         assert "[sighs]" in prompt
@@ -984,13 +984,13 @@ def test_multi_speaker_dynamic_expressive_styling():
 
     # Turn 0: Contains [laughs] -> should trigger laughter style, relaxed pacing (speed 0.9), and voice customization
     style_turn_0 = parts[0]["speech_metadata"]["style"]
-    assert "cheerful, amused, animated podcast delivery with genuine audible laughter" in style_turn_0
+    assert "natural, lively podcast delivery, lightly amused" in style_turn_0
     assert "relaxed and easygoing pacing" in style_turn_0
     assert "Laugh warmly and speak like old friends" in style_turn_0
 
     # Turn 1: Contains [sighs] -> should trigger expressive sigh style, relaxed pacing, and voice customization
     style_turn_1 = parts[1]["speech_metadata"]["style"]
-    assert "expressive, playful sigh, relatable and warm delivery" in style_turn_1
+    assert "relatable and warm delivery, thoughtful tone" in style_turn_1
     assert "relaxed and easygoing pacing" in style_turn_1
     assert "Laugh warmly and speak like old friends" in style_turn_1
 
