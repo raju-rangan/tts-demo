@@ -484,7 +484,8 @@ def test_podcast_personas():
         assert genders == expected_genders
 
         assert "CO-HOST PROFILES:" in p.system_instruction
-        assert "FINANCIAL PRONUNCIATION & TERMINOLOGY GUIDELINES:" in p.system_instruction
+        assert "VIBE & CONVERSATIONAL SPIRIT:" in p.system_instruction
+        assert "FINANCIAL PRONUNCIATION & TERMINOLOGY GUIDELINES:" not in p.system_instruction
 
 
 def test_podcast_script_generation():
@@ -721,10 +722,11 @@ def test_generate_podcast_script_10min_and_research():
         assert "1400 to 1700 total spoken words" in prompt
         assert "40 to 55 dynamic dialogue turns" in prompt
         assert "NOTEBOOKLM 5-ACT NARRATIVE STORY ARC" in prompt
-        assert "THE DRAMATIC SCENARIO COLD OPEN & LISTENER ALIGNMENT" in prompt
-        assert "SOCRATIC FRICTION (MANDATORY)" in prompt
-        assert "VIVID METAPHORS (MANDATORY)" in prompt
-        assert "THE CHALLENGER OUTRO & PROVOCATIVE TAKEAWAY" in prompt
+        assert "ACT I: THE FUN HOOK" in prompt
+        assert "ACT II: UNPACKING THE STORY WITH FUN ANALOGIES" in prompt
+        assert "ACT III: THE PLAYFUL REALITY CHECK & BANTER" in prompt
+        assert "ACT IV: PRACTICAL" in prompt
+        assert "ACT V: THE LAUGHING WRAP-UP" in prompt
         assert "HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL)" in prompt
         assert "[laughs]" in prompt
         assert "[sighs]" in prompt
@@ -794,11 +796,11 @@ def test_square_bracket_vocal_cue_normalization():
     assert "[chuckles]" in script.turns[1].text
     assert "(sighs)" not in script.turns[1].text
     # Jane omitted style -> fallback to expressive style
-    assert script.turns[1].style == "analytical and measured"
+    assert script.turns[1].style == "warm and amused"
 
     assert "[pauses]" in script.turns[2].text
     assert "(pauses)" not in script.turns[2].text
-    assert script.turns[2].style == "curious and energetic"
+    assert script.turns[2].style == "cheerful and upbeat"
 
 
 def test_multi_speaker_pairwise_turn_batching():
@@ -943,6 +945,61 @@ def test_persona_voice_remapping_cross_cohosts():
     res_ww = parse_markdown_script_to_turns(script_joe_jane, woman_woman_persona.speakers)
     speakers_ww = [t.speaker for t in res_ww.turns]
     assert speakers_ww == ["Jane", "Maya", "Jane", "Maya"]
+
+
+def test_multi_speaker_dynamic_expressive_styling():
+    """Verify _generate_multi_speaker_speech synthesizes expressive styles based on vocal cues and customization."""
+    from unittest.mock import MagicMock
+    from src.ai.generator import GeminiAudioGenerator, PodcastScript, PodcastTurn
+    from src.ai.personas import get_persona
+    import base64
+
+    gen = GeminiAudioGenerator()
+    mock_client = MagicMock()
+    gen._client = mock_client
+
+    mock_resp = MagicMock()
+    mock_resp.usage_metadata = MagicMock(prompt_token_count=100, candidates_token_count=200)
+    mock_resp.candidates = [MagicMock()]
+    mock_part = MagicMock()
+    mock_part.inline_data = MagicMock(mime_type="audio/wav", data=base64.b64encode(b"\x01\x00" * 1200).decode("utf-8"))
+    mock_resp.candidates[0].content.parts = [mock_part]
+    mock_client.models.generate_content.return_value = mock_resp
+
+    persona = get_persona("Podcast: Co-Hosts (Man & Woman)")
+    script = PodcastScript(
+        title="Lively Banter Test",
+        summary="Testing expressive cues",
+        turns=[
+            PodcastTurn(speaker="Joe", text="[laughs] That is wild, Jane!", style="measured and analytical"),
+            PodcastTurn(speaker="Jane", text="[sighs] Tell me about it, Joe.", style="serious"),
+        ]
+    )
+
+    result = gen._generate_multi_speaker_speech(
+        script=script,
+        persona=persona,
+        job_id="test_expressive_styling",
+        speed=0.9,
+        voice_customization="Laugh warmly and speak like old friends"
+    )
+
+    assert result.job_id == "test_expressive_styling"
+    call_args = mock_client.models.generate_content.call_args.kwargs
+    parts = call_args["contents"][0]["parts"]
+
+    # Turn 0: Contains [laughs] -> should trigger laughter style, relaxed pacing (speed 0.9), and voice customization
+    style_turn_0 = parts[0]["speech_metadata"]["style"]
+    assert "cheerful, amused, animated podcast delivery with genuine audible laughter" in style_turn_0
+    assert "relaxed and easygoing pacing" in style_turn_0
+    assert "Laugh warmly and speak like old friends" in style_turn_0
+
+    # Turn 1: Contains [sighs] -> should trigger expressive sigh style, relaxed pacing, and voice customization
+    style_turn_1 = parts[1]["speech_metadata"]["style"]
+    assert "expressive, playful sigh, relatable and warm delivery" in style_turn_1
+    assert "relaxed and easygoing pacing" in style_turn_1
+    assert "Laugh warmly and speak like old friends" in style_turn_1
+
 
 
 

@@ -771,6 +771,7 @@ SOURCE DOCUMENT TO COVER:
         job_id: str,
         speed: float = 1.0,
         critique_feedback: Optional[str] = None,
+        voice_customization: Optional[str] = None,
         progress_callback: Optional[Any] = None
     ) -> GenerationResult:
         """
@@ -819,7 +820,7 @@ SOURCE DOCUMENT TO COVER:
                     total_turns=len(batches)
                 )
 
-            # Build content parts with text and speech_metadata
+            # Build content parts with text and speech_metadata (Logic 1: Light, lively conversational banter)
             parts = []
             for turn in batch:
                 clean_turn_text = re.sub(
@@ -830,12 +831,35 @@ SOURCE DOCUMENT TO COVER:
                 )
                 matched_speaker = speaker_map.get(turn.speaker.lower(), turn.speaker)
 
-                turn_style = turn.style or "natural and conversational"
+                # Logic 1: Dynamic expressive podcast style determination
+                raw_style = (turn.style or "").strip().lower()
+                clean_lower = clean_turn_text.lower()
+
+                # Emotional vocal cue detection
+                if "[laughs]" in clean_turn_text or "[chuckles]" in clean_turn_text or "haha" in clean_lower:
+                    turn_style = "cheerful, amused, animated podcast delivery with genuine audible laughter"
+                elif "[sighs]" in clean_turn_text:
+                    turn_style = "expressive, playful sigh, relatable and warm delivery"
+                elif "[pauses]" in clean_turn_text:
+                    turn_style = "thoughtful, engaging, dynamic conversational pacing"
+                # Strip out any formal/dry legacy styles
+                elif any(dry in raw_style for dry in ("measured", "analytical", "serious", "formal", "dry", "flat", "cautious")):
+                    turn_style = "lighthearted, warm, and engaging conversational podcast banter"
+                elif turn.style and turn.style.strip():
+                    turn_style = f"lively podcast conversation, {turn.style.strip()}"
+                else:
+                    turn_style = "warm, expressive, light and friendly conversational tone"
+
+                # Pacing adjustment
                 if abs(speed - 1.0) >= 0.05:
                     if speed < 0.95:
-                        turn_style += ", deliberate and unhurried pacing"
+                        turn_style += ", relaxed and easygoing pacing"
                     elif speed > 1.05:
-                        turn_style += ", brisk and energetic pacing"
+                        turn_style += ", brisk, energetic, and upbeat pacing"
+
+                # Incorporate user-specified Director's Notes / Voice Customization
+                if voice_customization and voice_customization.strip():
+                    turn_style += f", {voice_customization.strip()}"
 
                 parts.append({
                     "text": clean_turn_text,
@@ -1012,6 +1036,7 @@ SOURCE DOCUMENT TO COVER:
                 job_id=job_id,
                 speed=speed,
                 critique_feedback=critique_feedback,
+                voice_customization=voice_customization,
                 progress_callback=progress_callback
             )
 
