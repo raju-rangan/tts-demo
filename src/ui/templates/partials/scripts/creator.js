@@ -94,6 +94,11 @@
       }
       const voiceInput = document.getElementById('inputVoiceCustomization');
       if (voiceInput) voiceInput.value = '';
+      const scriptInput = document.getElementById('inputPodcastScript');
+      if (scriptInput) scriptInput.value = '';
+      const draftStatus = document.getElementById('podcastDraftStatus');
+      if (draftStatus) draftStatus.classList.add('hidden');
+      updatePodcastScriptStats();
       const speedSlider = document.getElementById('inputSpeed');
       if (speedSlider) {
         speedSlider.value = '1.0';
@@ -118,6 +123,21 @@
       }
     }
 
+    function updatePodcastScriptStats() {
+      const scriptText = document.getElementById('inputPodcastScript')?.value?.trim() || '';
+      const statsEl = document.getElementById('podcastScriptStats');
+      if (!statsEl) return;
+      if (!scriptText) {
+        statsEl.textContent = '0 words • ~0.0 mins';
+        return;
+      }
+      const words = scriptText.split(/\s+/).filter(Boolean).length;
+      const mins = (words / 150.0).toFixed(1);
+      const turns = (scriptText.match(/^\s*\*\*[^*]+\*\*/gm) || []).length;
+      const turnLabel = turns > 0 ? ` • ${turns} turns` : '';
+      statsEl.textContent = `${words.toLocaleString()} words${turnLabel} • ~${mins} mins`;
+    }
+
     function handlePersonaChange(personaName) {
       const isPodcast = personaName && personaName.startsWith('Podcast:');
       const labelText = document.getElementById('textVoiceCustomizationLabel');
@@ -125,6 +145,7 @@
       const sampleBtn = document.getElementById('btnSampleDirectives');
       const inputCustom = document.getElementById('inputVoiceCustomization');
       const helpText = document.getElementById('helpVoiceCustomization');
+      const studioCard = document.getElementById('podcastScriptStudioCard');
 
       if (isPodcast) {
         if (labelText) labelText.textContent = "Podcast Content Directives & Host Dynamics";
@@ -132,12 +153,85 @@
         if (sampleBtn) sampleBtn.classList.remove('hidden');
         if (inputCustom) inputCustom.placeholder = "e.g. Unpack interest rate risks, have Host 1 play the skeptical saver, and debate liquidity vs. yield...";
         if (helpText) helpText.textContent = "Guides Gemini 3.8 Flash to write a 2-person podcast dialogue focused on these directions before multi-speaker synthesis.";
+        if (studioCard) studioCard.classList.remove('hidden');
       } else {
         if (labelText) labelText.textContent = "Voice Customization & Delivery Directives";
         if (badgeTag) badgeTag.textContent = "Director's Notes (Optional)";
         if (sampleBtn) sampleBtn.classList.add('hidden');
         if (inputCustom) inputCustom.placeholder = "e.g. Speak with an empathetic, reassuring tone and slightly slower cadence on regulatory disclosures...";
         if (helpText) helpText.textContent = "Directly guides pacing, vocal warmth, emphasis, or emotional nuance in Gemini TTS generation.";
+        if (studioCard) studioCard.classList.add('hidden');
+      }
+    }
+
+    async function draftPodcastScript() {
+      const text = document.getElementById('inputText')?.value?.trim() || '';
+      if (!text || text.length < 10) {
+        alert('Please enter or load article text in the "Article / Knowledge Transcript" field first.');
+        document.getElementById('inputText')?.focus();
+        return;
+      }
+
+      const persona = document.getElementById('inputPersona')?.value || 'Podcast: Co-Hosts (Man & Woman)';
+      const voice_customization = document.getElementById('inputVoiceCustomization')?.value?.trim() || null;
+      const enable_web_search = document.getElementById('inputEnableWebSearch')?.checked ?? true;
+
+      const btn = document.getElementById('btnDraftPodcastScript');
+      const btnText = document.getElementById('btnDraftPodcastScriptText');
+      const statusBox = document.getElementById('podcastDraftStatus');
+      const statusText = document.getElementById('podcastDraftStatusText');
+      const scriptArea = document.getElementById('inputPodcastScript');
+
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.textContent = 'Drafting Script...';
+      if (statusBox) {
+        statusBox.className = 'p-3 rounded-xl bg-purple-950/40 border border-purple-800/50 text-xs flex items-center space-x-2 text-purple-200';
+        if (statusText) {
+          statusText.textContent = enable_web_search
+            ? 'Grounding with Google Search & crafting ~10-minute lively dialogue (Gemini 3.8 Flash)...'
+            : 'Drafting ~10-minute lively dialogue with vocal cues (Gemini 3.8 Flash)...';
+        }
+        statusBox.classList.remove('hidden');
+      }
+      lucide.createIcons();
+
+      try {
+        const resp = await fetch('/api/podcast/draft-script', {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            text: text,
+            persona: persona,
+            voice_customization: voice_customization,
+            target_duration_mins: 10,
+            enable_web_search: enable_web_search
+          })
+        });
+
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data.detail || data.message || 'Failed to draft podcast script');
+        }
+
+        if (scriptArea && data.markdown_script) {
+          scriptArea.value = data.markdown_script;
+          updatePodcastScriptStats();
+        }
+
+        if (statusBox) {
+          statusBox.className = 'p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-xs flex items-center space-x-2 text-emerald-300';
+          statusBox.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i><span>Generated ${data.word_count.toLocaleString()} words (${data.turn_count} turns, ~${data.estimated_duration_mins} mins) with natural expressions! Review and edit anytime below.</span>`;
+          lucide.createIcons();
+        }
+      } catch (err) {
+        if (statusBox) {
+          statusBox.className = 'p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs flex items-center space-x-2 text-rose-300';
+          statusBox.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i><span>Error: ${err.message}</span>`;
+          lucide.createIcons();
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.textContent = 'Re-Draft 10-Min Script';
       }
     }
 
@@ -181,6 +275,9 @@
       const voice_customization = document.getElementById('inputVoiceCustomization')?.value?.trim() || null;
       const speed = parseFloat(document.getElementById('inputSpeed')?.value || '1.0');
       const run_judge = document.getElementById('inputRunJudge').checked;
+      const podcast_script = persona.startsWith('Podcast:')
+        ? (document.getElementById('inputPodcastScript')?.value?.trim() || null)
+        : null;
       
       const statusBox = document.getElementById('newJobStatus');
       const submitBtn = document.getElementById('submitJobBtn');
@@ -194,7 +291,7 @@
         const resp = await fetch('/api/jobs', {
           method: 'POST',
           headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ text, persona, run_judge, voice_customization, speed })
+          body: JSON.stringify({ text, persona, run_judge, voice_customization, speed, podcast_script })
         });
         const data = await resp.json();
         if (!resp.ok) {

@@ -307,6 +307,10 @@ class GeminiAudioGenerator:
             )
         return self._reasoning_client
 
+    @reasoning_client.setter
+    def reasoning_client(self, client: genai.Client):
+        self._reasoning_client = client
+
 
     def _generate_single_chunk(
         self,

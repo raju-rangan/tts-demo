@@ -1,7 +1,7 @@
   <!-- ================= NEW JOB MODAL ================= -->
   <div id="newJobModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm px-4">
-    <div class="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative">
-      <div class="flex items-center justify-between pb-4 border-b border-zinc-800">
+    <div class="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative max-h-[92vh] flex flex-col">
+      <div class="flex items-center justify-between pb-4 border-b border-zinc-800 shrink-0">
         <div class="flex items-center space-x-2.5">
           <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
             <i data-lucide="plus" class="w-5 h-5"></i>
@@ -16,7 +16,7 @@
         </button>
       </div>
 
-      <form id="newJobForm" onsubmit="submitNewJob(event)" class="space-y-4 pt-4">
+      <form id="newJobForm" onsubmit="submitNewJob(event)" class="space-y-4 pt-4 overflow-y-auto flex-1 pr-1">
         <div>
           <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">Financial Voice Persona</label>
           <select id="inputPersona" required onchange="handlePersonaChange(this.value)" class="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-emerald-500 transition">
@@ -92,6 +92,69 @@
               <i data-lucide="layers" class="w-3.5 h-3.5"></i>
               <span id="inputWordWarningText">Multi-turn auto-chunking active (~400 words/turn). Audio will be stitched seamlessly.</span>
             </span>
+          </div>
+        </div>
+
+        <!-- Podcast Script Studio (Displayed when a Podcast Persona is selected) -->
+        <div id="podcastScriptStudioCard" class="hidden p-4 bg-zinc-950 border border-purple-500/30 rounded-xl space-y-3.5 shadow-inner">
+          <div class="flex items-start justify-between">
+            <div class="space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-md">Podcast Studio</span>
+                <h4 class="text-xs font-bold text-white flex items-center space-x-1.5">
+                  <i data-lucide="radio" class="w-3.5 h-3.5 text-purple-400"></i>
+                  <span>2-Person Podcast Script (~10 Mins)</span>
+                </h4>
+              </div>
+              <p class="text-[11px] text-zinc-400 leading-normal">
+                Draft a lively ~10-minute dialogue grounded with Google Search research, or type and edit your dialogue directly below before audio synthesis.
+              </p>
+            </div>
+            <div class="flex items-center space-x-2 shrink-0">
+              <span id="podcastScriptStats" class="text-[11px] font-mono text-purple-300 bg-purple-950/60 px-2.5 py-1 rounded-lg border border-purple-800/50">
+                0 words • ~0.0 mins
+              </span>
+            </div>
+          </div>
+
+          <!-- Studio Toolbar & Action Bar -->
+          <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-zinc-900/80 border border-zinc-800 rounded-lg">
+            <label class="flex items-center space-x-2 cursor-pointer select-none text-[11px] text-zinc-300">
+              <input type="checkbox" id="inputEnableWebSearch" checked class="w-3.5 h-3.5 rounded text-purple-500 focus:ring-purple-500 bg-zinc-950 border-zinc-700">
+              <span class="font-medium">Web Search Grounding</span>
+              <span class="text-zinc-500 font-normal">(Enriches dialogue with fresh real-world facts)</span>
+            </label>
+
+            <button type="button" id="btnDraftPodcastScript" onclick="draftPodcastScript()" class="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-lg transition shadow-md shadow-purple-900/20 flex items-center space-x-1.5 cursor-pointer">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span id="btnDraftPodcastScriptText">Draft ~10-Min Script</span>
+            </button>
+          </div>
+
+          <div id="podcastDraftStatus" class="hidden p-3 rounded-xl bg-purple-950/30 border border-purple-800/50 text-xs flex items-center space-x-2 text-purple-200">
+            <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-purple-400 shrink-0"></i>
+            <span id="podcastDraftStatusText">Researching online facts & drafting 10-minute dialogue with Gemini 3.8 Flash...</span>
+          </div>
+
+          <!-- Editable Podcast Script Textarea -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="font-semibold text-zinc-300 uppercase tracking-wider text-[10px]">Editable Dialogue Script</span>
+              <span class="text-zinc-500 font-mono text-[10px]">Format: **Speaker** (style): Spoken text [laughs]</span>
+            </div>
+            <textarea id="inputPodcastScript" rows="8" oninput="updatePodcastScriptStats()" placeholder="Click 'Draft ~10-Min Script' above to generate with web grounding, or type/paste your own 2-speaker dialogue here..."
+              class="w-full p-3 bg-zinc-900/90 border border-zinc-700 rounded-xl text-xs font-mono text-zinc-100 focus:outline-none focus:border-purple-500 transition leading-relaxed"></textarea>
+          </div>
+
+          <!-- Natural Human Expression Markers Guidance Callout -->
+          <div class="p-3 bg-zinc-900/70 border border-zinc-800 rounded-xl text-[11px] text-zinc-400 space-y-1.5">
+            <div class="flex items-center space-x-1.5 text-zinc-200 font-semibold">
+              <i data-lucide="smile" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Natural Human Expressions & Vocal Delivery Cues:</span>
+            </div>
+            <p class="text-zinc-400 leading-relaxed">
+              Gemini TTS dynamically expresses cues embedded in the script: <code class="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded font-mono text-[10px]">[laughs]</code>, <code class="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded font-mono text-[10px]">[sighs]</code>, <code class="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded font-mono text-[10px]">[chuckles]</code>, <code class="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded font-mono text-[10px]">[pauses]</code>, and organic fillers (<em>"Right?!", "Wait, seriously?", "Ugh, tell me about it"</em>). Feel free to customize lines or host delivery styles above before generating audio!
+            </p>
           </div>
         </div>
 

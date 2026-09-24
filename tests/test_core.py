@@ -648,3 +648,124 @@ def test_generate_speech_routes_podcast_pipeline():
         assert res.duration_seconds == 12.5
         assert res.model_used == "gemini-3.1-flash-tts-preview"
 
+
+def test_parse_markdown_script_to_turns():
+    """Verify parse_markdown_script_to_turns correctly extracts speaker, style, and text with vocal markers."""
+    from src.ai.generator import parse_markdown_script_to_turns
+
+    default_speakers = [
+        {"speaker": "Joe", "voice_name": "Puck", "gender": "man"},
+        {"speaker": "Jane", "voice_name": "Kore", "gender": "woman"}
+    ]
+
+    sample_md = """# Defense and Debt Debate
+
+**Joe** (cheerful and lively): Welcome everyone! [laughs] Today we are breaking down a massive defense spending surge.
+**Jane** (skeptical and measured): [sighs] That's right Joe, but where is all that funding actually going to come from?
+**Joe**: That is the trillion-dollar question. [chuckles] Let's look at the deficit projections."""
+
+    script = parse_markdown_script_to_turns(sample_md, default_speakers)
+    assert script.title == "Defense and Debt Debate"
+    assert len(script.turns) == 3
+
+    t1, t2, t3 = script.turns
+    assert t1.speaker == "Joe"
+    assert t1.style == "cheerful and lively"
+    assert "[laughs]" in t1.text
+    assert "Today we are breaking down" in t1.text
+
+    assert t2.speaker == "Jane"
+    assert t2.style == "skeptical and measured"
+    assert "[sighs]" in t2.text
+
+    assert t3.speaker == "Joe"
+    assert "[chuckles]" in t3.text
+
+
+def test_generate_podcast_script_10min_and_research():
+    """Verify generate_podcast_script constructs ~10min prompt and invokes web search grounding."""
+    from unittest.mock import patch, MagicMock
+    from src.ai.generator import GeminiAudioGenerator, PodcastScript, PodcastTurn
+    from src.ai.personas import get_persona
+
+    gen = GeminiAudioGenerator()
+    persona = get_persona("Podcast: Co-Hosts (Man & Woman)")
+
+    mock_reasoning_client = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.text = '{"title": "10-Min Deep Dive", "summary": "Full analysis", "turns": [{"speaker": "Joe", "text": "Welcome to the show! [laughs]", "style": "energetic"}, {"speaker": "Jane", "text": "Great to be here! [chuckles]", "style": "thoughtful"}]}'
+    mock_reasoning_client.models.generate_content.return_value = mock_resp
+    gen._reasoning_client = mock_reasoning_client
+
+    with patch.object(gen, "research_podcast_context", return_value="Live Grounding Fact: Global defense backlog hit $1.2T.") as mock_research:
+
+        script = gen.generate_podcast_script(
+            text="Article about defense spending and national debt.",
+            persona=persona,
+            director_notes="Focus on European rearmament bottlenecks.",
+            target_duration_mins=10,
+            enable_web_search=True
+        )
+
+        assert mock_research.call_count == 1
+        assert script.title == "10-Min Deep Dive"
+        assert len(script.turns) == 2
+        assert script.turns[0].speaker == "Joe"
+        assert script.turns[1].speaker == "Jane"
+
+
+        # Check prompt contents sent to reasoning client
+        call_args = mock_reasoning_client.models.generate_content.call_args.kwargs
+        prompt = call_args["contents"]
+        assert "~10 MINUTES" in prompt
+        assert "1400 to 1700 total spoken words" in prompt
+        assert "40 to 55 dynamic dialogue turns" in prompt
+        assert "HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL)" in prompt
+        assert "[laughs]" in prompt
+        assert "[sighs]" in prompt
+        assert "Live Grounding Fact: Global defense backlog hit $1.2T." in prompt
+        assert "Focus on European rearmament bottlenecks." in prompt
+
+
+def test_generate_speech_with_custom_podcast_script():
+    """Verify generate_speech skips script generation if pre-drafted podcast_script is provided."""
+    from unittest.mock import patch, MagicMock
+    from src.ai.generator import GeminiAudioGenerator, GenerationResult
+
+    gen = GeminiAudioGenerator()
+
+    custom_script = """**Joe** (upbeat): This is a pre-drafted script! [laughs]
+**Jane** (calm): Indeed it is Joe."""
+
+    fake_result = GenerationResult(
+        job_id="job_custom_pod",
+        audio_bytes=b"fake_custom_audio",
+        audio_format="audio/mpeg",
+        duration_seconds=8.0,
+        persona_used="Podcast: Co-Hosts (Man & Woman)",
+        model_used="gemini-3.1-flash-tts-preview",
+        transcript=custom_script,
+        title="Custom Script"
+    )
+
+    with patch.object(gen, "generate_podcast_script") as mock_script_gen, \
+         patch.object(gen, "_generate_multi_speaker_speech", return_value=fake_result) as mock_multi_synth:
+
+        res = gen.generate_speech(
+            text="Original article text",
+            persona_name="Podcast: Co-Hosts (Man & Woman)",
+            job_id="job_custom_pod",
+            podcast_script=custom_script
+        )
+
+        # generate_podcast_script must NOT be called
+        assert mock_script_gen.call_count == 0
+        # _generate_multi_speaker_speech MUST be called with parsed turns
+        assert mock_multi_synth.call_count == 1
+        passed_script = mock_multi_synth.call_args.kwargs["script"]
+        assert len(passed_script.turns) == 2
+        assert passed_script.turns[0].speaker == "Joe"
+        assert "[laughs]" in passed_script.turns[0].text
+        assert res.job_id == "job_custom_pod"
+
+

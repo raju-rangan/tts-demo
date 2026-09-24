@@ -117,6 +117,14 @@ class CreateJobRequest(BaseModel):
     title: Optional[str] = Field(default=None)
     voice_customization: Optional[str] = Field(default=None, description="Custom director notes or vocal delivery directives")
     speed: Optional[float] = Field(default=1.0, ge=0.5, le=2.0, description="Speech delivery rate (0.5 to 2.0, default 1.0)")
+    podcast_script: Optional[str] = Field(default=None, description="Optional custom or pre-edited markdown podcast script")
+
+class DraftPodcastScriptRequest(BaseModel):
+    text: str = Field(..., min_length=10, description="Source article text to adapt into podcast script")
+    persona: str = Field(default="Podcast: Co-Hosts (Man & Woman)", description="Selected podcast persona")
+    voice_customization: Optional[str] = Field(default=None, description="Director notes or focus instructions")
+    target_duration_mins: int = Field(default=10, ge=1, le=30, description="Target duration in minutes (default 10)")
+    enable_web_search: bool = Field(default=True, description="Whether to ground the podcast script with live Google Web Search research")
 
 class BulkJobRequest(BaseModel):
     urls: List[str] = Field(..., min_length=1, description="List of article URLs to extract and synthesize")
@@ -984,7 +992,8 @@ def _execute_async_synthesis(
     critique_feedback: Optional[str] = None,
     retry_count: int = 0,
     previous_attempt_score: Optional[float] = None,
-    remediation_prompt: Optional[str] = None
+    remediation_prompt: Optional[str] = None,
+    podcast_script: Optional[str] = None
 ):
     """Background worker that runs TTS synthesis, GCS upload, and Multimodal Judge."""
     repo = get_job_repository()
@@ -1008,7 +1017,8 @@ def _execute_async_synthesis(
     words = len(text.split())
     chars = len(text)
     critique_note = " | Critique Remediation Active" if critique_feedback else ""
-    logger.info(f"▶ [{job_id}] Starting synthesis job | Persona: '{persona_name}' | Speed: {speed:.2f}x | Words: {words} | Chars: {chars} | Run Judge: {run_judge} | Customization: {bool(voice_customization)}{critique_note}")
+    podcast_note = " | Pre-Drafted Podcast Script Active" if podcast_script else ""
+    logger.info(f"▶ [{job_id}] Starting synthesis job | Persona: '{persona_name}' | Speed: {speed:.2f}x | Words: {words} | Chars: {chars} | Run Judge: {run_judge} | Customization: {bool(voice_customization)}{critique_note}{podcast_note}")
     t0 = time.time()
     try:
         # Step 1: Voice Generation (multi-turn auto-chunking & DSP mastering)
@@ -1019,6 +1029,7 @@ def _execute_async_synthesis(
             voice_customization=voice_customization,
             speed=speed,
             critique_feedback=critique_feedback,
+            podcast_script=podcast_script,
             progress_callback=progress_callback
         )
         synth_time = time.time() - t0
@@ -1172,6 +1183,11 @@ def create_job(
     persona_obj = get_persona(req.persona)
     speed = float(req.speed) if req.speed is not None else 1.0
 
+    initial_transcript = req.podcast_script if (req.podcast_script and req.podcast_script.strip()) else req.text
+    initial_words = len(initial_transcript.split())
+    initial_chars = len(initial_transcript)
+    progress_msg = "Synthesizing customized podcast dialogue..." if (req.podcast_script and req.podcast_script.strip()) else "Partitioning text into natural conversational turns..."
+
     # Pre-save running record with initial progress
     repo = get_job_repository()
     initial_job = JobRecord(
@@ -1181,15 +1197,15 @@ def create_job(
         audience=persona_obj.audience,
         voice_name=persona_obj.voice_name,
         article_title=req.title or req.text.split("\n")[0][:80].strip("#* "),
-        transcript=req.text,
-        word_count=len(req.text.split()),
-        char_count=len(req.text),
+        transcript=initial_transcript,
+        word_count=initial_words,
+        char_count=initial_chars,
         gcs_uri="gs://knowledge-to-audio-poc/pending/" + job_id,
         status="RUNNING",
         speed=speed,
         voice_customization=req.voice_customization,
         progress_stage="CHUNKING",
-        progress_message="Partitioning text into natural conversational turns...",
+        progress_message=progress_msg,
         created_by=user.get("email")
     )
     repo.save_job(initial_job)
@@ -1204,7 +1220,8 @@ def create_job(
         title=req.title,
         voice_customization=req.voice_customization,
         speed=speed,
-        created_by=user.get("email")
+        created_by=user.get("email"),
+        podcast_script=req.podcast_script
     )
 
     return {
@@ -1213,6 +1230,55 @@ def create_job(
         "message": f"Speech generation started for persona '{req.persona}'",
         "job": initial_job
     }
+
+
+@app.post("/api/podcast/draft-script")
+def draft_podcast_script(
+    req: DraftPodcastScriptRequest,
+    user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Drafts an interactive, multi-speaker podcast script (~10 mins) using Gemini 3.8 Flash,
+    optionally grounded with real-time Google Web Search research.
+    Returns markdown script, word count, turn count, and estimated duration.
+    """
+    persona_obj = get_persona(req.persona)
+    if not getattr(persona_obj, "is_podcast", False):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Persona '{req.persona}' is not a multi-speaker podcast persona."
+        )
+
+    generator = GeminiAudioGenerator()
+    try:
+        script = generator.generate_podcast_script(
+            text=req.text,
+            persona=persona_obj,
+            director_notes=req.voice_customization,
+            target_duration_mins=req.target_duration_mins,
+            enable_web_search=req.enable_web_search
+        )
+        total_words = sum(len(t.text.split()) for t in script.turns)
+        est_duration_mins = round(total_words / 150.0, 1)
+
+        dialogue_lines = []
+        for t in script.turns:
+            style_part = f" ({t.style})" if t.style else ""
+            dialogue_lines.append(f"**{t.speaker}**{style_part}: {t.text}\n")
+        markdown_script = "\n".join(dialogue_lines)
+
+        return {
+            "title": script.title,
+            "markdown_script": markdown_script,
+            "turn_count": len(script.turns),
+            "word_count": total_words,
+            "estimated_duration_mins": est_duration_mins,
+            "speakers": persona_obj.speakers
+        }
+    except Exception as e:
+        logger.error(f"Failed to draft podcast script: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to draft podcast script: {str(e)}")
+
 
 
 @app.get("/api/jobs/{job_id}/retry-preview")
@@ -1317,7 +1383,8 @@ def retry_job(
         critique_feedback=critique_text,
         retry_count=new_retry_count,
         previous_attempt_score=prev_score,
-        remediation_prompt=critique_text
+        remediation_prompt=critique_text,
+        podcast_script=job.transcript if ("**" in (job.transcript or "") and ":" in (job.transcript or "")) else None
     )
 
     return {

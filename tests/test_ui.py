@@ -1032,6 +1032,117 @@ def test_html_podcast_ui_elements(client):
     assert "handlePersonaChange" in html
     assert "loadSamplePodcastDirectives" in html
 
+    # Podcast Script Studio Elements
+    assert 'id="podcastScriptStudioCard"' in html
+    assert 'id="inputPodcastScript"' in html
+    assert 'id="btnDraftPodcastScript"' in html
+    assert 'id="inputEnableWebSearch"' in html
+    assert 'id="podcastScriptStats"' in html
+    assert 'id="podcastDraftStatus"' in html
+    assert "draftPodcastScript" in html
+    assert "updatePodcastScriptStats" in html
+
+
+def test_draft_podcast_script_api_success(client, monkeypatch):
+    """Verify /api/podcast/draft-script endpoint drafts a grounded script with stats."""
+    from src.ai.generator import PodcastScript, PodcastTurn
+
+    login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
+    assert login_resp.status_code == 200
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    fake_script = PodcastScript(
+        title="Defense & Debt Breakdown",
+        summary="A lively debate on fiscal tradeoffs",
+        turns=[
+            PodcastTurn(speaker="Joe", text="Welcome everyone! [laughs] Let's dive in.", style="cheerful"),
+            PodcastTurn(speaker="Jane", text="[sighs] It's a complicated debate, Joe.", style="measured"),
+        ]
+    )
+
+    def mock_gen_script(self, text, persona, director_notes=None, target_duration_mins=10, enable_web_search=True, progress_callback=None):
+        return fake_script
+
+    monkeypatch.setattr("src.ai.generator.GeminiAudioGenerator.generate_podcast_script", mock_gen_script)
+
+    payload = {
+        "text": "A Balancing Act: The Trade-Off Between Debt and Defense spending.",
+        "persona": "Podcast: Co-Hosts (Man & Woman)",
+        "voice_customization": "Cover debt ceiling risks and defense backlogs",
+        "target_duration_mins": 10,
+        "enable_web_search": True
+    }
+
+    resp = client.post("/api/podcast/draft-script", json=payload, headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["title"] == "Defense & Debt Breakdown"
+    assert data["turn_count"] == 2
+    assert "**Joe** (cheerful): Welcome everyone! [laughs] Let's dive in." in data["markdown_script"]
+    assert "**Jane** (measured): [sighs] It's a complicated debate, Joe." in data["markdown_script"]
+    assert data["word_count"] > 0
+    assert "estimated_duration_mins" in data
+    assert len(data["speakers"]) == 2
+
+
+def test_draft_podcast_script_api_rejects_non_podcast_persona(client):
+    """Verify /api/podcast/draft-script rejects solo narrator personas with 400."""
+    login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
+    assert login_resp.status_code == 200
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    payload = {
+        "text": "Article text that does not need a podcast script.",
+        "persona": "Retail Banking Guide"
+    }
+
+    resp = client.post("/api/podcast/draft-script", json=payload, headers=headers)
+    assert resp.status_code == 400
+    assert "not a multi-speaker podcast persona" in resp.json()["detail"]
+
+
+def test_create_job_with_custom_podcast_script(client, monkeypatch):
+    """Verify create_job handles pre-drafted custom podcast script and passes it to worker."""
+    from src.db.repository import get_job_repository
+    repo = get_job_repository()
+
+    login_resp = client.post("/api/auth/login", json={"email": "admin@apexbank.com", "password": "demo1234"})
+    assert login_resp.status_code == 200
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    executed_args = {}
+    def mock_execute(job_id, text, persona_name, run_judge, title, voice_customization=None, podcast_script=None, **kwargs):
+        executed_args["job_id"] = job_id
+        executed_args["persona_name"] = persona_name
+        executed_args["podcast_script"] = podcast_script
+
+    monkeypatch.setattr("src.ui.app._execute_async_synthesis", mock_execute)
+
+    custom_script = "**Joe** (upbeat): Custom script turn 1! [laughs]\n**Jane**: Custom turn 2."
+    payload = {
+        "text": "Source article for context",
+        "persona": "Podcast: Co-Hosts (Man & Woman)",
+        "title": "Custom Podcast Show",
+        "podcast_script": custom_script
+    }
+
+    resp = client.post("/api/jobs", json=payload, headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    job_id = data["job_id"]
+
+    try:
+        assert data["job"]["persona"] == "Podcast: Co-Hosts (Man & Woman)"
+        assert data["job"]["transcript"] == custom_script
+        assert executed_args["podcast_script"] == custom_script
+    finally:
+        repo.delete_job(job_id)
+
+
 
 
 
