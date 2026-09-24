@@ -35,12 +35,86 @@ logger = logging.getLogger(__name__)
 
 class PodcastTurn(BaseModel):
     speaker: str = Field(..., description="Name of the speaking co-host (e.g. Joe, Jane, Alex, Maya)")
-    text: str = Field(..., description="The spoken dialogue line for this turn, without stage directions or brackets")
+    text: str = Field(..., description="The spoken dialogue line for this turn, including natural vocal reactions like [laughs], [sighs], [chuckles], [pauses]")
     style: Optional[str] = Field(default="natural and conversational", description="Speaking style, emotion, or delivery nuance")
 
 class PodcastScript(BaseModel):
     title: str = Field(..., description="An engaging, catchy podcast episode title")
+    summary: Optional[str] = Field(default=None, description="Brief episode summary")
     turns: List[PodcastTurn] = Field(..., min_length=2, description="Ordered dialogue turns between the two co-hosts")
+
+
+def parse_markdown_script_to_turns(
+    script_text: str,
+    default_speakers: Optional[Tuple[Any, ...]] = None
+) -> PodcastScript:
+    """
+    Parses user-edited markdown podcast script into a strongly typed PodcastScript.
+    Recognizes lines formatted like:
+      # Episode Title
+      **Joe** (upbeat): Welcome to the show! [laughs]
+      **Jane**: [sighs] Thanks Joe, today we have a massive topic.
+    """
+    lines = script_text.strip().split("\n")
+    title = "Podcast Episode"
+    turns: List[PodcastTurn] = []
+
+    current_speaker: Optional[str] = None
+    current_style: Optional[str] = None
+    current_text_parts: List[str] = []
+
+    speaker_regex = re.compile(r"^\*{0,2}([\w\s]+?)\*{0,2}(?:\s*\(([^)]+)\))?\s*:\s*(.+)$")
+
+    def flush():
+        nonlocal current_speaker, current_style, current_text_parts
+        if current_speaker and current_text_parts:
+            text = " ".join(current_text_parts).strip()
+            if text:
+                turns.append(PodcastTurn(
+                    speaker=current_speaker,
+                    text=text,
+                    style=current_style or "natural and conversational"
+                ))
+        current_speaker = None
+        current_style = None
+        current_text_parts = []
+
+    for line in lines:
+        line_clean = line.strip()
+        if not line_clean:
+            continue
+        if line_clean.startswith("# "):
+            title = line_clean[2:].strip()
+            continue
+        m = speaker_regex.match(line_clean)
+        if m:
+            flush()
+            current_speaker = m.group(1).strip()
+            current_style = m.group(2).strip() if m.group(2) else None
+            current_text_parts = [m.group(3).strip()]
+        else:
+            if current_speaker:
+                current_text_parts.append(line_clean)
+    flush()
+
+    if not turns:
+        s1 = default_speakers[0]["speaker"] if default_speakers and len(default_speakers) > 0 else "Joe"
+        s2 = default_speakers[1]["speaker"] if default_speakers and len(default_speakers) > 1 else "Jane"
+        paras = [p.strip() for p in script_text.split("\n\n") if p.strip()]
+        for idx, p in enumerate(paras):
+            spk = s1 if idx % 2 == 0 else s2
+            turns.append(PodcastTurn(
+                speaker=spk,
+                text=p,
+                style="natural and conversational"
+            ))
+
+    return PodcastScript(
+        title=title,
+        summary=f"Podcast episode with {len(turns)} dialogue turns",
+        turns=turns
+    )
+
 
 @dataclass
 class AggregatedUsageMetadata:
@@ -193,10 +267,11 @@ class GeminiAudioGenerator:
         self.multi_speaker_model = os.getenv("GEMINI_MULTI_SPEAKER_VOICE_MODEL", self.model)
         self.podcast_script_model = os.getenv("GEMINI_PODCAST_SCRIPT_MODEL", settings.judge_model)
         self._client: Optional[genai.Client] = None
+        self._reasoning_client: Optional[genai.Client] = None
 
     @property
     def client(self) -> genai.Client:
-        """Lazy-initialized Google Gen AI Client."""
+        """Lazy-initialized Google Gen AI Client for TTS speech synthesis (using location settings)."""
         if self._client is None:
             api_key = os.getenv("GEMINI_API_KEY")
             http_opts = types.HttpOptions(timeout=600000)  # 10 minute timeout for long audio generation
@@ -210,6 +285,28 @@ class GeminiAudioGenerator:
                     http_options=http_opts
                 )
         return self._client
+
+    @property
+    def reasoning_client(self) -> genai.Client:
+        """Lazy-initialized Client for text/multimodal reasoning (configured for global location on Vertex AI)."""
+        if self._reasoning_client is not None:
+            return self._reasoning_client
+        if self._client is not None:
+            return self._client
+        api_key = os.getenv("GEMINI_API_KEY")
+        http_opts = types.HttpOptions(timeout=600000)
+        if api_key:
+            self._reasoning_client = genai.Client(api_key=api_key, http_options=http_opts)
+        else:
+            judge_loc = getattr(settings, "judge_location", "global")
+            self._reasoning_client = genai.Client(
+                vertexai=bool(self.project_id and self.project_id != "tts-demo-project"),
+                project=self.project_id if self.project_id != "tts-demo-project" else None,
+                location=judge_loc if self.project_id != "tts-demo-project" else None,
+                http_options=http_opts
+            )
+        return self._reasoning_client
+
 
     def _generate_single_chunk(
         self,
@@ -338,19 +435,63 @@ class GeminiAudioGenerator:
                     logger.error(f"client.models.generate_content failed{turn_label} after {max_attempts} attempts: {e}", exc_info=True)
                     raise RuntimeError(f"Could not generate audio using model '{self.model}'{turn_label} ({e}). Verify Vertex AI quota and model availability.")
 
+    def research_podcast_context(
+        self,
+        source_text: str,
+        director_notes: Optional[str] = None,
+        job_id: Optional[str] = None
+    ) -> str:
+        """
+        Uses Gemini with Google Search Grounding to research real-time facts, current news,
+        market multiples, and verified figures relevant to the podcast topic.
+        """
+        job_label = f"[{job_id}] " if job_id else ""
+        logger.info(f"▶ {job_label}Conducting real-time web research to enrich podcast context...")
+
+        search_prompt = (
+            "You are an expert investigative research producer for a leading financial and geopolitical podcast.\n"
+            "Review the core themes of this article and the director's instructions:\n"
+            f"SOURCE ARTICLE EXCERPT: {source_text[:1200]}\n\n"
+            f"DIRECTOR'S INSTRUCTIONS: {director_notes or 'Focus on the key trade-offs, fiscal constraints, and market dynamics.'}\n\n"
+            "Using Google Search, find the latest real-world facts, recent data points, company valuations (e.g. Rheinmetall, defense contractors), "
+            "government budget figures, debt metrics, or recent quotes that would make the podcast dialogue exceptionally rich, timely, and authentic.\n"
+            "Provide a concise, bulleted research brief (max 250 words) with specific facts and figures the hosts can naturally drop into conversation."
+        )
+
+        try:
+            config = types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+                temperature=0.3,
+            )
+            response = self.reasoning_client.models.generate_content(
+                model=self.podcast_script_model,
+                contents=search_prompt,
+                config=config
+            )
+            dossier = response.text or ""
+            logger.info(f"✓ {job_label}Web research completed ({len(dossier)} chars)")
+            return dossier
+        except Exception as e:
+            logger.warning(f"Web research grounding could not be completed ({e}). Proceeding with source document only.")
+            return ""
+
     def generate_podcast_script(
         self,
         text: str,
         persona: VoicePersona,
         director_notes: Optional[str] = None,
-        job_id: Optional[str] = None
+        job_id: Optional[str] = None,
+        target_duration_mins: int = 10,
+        enable_web_search: bool = True,
+        progress_callback: Optional[Any] = None
     ) -> PodcastScript:
         """
-        Uses Gemini to generate an engaging, balanced 2-person podcast dialogue script
-        based on the source text, the selected co-host persona profiles, and director's notes.
+        Uses Gemini to generate an engaging, balanced 2-person podcast dialogue script (~10 minutes,
+        ~1400-1600 words) based on the source text, web research, co-host persona profiles, and director's notes.
+        Includes human vocal expressions (laughs, sighs, chuckles, pauses).
         """
         job_label = f"[{job_id}] " if job_id else ""
-        logger.info(f"▶ {job_label}Generating 2-person podcast script for persona '{persona.name}' using model '{self.podcast_script_model}'...")
+        logger.info(f"▶ {job_label}Generating {target_duration_mins}-min podcast script for persona '{persona.name}' using model '{self.podcast_script_model}'...")
 
         speakers = persona.speakers or (
             {"speaker": "Joe", "voice_name": "Puck", "gender": "male", "role": "Host"},
@@ -358,6 +499,29 @@ class GeminiAudioGenerator:
         )
         s1 = speakers[0]
         s2 = speakers[1]
+
+        research_section = ""
+        if enable_web_search:
+            if progress_callback:
+                progress_callback(
+                    stage="CHUNKING",
+                    message="Performing web research with Google Search Grounding to enrich dialogue...",
+                    current_turn=1,
+                    total_turns=2
+                )
+            research_dossier = self.research_podcast_context(
+                source_text=text,
+                director_notes=director_notes,
+                job_id=job_id
+            )
+            if research_dossier.strip():
+                research_section = (
+                    "======================================================================\n"
+                    "LATEST WEB RESEARCH & REAL-WORLD CONTEXT (GROUNDING):\n"
+                    f"{research_dossier.strip()}\n"
+                    "Weave these specific real-world facts, quotes, or numbers naturally into the discussion.\n"
+                    "======================================================================\n\n"
+                )
 
         customization_section = ""
         if director_notes and director_notes.strip():
@@ -371,21 +535,50 @@ class GeminiAudioGenerator:
                 "======================================================================\n\n"
             )
 
+        target_words = max(600, target_duration_mins * 150)
+        target_turns = max(14, int(target_duration_mins * 4.5))
+
+        if progress_callback:
+            progress_callback(
+                stage="CHUNKING",
+                message=f"Drafting full {target_duration_mins}-minute podcast dialogue ({target_turns} turns) with human expressions...",
+                current_turn=2 if enable_web_search else 1,
+                total_turns=2 if enable_web_search else 1
+            )
+
         prompt = f"""
-You are an expert executive podcast producer and scriptwriter for a premier financial services show.
-Your task is to transform the provided source document into a vibrant, natural, 2-person podcast conversation between two knowledgeable co-hosts: {s1['speaker']} and {s2['speaker']}.
+You are an expert executive podcast producer and scriptwriter for a premier financial and geopolitical show.
+Your task is to transform the provided source document into a vibrant, natural, full-length 2-person podcast conversation between two knowledgeable co-hosts: {s1['speaker']} and {s2['speaker']}.
 
 CO-HOST PROFILES:
 - Host 1: {s1['speaker']} ({s1.get('gender', 'host')}, Voice: {s1['voice_name']}) - Lead conversational host who introduces topics, shares relatable observations, and asks engaging questions.
 - Host 2: {s2['speaker']} ({s2.get('gender', 'co-host')}, Voice: {s2['voice_name']}) - Insightful expert co-host who provides clarity, explains analytical trade-offs, and breaks down complex financial concepts.
 
 {customization_section}
-PODCAST SCRIPT GUIDELINES:
-1. Dynamic Chemistry: The conversation must feel authentic and engaging—hosts should react with genuine interest (e.g. "That's a great point, Joe", "Exactly, Jane"), bounce ideas back and forth, and explain concepts using clear real-world examples.
-2. Grounded Accuracy: Faithfully represent all key facts, numbers, interest rates, FDIC limits, and policies mentioned in the source document.
-3. Natural Turn Length: Keep each turn relatively concise (typically 1 to 3 sentences per turn). Avoid unbroken monologues. Alternate between {s1['speaker']} and {s2['speaker']}. Aim for approximately 8 to 14 dialogue turns.
-4. Vocal Style: For each turn, provide a delivery style in the 'style' field (e.g., "cheerful and friendly", "thoughtful and measured", "inquisitive and energetic", "reassuring and warm", "curious").
-5. Verbatim Purity: In the 'text' field of each turn, include ONLY the words that the speaker actually utters aloud. Do NOT include stage directions in asterisks or brackets (e.g. no '(laughs)' or '[chuckles]').
+{research_section}
+EPISODE STRUCTURE & SCALE (~{target_duration_mins} MINUTES):
+- Word Count: Target approximately {target_words - 100} to {target_words + 200} total spoken words across the full conversation.
+- Turn Count: Generate approximately {target_turns - 5} to {target_turns + 10} dynamic dialogue turns alternating between {s1['speaker']} and {s2['speaker']}.
+- Pacing & Flow: Structure the conversation across 5 natural podcast acts:
+  1. Act I: The Hook & Episode Overview — Lively welcome, introducing the central question.
+  2. Act II: The Skeptic's Stance — Unpacking the debt ceiling, deficit realities, and affordability pushback.
+  3. Act III: The Structural Bull Case — Deep dive into industrial bottlenecks, multi-year order backlogs, and manufacturer multiples (e.g. Rheinmetall vs tech giants).
+  4. Act IV: Global Ripple Effects — European rearmament challenges, NATO spending pledges, and Japan's fiscal dilemma.
+  5. Act V: The Bottom Line — What this means for investors and savers, key takeaways, and closing banter.
+
+HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL):
+This podcast must sound completely natural, lively, and unmistakably human—NOT dry, robotic, or like reading a bulleted report.
+- Natural Vocal Expressions & Reactions:
+  Sprinkle expressive human tags directly inside the turn text:
+  `[laughs]`, `[sighs]`, `[chuckles]`, `[clears throat]`, `[pauses]`.
+- Conversational Interjections & Fillers:
+  Use natural informal interjections and authentic conversational flow:
+  e.g., "Haha, wow", "Wait, seriously?", "Ugh, tell me about it", "Look...", "Hah!", "You know what’s wild?", "Right?! Exactly.", "Hmm, that's a tough pill to swallow."
+- Chemistry & Banter:
+  Co-hosts should react genuinely to each other, interrupt politely, bounce questions back and forth, and share relatable analogies. Keep individual turns snappy (1-3 sentences).
+- Vocal Delivery Styles:
+  In the 'style' field of every turn, specify the exact emotional delivery and vocal tone:
+  e.g., "chuckling and amused", "weary, sighing delivery", "passionate and animated", "skeptical, inquisitive tone", "thoughtful and measured", "warm closing tone".
 
 SOURCE DOCUMENT TO COVER:
 {text}
@@ -396,9 +589,10 @@ SOURCE DOCUMENT TO COVER:
                 response_mime_type="application/json",
                 response_schema=PodcastScript,
                 system_instruction=persona.system_instruction,
-                temperature=0.7,
+                temperature=0.75,
+                max_output_tokens=8192,
             )
-            response = self.client.models.generate_content(
+            response = self.reasoning_client.models.generate_content(
                 model=self.podcast_script_model,
                 contents=prompt,
                 config=config
@@ -413,10 +607,11 @@ SOURCE DOCUMENT TO COVER:
             return PodcastScript(
                 title="Financial Insights Podcast",
                 turns=[
-                    PodcastTurn(speaker=s1['speaker'], text=f"Welcome to today's financial briefing. Let's discuss this article: {text[:200]}...", style="cheerful and friendly"),
-                    PodcastTurn(speaker=s2['speaker'], text=f"Thanks {s1['speaker']}. That's a critical topic for banking customers to understand.", style="calm and relaxed"),
+                    PodcastTurn(speaker=s1['speaker'], text=f"Welcome to today's financial briefing! [laughs] Let's discuss this article: {text[:200]}...", style="cheerful and friendly"),
+                    PodcastTurn(speaker=s2['speaker'], text=f"[sighs] Thanks {s1['speaker']}. That's a critical topic for banking customers and investors to understand.", style="thoughtful and measured"),
                 ]
             )
+
 
     def _generate_multi_speaker_speech(
         self,
@@ -602,12 +797,15 @@ SOURCE DOCUMENT TO COVER:
         voice_customization: Optional[str] = None,
         speed: float = 1.0,
         critique_feedback: Optional[str] = None,
+        podcast_script: Optional[str] = None,
+        target_duration_mins: int = 10,
         progress_callback: Optional[Any] = None
     ) -> GenerationResult:
         """
         Generates spoken audio from text using Gemini TTS API.
         For podcast personas, automatically writes a 2-person dialogue script incorporating
         Director's Notes instructions and synthesizes with Gemini Multi-Speaker TTS.
+        If a user-edited podcast_script is provided, synthesizes it directly without re-generating.
         For solo articles exceeding the chunk threshold (~400 words), partitions into complete-sentence chunks,
         processes sequentially, applies DSP mastering (RMS leveling + micro-fades), and losslessly stitches audio.
         """
@@ -616,19 +814,28 @@ SOURCE DOCUMENT TO COVER:
 
         # ---------------- Podcast Multi-Speaker Workflow ----------------
         if getattr(persona, "is_podcast", False):
-            if progress_callback:
-                progress_callback(
-                    stage="CHUNKING",
-                    message="Crafting 2-person podcast script from article with Gemini...",
-                    current_turn=1,
-                    total_turns=1
+            if podcast_script and podcast_script.strip():
+                if progress_callback:
+                    progress_callback(
+                        stage="CHUNKING",
+                        message="Parsing customized podcast script for multi-speaker synthesis...",
+                        current_turn=1,
+                        total_turns=1
+                    )
+                script = parse_markdown_script_to_turns(
+                    script_text=podcast_script,
+                    default_speakers=persona.speakers
                 )
-            script = self.generate_podcast_script(
-                text=text,
-                persona=persona,
-                director_notes=voice_customization,
-                job_id=job_id
-            )
+            else:
+                script = self.generate_podcast_script(
+                    text=text,
+                    persona=persona,
+                    director_notes=voice_customization,
+                    job_id=job_id,
+                    target_duration_mins=target_duration_mins,
+                    enable_web_search=True,
+                    progress_callback=progress_callback
+                )
             return self._generate_multi_speaker_speech(
                 script=script,
                 persona=persona,
