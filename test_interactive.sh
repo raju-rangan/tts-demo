@@ -112,7 +112,7 @@ test_custom_persona() {
     echo "  1) Retail Banking Guide            (Audience: External Customers | Voice: Sulafat)"
     echo "  2) Wealth & Market Advisor         (Audience: External Customers | Voice: Charon)"
     echo "  3) Regulatory & Policy Officer     (Audience: Internal Employees | Voice: Kore)"
-    echo "  4) Employee Enablement & Ops       (Audience: Internal Employees | Voice: Puck)"
+    echo "  4) Employee Enablement & Ops       (Audience: Internal Employees | Voice: Enceladus)"
     echo "  5) Fraud & Security Alert          (Audience: Both / Shared      | Voice: Schedar)"
     echo ""
     printf "Enter selection [1-5]: "

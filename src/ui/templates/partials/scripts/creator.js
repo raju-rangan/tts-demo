@@ -94,6 +94,16 @@
       }
       const voiceInput = document.getElementById('inputVoiceCustomization');
       if (voiceInput) voiceInput.value = '';
+      const scriptInput = document.getElementById('inputPodcastScript');
+      if (scriptInput) scriptInput.value = '';
+      const scriptJsonInput = document.getElementById('inputPodcastScriptJson');
+      if (scriptJsonInput) scriptJsonInput.value = '';
+      if (typeof switchPodcastEditorTab === 'function') {
+        switchPodcastEditorTab('dialogue');
+      }
+      const draftStatus = document.getElementById('podcastDraftStatus');
+      if (draftStatus) draftStatus.classList.add('hidden');
+      updatePodcastScriptStats();
       const speedSlider = document.getElementById('inputSpeed');
       if (speedSlider) {
         speedSlider.value = '1.0';
@@ -118,11 +128,417 @@
       }
     }
 
-    function loadSampleText() {
-      document.getElementById('inputText').value = `High-Yield Savings Accounts vs. Certificates of Deposit (CDs): A Financial Guide for Retail Banking Customers.\n\nWhen planning your short-to-medium-term savings strategy, two of the most secure instruments available are High-Yield Savings Accounts (HYSA) and Certificates of Deposit (CDs). Both products are FDIC-insured up to $250,000 per depositor, per institution, offering principal protection alongside competitive yields.\n\n1. High-Yield Savings Accounts: Flexibility & Liquidity. A high-yield savings account is an interest-bearing deposit account that typically offers an Annual Percentage Yield (APY) significantly higher than traditional brick-and-mortar savings accounts. The defining advantage is liquidity: funds can be deposited or withdrawn at any time via electronic funds transfers (EFT) or Automated Clearing House (ACH) withdrawals, subject to standard federal and bank transaction limits. These accounts are ideal for emergency funds or near-term expenses.\n\n2. Certificates of Deposit: Guaranteed Rate Certainty. A CD is a time-deposit account where you commit a lump sum for a fixed term—ranging from 3 months to 5 years—in exchange for a guaranteed APY that remains locked regardless of Federal Reserve interest rate fluctuations. However, withdrawing funds prior to the maturity date triggers an early withdrawal penalty, typically calculated as several months of interest.\n\n3. Regulatory & Compliance Safeguards. Both HYSAs and CDs require standard Customer Identification Programs (CIP) and Know Your Customer (KYC) verification in accordance with the Bank Secrecy Act (BSA) and anti-money laundering (AML) regulations.`;
+    let currentPodcastTab = 'dialogue';
+
+    const PODCAST_PERSONA_COHOSTS = {
+      'Podcast: Co-Hosts (Man & Woman)': {
+        host1: 'Joe', voice1: 'Enceladus',
+        host2: 'Jane', voice2: 'Kore',
+        label: 'Co-Hosts: Joe (Enceladus) & Jane (Kore)'
+      },
+      'Podcast: Co-Hosts (Man & Man)': {
+        host1: 'Joe', voice1: 'Enceladus',
+        host2: 'Alex', voice2: 'Charon',
+        label: 'Co-Hosts: Joe (Enceladus) & Alex (Charon)'
+      },
+      'Podcast: Co-Hosts (Woman & Woman)': {
+        host1: 'Jane', voice1: 'Kore',
+        host2: 'Maya', voice2: 'Sulafat',
+        label: 'Co-Hosts: Jane (Kore) & Maya (Sulafat)'
+      }
+    };
+
+    function parseMarkdownToPodcastJson(mdText) {
+      if (!mdText || !mdText.trim()) {
+        return { title: 'Podcast Episode', summary: 'Episode dialogue', turns: [] };
+      }
+      const lines = mdText.trim().split('\n');
+      let title = 'Podcast Episode';
+      const turns = [];
+      const speakerRegex = /^\*{0,2}([\w\s]+?)\*{0,2}(?:\s*\(([^)]+)\))?\s*:\s*(.+)$/;
+
+      let currentSpeaker = null;
+      let currentStyle = null;
+      let currentParts = [];
+
+      function flush() {
+        if (currentSpeaker && currentParts.length > 0) {
+          const text = currentParts.join(' ').trim();
+          if (text) {
+            turns.push({
+              speaker: currentSpeaker,
+              style: currentStyle || (turns.length % 2 === 0 ? 'curious and energetic' : 'analytical and measured'),
+              text: text
+            });
+          }
+        }
+        currentSpeaker = null;
+        currentStyle = null;
+        currentParts = [];
+      }
+
+      for (const line of lines) {
+        const clean = line.trim();
+        if (!clean) continue;
+        if (clean.startsWith('# ')) {
+          title = clean.substring(2).trim();
+          continue;
+        }
+        const m = clean.match(speakerRegex);
+        if (m) {
+          flush();
+          currentSpeaker = m[1].trim();
+          currentStyle = m[2] ? m[2].trim() : null;
+          currentParts = [m[3].trim()];
+        } else if (currentSpeaker) {
+          currentParts.push(clean);
+        }
+      }
+      flush();
+
+      return {
+        title: title,
+        summary: `Podcast episode with ${turns.length} dialogue turns`,
+        turns: turns
+      };
+    }
+
+    function parsePodcastJsonToMarkdown(jsonText) {
+      if (!jsonText || !jsonText.trim()) return '';
+      const parsed = JSON.parse(jsonText.trim());
+      let title = 'Podcast Episode';
+      let turns = [];
+      if (Array.isArray(parsed)) {
+        turns = parsed;
+      } else if (typeof parsed === 'object' && parsed !== null) {
+        title = parsed.title || title;
+        turns = Array.isArray(parsed.turns) ? parsed.turns : [];
+      }
+
+      const lines = [`# ${title}\n`];
+      for (const t of turns) {
+        const spk = t.speaker || 'Host';
+        const stylePart = t.style ? ` (${t.style})` : '';
+        const txt = t.text || '';
+        lines.push(`**${spk}**${stylePart}: ${txt}\n`);
+      }
+      return lines.join('\n');
+    }
+
+    function switchPodcastEditorTab(targetTab) {
+      const tabDialogue = document.getElementById('tabPodcastDialogue');
+      const tabJson = document.getElementById('tabPodcastJson');
+      const containerDialogue = document.getElementById('containerPodcastDialogue');
+      const containerJson = document.getElementById('containerPodcastJson');
+      const formatHint = document.getElementById('podcastFormatHint');
+      const areaDialogue = document.getElementById('inputPodcastScript');
+      const areaJson = document.getElementById('inputPodcastScriptJson');
+
+      if (targetTab === 'json') {
+        if (areaDialogue && areaJson) {
+          const mdText = areaDialogue.value.trim();
+          if (mdText) {
+            if (mdText.startsWith('{') || mdText.startsWith('[')) {
+              try {
+                const parsed = JSON.parse(mdText);
+                areaJson.value = JSON.stringify(parsed, null, 2);
+              } catch {
+                const jsonObj = parseMarkdownToPodcastJson(mdText);
+                areaJson.value = JSON.stringify(jsonObj, null, 2);
+              }
+            } else {
+              const jsonObj = parseMarkdownToPodcastJson(mdText);
+              areaJson.value = JSON.stringify(jsonObj, null, 2);
+            }
+          }
+        }
+
+        if (containerDialogue) containerDialogue.classList.add('hidden');
+        if (containerJson) containerJson.classList.remove('hidden');
+
+        if (tabDialogue) {
+          tabDialogue.className = 'px-2.5 py-1 text-xs font-medium rounded-md transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 flex items-center space-x-1.5 cursor-pointer';
+        }
+        if (tabJson) {
+          tabJson.className = 'px-2.5 py-1 text-xs font-medium rounded-md transition bg-purple-600 text-white shadow-sm flex items-center space-x-1.5 cursor-pointer';
+        }
+        if (formatHint) formatHint.textContent = 'Format: JSON with title and alternating turns array';
+
+        currentPodcastTab = 'json';
+        updatePodcastScriptJsonStats();
+      } else {
+        if (areaJson && areaDialogue) {
+          const jsonText = areaJson.value.trim();
+          if (jsonText) {
+            try {
+              const mdText = parsePodcastJsonToMarkdown(jsonText);
+              areaDialogue.value = mdText;
+            } catch (err) {
+              alert(`Invalid JSON format: ${err.message}. Please correct the JSON syntax before switching to Dialogue View.`);
+              return;
+            }
+          }
+        }
+
+        if (containerJson) containerJson.classList.add('hidden');
+        if (containerDialogue) containerDialogue.classList.remove('hidden');
+
+        if (tabDialogue) {
+          tabDialogue.className = 'px-2.5 py-1 text-xs font-medium rounded-md transition bg-purple-600 text-white shadow-sm flex items-center space-x-1.5 cursor-pointer';
+        }
+        if (tabJson) {
+          tabJson.className = 'px-2.5 py-1 text-xs font-medium rounded-md transition text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 flex items-center space-x-1.5 cursor-pointer';
+        }
+        if (formatHint) formatHint.textContent = 'Format: **Speaker** (style): Spoken text [laughs]';
+
+        currentPodcastTab = 'dialogue';
+        updatePodcastScriptStats();
+      }
+      lucide.createIcons();
+    }
+
+    function updatePodcastScriptJsonStats() {
+      const statsEl = document.getElementById('podcastScriptStats');
+      if (!statsEl) return;
+      const jsonText = document.getElementById('inputPodcastScriptJson')?.value?.trim() || '';
+      if (!jsonText) {
+        statsEl.textContent = '0 words • ~0.0 mins';
+        return;
+      }
+      try {
+        const parsed = JSON.parse(jsonText);
+        const turns = Array.isArray(parsed) ? parsed : (parsed.turns || []);
+        let totalWords = 0;
+        for (const t of turns) {
+          if (t.text) totalWords += t.text.split(/\s+/).filter(Boolean).length;
+        }
+        const mins = (totalWords / 150.0).toFixed(1);
+        const turnLabel = turns.length > 0 ? ` • ${turns.length} turns` : '';
+        statsEl.textContent = `${totalWords.toLocaleString()} words${turnLabel} • ~${mins} mins`;
+      } catch {
+        const words = jsonText.split(/\s+/).filter(Boolean).length;
+        const mins = (words / 150.0).toFixed(1);
+        statsEl.textContent = `${words.toLocaleString()} words (raw) • ~${mins} mins`;
+      }
+    }
+
+    function updatePodcastScriptStats() {
+      const scriptText = document.getElementById('inputPodcastScript')?.value?.trim() || '';
+      const statsEl = document.getElementById('podcastScriptStats');
+      if (!statsEl) return;
+      if (!scriptText) {
+        statsEl.textContent = '0 words • ~0.0 mins';
+        return;
+      }
+      const words = scriptText.split(/\s+/).filter(Boolean).length;
+      const mins = (words / 150.0).toFixed(1);
+      const turns = (scriptText.match(/^\s*\*\*[^*]+\*\*/gm) || []).length;
+      const turnLabel = turns > 0 ? ` • ${turns} turns` : '';
+      statsEl.textContent = `${words.toLocaleString()} words${turnLabel} • ~${mins} mins`;
+    }
+
+    function remapScriptSpeakersForPersona(newPersona) {
+      const config = PODCAST_PERSONA_COHOSTS[newPersona];
+      if (!config) return;
+      const targetH1 = config.host1;
+      const targetH2 = config.host2;
+
+      const areaDialogue = document.getElementById('inputPodcastScript');
+      const areaJson = document.getElementById('inputPodcastScriptJson');
+
+      function remapName(name) {
+        const n = (name || '').trim();
+        const nl = n.toLowerCase();
+        if (nl === targetH1.toLowerCase()) return targetH1;
+        if (nl === targetH2.toLowerCase()) return targetH2;
+        if (targetH1 === 'Jane') {
+          // Woman & Woman: Jane & Maya
+          if (nl === 'joe') return 'Jane';
+          if (nl === 'alex') return 'Maya';
+        } else if (targetH2 === 'Alex') {
+          // Man & Man: Joe & Alex
+          if (nl === 'jane' || nl === 'maya') return 'Alex';
+        } else if (targetH2 === 'Jane') {
+          // Man & Woman: Joe & Jane
+          if (nl === 'alex' || nl === 'maya') return 'Jane';
+        }
+        return name;
+      }
+
+      if (areaDialogue && areaDialogue.value.trim()) {
+        const lines = areaDialogue.value.split('\n');
+        const remappedLines = lines.map(line => {
+          return line.replace(/^(\*{0,2})([\w\s]+?)(\*{0,2})(?=\s*(?:\([^)]+\))?\s*:)/, (match, p1, speaker, p3) => {
+            const newSpk = remapName(speaker);
+            return `${p1}${newSpk}${p3}`;
+          });
+        });
+        areaDialogue.value = remappedLines.join('\n');
+      }
+
+      if (areaJson && areaJson.value.trim()) {
+        try {
+          const parsed = JSON.parse(areaJson.value.trim());
+          const turns = Array.isArray(parsed) ? parsed : (parsed.turns || []);
+          for (const t of turns) {
+            if (t.speaker) t.speaker = remapName(t.speaker);
+          }
+          areaJson.value = JSON.stringify(parsed, null, 2);
+        } catch {
+          // ignore parse error during typing
+        }
+      }
+
+      if (currentPodcastTab === 'json') {
+        updatePodcastScriptJsonStats();
+      } else {
+        updatePodcastScriptStats();
+      }
+    }
+
+    function handlePersonaChange(personaName) {
+      const isPodcast = personaName && personaName.startsWith('Podcast:');
+      const labelText = document.getElementById('textVoiceCustomizationLabel');
+      const badgeTag = document.getElementById('badgeVoiceCustomizationTag');
+      const sampleBtn = document.getElementById('btnSampleDirectives');
+      const inputCustom = document.getElementById('inputVoiceCustomization');
+      const helpText = document.getElementById('helpVoiceCustomization');
+      const studioCard = document.getElementById('podcastScriptStudioCard');
+
+      if (isPodcast) {
+        if (labelText) labelText.textContent = "Director's Notes & Editorial Angle (Shapes Dialogue & Debate)";
+        if (badgeTag) badgeTag.textContent = "Editorial Steering (High Priority)";
+        if (sampleBtn) sampleBtn.classList.remove('hidden');
+        if (inputCustom) inputCustom.placeholder = "e.g. Frame this as a clash between defense hawks and fiscal skeptics. Joe argues the bull case on rearmament and industrial scale, while Jane challenges with deficit debt constraints and procurement bottlenecks. End with a provocative question on whether European sovereignty can outpace allied political drift.";
+        if (helpText) helpText.textContent = "Primary Editorial Mandate: Directly dictates the core thesis, debate direction, co-host stances, and conversational tension.";
+        if (studioCard) studioCard.classList.remove('hidden');
+
+        // Update co-host badge and auto-remap co-host names in script
+        const cohostConfig = PODCAST_PERSONA_COHOSTS[personaName];
+        const badgeEl = document.getElementById('podcastCohostsBadgeText');
+        if (badgeEl && cohostConfig) {
+          badgeEl.textContent = cohostConfig.label;
+        }
+        remapScriptSpeakersForPersona(personaName);
+      } else {
+        if (labelText) labelText.textContent = "Voice Customization & Delivery Directives";
+        if (badgeTag) badgeTag.textContent = "Director's Notes (Optional)";
+        if (sampleBtn) sampleBtn.classList.add('hidden');
+        if (inputCustom) inputCustom.placeholder = "e.g. Speak with an empathetic, reassuring tone and slightly slower cadence on regulatory disclosures...";
+        if (helpText) helpText.textContent = "Directly guides pacing, vocal warmth, emphasis, or emotional nuance in Gemini TTS generation.";
+        if (studioCard) studioCard.classList.add('hidden');
+      }
+    }
+
+    async function draftPodcastScript() {
+      const text = document.getElementById('inputText')?.value?.trim() || '';
+      if (!text || text.length < 10) {
+        alert('Please enter or load article text in the "Article / Knowledge Transcript" field first.');
+        document.getElementById('inputText')?.focus();
+        return;
+      }
+
+      const persona = document.getElementById('inputPersona')?.value || 'Podcast: Co-Hosts (Man & Woman)';
+      const voice_customization = document.getElementById('inputVoiceCustomization')?.value?.trim() || null;
+      const enable_web_search = document.getElementById('inputEnableWebSearch')?.checked ?? true;
+
+      const btn = document.getElementById('btnDraftPodcastScript');
+      const btnText = document.getElementById('btnDraftPodcastScriptText');
+      const statusBox = document.getElementById('podcastDraftStatus');
+      const statusText = document.getElementById('podcastDraftStatusText');
+      const scriptArea = document.getElementById('inputPodcastScript');
+      const scriptAreaJson = document.getElementById('inputPodcastScriptJson');
+
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.textContent = 'Drafting Script...';
+      if (statusBox) {
+        statusBox.className = 'p-3 rounded-xl bg-purple-950/40 border border-purple-800/50 text-xs flex items-center space-x-2 text-purple-200';
+        if (statusText) {
+          statusText.textContent = enable_web_search
+            ? 'Grounding with Google Search & crafting ~10-minute lively dialogue (Gemini 3.8 Flash)...'
+            : 'Drafting ~10-minute lively dialogue with vocal cues (Gemini 3.8 Flash)...';
+        }
+        statusBox.classList.remove('hidden');
+      }
+      lucide.createIcons();
+
+      try {
+        const resp = await fetch('/api/podcast/draft-script', {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            text: text,
+            persona: persona,
+            voice_customization: voice_customization,
+            target_duration_mins: 10,
+            enable_web_search: enable_web_search
+          })
+        });
+
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data.detail || data.message || 'Failed to draft podcast script');
+        }
+
+        if (scriptArea && data.markdown_script) {
+          scriptArea.value = data.markdown_script;
+        }
+        if (scriptAreaJson && data.json_script) {
+          scriptAreaJson.value = data.json_script;
+        }
+
+        if (currentPodcastTab === 'json') {
+          updatePodcastScriptJsonStats();
+        } else {
+          updatePodcastScriptStats();
+        }
+
+        if (statusBox) {
+          statusBox.className = 'p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-xs flex items-center space-x-2 text-emerald-300';
+          statusBox.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i><span>Generated ${data.word_count.toLocaleString()} words (${data.turn_count} turns, ~${data.estimated_duration_mins} mins) with natural expressions! Review and edit anytime below.</span>`;
+          lucide.createIcons();
+        }
+      } catch (err) {
+        if (statusBox) {
+          statusBox.className = 'p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs flex items-center space-x-2 text-rose-300';
+          statusBox.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i><span>Error: ${err.message}</span>`;
+          lucide.createIcons();
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.textContent = 'Re-Draft 10-Min Script';
+      }
+    }
+
+    function loadSamplePodcastDirectives() {
       const voiceCust = document.getElementById('inputVoiceCustomization');
       if (voiceCust) {
-        voiceCust.value = "Speak with an articulate, reassuring retail banking demeanor. Enunciate 'High-Yield' and acronyms FDIC, APY, CD with precision.";
+        voiceCust.value = "Follow the NotebookLM style: open with an evocative thought-experiment ('Imagine logging into your banking dashboard on a random Tuesday...'), have Host 2 push back with healthy skepticism, use vivid real-world analogies (nightclub bouncer, dumb vault), and end with a provocative cliffhanger question for the executive listener.";
+      }
+    }
+
+    function loadSampleDirectives() {
+      const persona = document.getElementById('inputPersona')?.value || '';
+      if (persona.startsWith('Podcast:')) {
+        loadSamplePodcastDirectives();
+      } else {
+        const voiceCust = document.getElementById('inputVoiceCustomization');
+        if (voiceCust) {
+          voiceCust.value = "Speak with an articulate, reassuring retail banking demeanor. Enunciate 'High-Yield' and acronyms FDIC, APY, CD with precision.";
+        }
+      }
+    }
+
+    function loadSampleText() {
+      document.getElementById('inputText').value = `High-Yield Savings Accounts vs. Certificates of Deposit (CDs): A Financial Guide for Retail Banking Customers.\n\nWhen planning your short-to-medium-term savings strategy, two of the most secure instruments available are High-Yield Savings Accounts (HYSA) and Certificates of Deposit (CDs). Both products are FDIC-insured up to $250,000 per depositor, per institution, offering principal protection alongside competitive yields.\n\n1. High-Yield Savings Accounts: Flexibility & Liquidity. A high-yield savings account is an interest-bearing deposit account that typically offers an Annual Percentage Yield (APY) significantly higher than traditional brick-and-mortar savings accounts. The defining advantage is liquidity: funds can be deposited or withdrawn at any time via electronic funds transfers (EFT) or Automated Clearing House (ACH) withdrawals, subject to standard federal and bank transaction limits. These accounts are ideal for emergency funds or near-term expenses.\n\n2. Certificates of Deposit: Guaranteed Rate Certainty. A CD is a time-deposit account where you commit a lump sum for a fixed term—ranging from 3 months to 5 years—in exchange for a guaranteed APY that remains locked regardless of Federal Reserve interest rate fluctuations. However, withdrawing funds prior to the maturity date triggers an early withdrawal penalty, typically calculated as several months of interest.\n\n3. Regulatory & Compliance Safeguards. Both HYSAs and CDs require standard Customer Identification Programs (CIP) and Know Your Customer (KYC) verification in accordance with the Bank Secrecy Act (BSA) and anti-money laundering (AML) regulations.`;
+      const persona = document.getElementById('inputPersona')?.value || '';
+      if (persona.startsWith('Podcast:')) {
+        loadSamplePodcastDirectives();
+      } else {
+        const voiceCust = document.getElementById('inputVoiceCustomization');
+        if (voiceCust) {
+          voiceCust.value = "Speak with an articulate, reassuring retail banking demeanor. Enunciate 'High-Yield' and acronyms FDIC, APY, CD with precision.";
+        }
       }
       updateInputStats();
     }
@@ -134,6 +550,12 @@
       const voice_customization = document.getElementById('inputVoiceCustomization')?.value?.trim() || null;
       const speed = parseFloat(document.getElementById('inputSpeed')?.value || '1.0');
       const run_judge = document.getElementById('inputRunJudge').checked;
+      let podcast_script = null;
+      if (persona.startsWith('Podcast:')) {
+        const dVal = document.getElementById('inputPodcastScript')?.value?.trim();
+        const jVal = document.getElementById('inputPodcastScriptJson')?.value?.trim();
+        podcast_script = currentPodcastTab === 'json' ? (jVal || dVal || null) : (dVal || jVal || null);
+      }
       
       const statusBox = document.getElementById('newJobStatus');
       const submitBtn = document.getElementById('submitJobBtn');
@@ -147,7 +569,7 @@
         const resp = await fetch('/api/jobs', {
           method: 'POST',
           headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ text, persona, run_judge, voice_customization, speed })
+          body: JSON.stringify({ text, persona, run_judge, voice_customization, speed, podcast_script })
         });
         const data = await resp.json();
         if (!resp.ok) {

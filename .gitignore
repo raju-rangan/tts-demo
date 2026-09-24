@@ -75,7 +75,7 @@ data/*.sqlite3
 *.raw
 
 # Runtime logs
-logs/*.log
+logs/*
 !logs/.gitkeep
 
 # OS generated files

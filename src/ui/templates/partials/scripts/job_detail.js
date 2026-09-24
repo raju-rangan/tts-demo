@@ -35,7 +35,21 @@
         if (typeof updatePlaybackRateButtons === 'function') updatePlaybackRateButtons(1.0);
       }
       document.getElementById('detailWordCount').textContent = job.word_count || 0;
-      document.getElementById('detailTranscriptText').textContent = job.transcript;
+      
+      const transcriptEl = document.getElementById('detailTranscriptText');
+      if (transcriptEl) {
+        if (job.transcript && (job.transcript.includes('**') || (job.persona && job.persona.startsWith('Podcast:')))) {
+          const div = document.createElement('div');
+          div.textContent = job.transcript;
+          const escaped = div.innerHTML;
+          const formatted = escaped
+            .replace(/^#\s+(.+)$/gm, '<div class="text-sm font-bold text-white mb-2 pb-1 border-b border-zinc-800">$1</div>')
+            .replace(/\*\*(Joe|Alex|Jane|Maya|Host|Co-host|Speaker\s*\d*)\*\*:?/gi, '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 mr-1.5">$1</span>');
+          transcriptEl.innerHTML = formatted;
+        } else {
+          transcriptEl.textContent = job.transcript || '';
+        }
+      }
 
       // Director's Notes / Voice Customization
       const voiceCustCard = document.getElementById('detailVoiceCustomizationCard');

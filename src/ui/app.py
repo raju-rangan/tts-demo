@@ -2,6 +2,7 @@
 import os
 import io
 import time
+import json
 import secrets
 import logging
 from typing import Optional, List, Dict, Any
@@ -117,6 +118,14 @@ class CreateJobRequest(BaseModel):
     title: Optional[str] = Field(default=None)
     voice_customization: Optional[str] = Field(default=None, description="Custom director notes or vocal delivery directives")
     speed: Optional[float] = Field(default=1.0, ge=0.5, le=2.0, description="Speech delivery rate (0.5 to 2.0, default 1.0)")
+    podcast_script: Optional[str] = Field(default=None, description="Optional custom or pre-edited markdown podcast script")
+
+class DraftPodcastScriptRequest(BaseModel):
+    text: str = Field(..., min_length=10, description="Source article text to adapt into podcast script")
+    persona: str = Field(default="Podcast: Co-Hosts (Man & Woman)", description="Selected podcast persona")
+    voice_customization: Optional[str] = Field(default=None, description="Director notes or focus instructions")
+    target_duration_mins: int = Field(default=10, ge=1, le=30, description="Target duration in minutes (default 10)")
+    enable_web_search: bool = Field(default=True, description="Whether to ground the podcast script with live Google Web Search research")
 
 class BulkJobRequest(BaseModel):
     urls: List[str] = Field(..., min_length=1, description="List of article URLs to extract and synthesize")
@@ -556,7 +565,7 @@ def reset_all_tours_endpoint(user: Dict[str, Any] = Depends(get_current_user)):
 
 @app.get("/api/personas")
 def list_personas():
-    """Returns all 5 banking voice personas with metadata and pronunciation rules."""
+    """Returns all available voice personas with metadata, speaker definitions, and pronunciation rules."""
     result = []
     for name, p in PERSONAS.items():
         result.append({
@@ -564,7 +573,9 @@ def list_personas():
             "voice_name": p.voice_name,
             "audience": p.audience,
             "description": p.description,
-            "sample_pause_guidance": "Adheres to federal banking acronym guidelines (FDIC, APY, ACH, KYC)."
+            "sample_pause_guidance": "Adheres to federal banking acronym guidelines (FDIC, APY, ACH, KYC).",
+            "is_podcast": getattr(p, "is_podcast", False),
+            "speakers": getattr(p, "speakers", None)
         })
     return result
 
@@ -982,7 +993,8 @@ def _execute_async_synthesis(
     critique_feedback: Optional[str] = None,
     retry_count: int = 0,
     previous_attempt_score: Optional[float] = None,
-    remediation_prompt: Optional[str] = None
+    remediation_prompt: Optional[str] = None,
+    podcast_script: Optional[str] = None
 ):
     """Background worker that runs TTS synthesis, GCS upload, and Multimodal Judge."""
     repo = get_job_repository()
@@ -1006,7 +1018,8 @@ def _execute_async_synthesis(
     words = len(text.split())
     chars = len(text)
     critique_note = " | Critique Remediation Active" if critique_feedback else ""
-    logger.info(f"▶ [{job_id}] Starting synthesis job | Persona: '{persona_name}' | Speed: {speed:.2f}x | Words: {words} | Chars: {chars} | Run Judge: {run_judge} | Customization: {bool(voice_customization)}{critique_note}")
+    podcast_note = " | Pre-Drafted Podcast Script Active" if podcast_script else ""
+    logger.info(f"▶ [{job_id}] Starting synthesis job | Persona: '{persona_name}' | Speed: {speed:.2f}x | Words: {words} | Chars: {chars} | Run Judge: {run_judge} | Customization: {bool(voice_customization)}{critique_note}{podcast_note}")
     t0 = time.time()
     try:
         # Step 1: Voice Generation (multi-turn auto-chunking & DSP mastering)
@@ -1017,6 +1030,7 @@ def _execute_async_synthesis(
             voice_customization=voice_customization,
             speed=speed,
             critique_feedback=critique_feedback,
+            podcast_script=podcast_script,
             progress_callback=progress_callback
         )
         synth_time = time.time() - t0
@@ -1045,6 +1059,12 @@ def _execute_async_synthesis(
         with open("scripts/samples/latest_generated.mp3", "wb") as f:
             f.write(gen_result.audio_bytes)
 
+        # Determine effective transcript & title (supporting podcast-generated scripts)
+        effective_transcript = gen_result.transcript if gen_result.transcript else text
+        effective_title = title or gen_result.title or text.split("\n")[0][:80].strip("#* ")
+        effective_words = len(effective_transcript.split())
+        effective_chars = len(effective_transcript)
+
         # Step 3: Multimodal Quality Audit
         eval_result = None
         judge_time = 0.0
@@ -1059,7 +1079,7 @@ def _execute_async_synthesis(
             try:
                 eval_result = judge.evaluate_audio_gcs(
                     gcs_audio_uri=gcs_uri,
-                    reference_text=text,
+                    reference_text=effective_transcript,
                     persona_name=persona_name
                 )
                 judge_time = time.time() - t1
@@ -1071,11 +1091,11 @@ def _execute_async_synthesis(
         # Step 4: Token & Cost Calculations
         eval_usage = getattr(eval_result, "usage_metadata", None) if eval_result else None
         token_usage, cost = TokenCostCalculator.calculate_pipeline_cost(
-            text=text,
+            text=effective_transcript,
             duration_seconds=gen_result.duration_seconds,
             tts_usage_metadata=getattr(gen_result, "usage_metadata", None),
             judge_usage_metadata=eval_usage,
-            tts_model=settings.voice_model,
+            tts_model=gen_result.model_used or settings.voice_model,
             judge_model=settings.judge_model if judge else ""
         )
 
@@ -1086,10 +1106,10 @@ def _execute_async_synthesis(
             persona=persona_name,
             audience=persona_obj.audience,
             voice_name=persona_obj.voice_name,
-            article_title=title or text.split("\n")[0][:80].strip("#* "),
-            transcript=text,
-            word_count=words,
-            char_count=chars,
+            article_title=effective_title,
+            transcript=effective_transcript,
+            word_count=effective_words,
+            char_count=effective_chars,
             gcs_uri=gcs_uri,
             signed_url=signed_url,
             audio_format="MP3 24kHz @ 320kbps",
@@ -1164,6 +1184,11 @@ def create_job(
     persona_obj = get_persona(req.persona)
     speed = float(req.speed) if req.speed is not None else 1.0
 
+    initial_transcript = req.podcast_script if (req.podcast_script and req.podcast_script.strip()) else req.text
+    initial_words = len(initial_transcript.split())
+    initial_chars = len(initial_transcript)
+    progress_msg = "Synthesizing customized podcast dialogue..." if (req.podcast_script and req.podcast_script.strip()) else "Partitioning text into natural conversational turns..."
+
     # Pre-save running record with initial progress
     repo = get_job_repository()
     initial_job = JobRecord(
@@ -1173,15 +1198,15 @@ def create_job(
         audience=persona_obj.audience,
         voice_name=persona_obj.voice_name,
         article_title=req.title or req.text.split("\n")[0][:80].strip("#* "),
-        transcript=req.text,
-        word_count=len(req.text.split()),
-        char_count=len(req.text),
+        transcript=initial_transcript,
+        word_count=initial_words,
+        char_count=initial_chars,
         gcs_uri="gs://knowledge-to-audio-poc/pending/" + job_id,
         status="RUNNING",
         speed=speed,
         voice_customization=req.voice_customization,
         progress_stage="CHUNKING",
-        progress_message="Partitioning text into natural conversational turns...",
+        progress_message=progress_msg,
         created_by=user.get("email")
     )
     repo.save_job(initial_job)
@@ -1196,7 +1221,8 @@ def create_job(
         title=req.title,
         voice_customization=req.voice_customization,
         speed=speed,
-        created_by=user.get("email")
+        created_by=user.get("email"),
+        podcast_script=req.podcast_script
     )
 
     return {
@@ -1205,6 +1231,67 @@ def create_job(
         "message": f"Speech generation started for persona '{req.persona}'",
         "job": initial_job
     }
+
+
+@app.post("/api/podcast/draft-script")
+def draft_podcast_script(
+    req: DraftPodcastScriptRequest,
+    user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Drafts an interactive, multi-speaker podcast script (~10 mins) using Gemini 3.8 Flash,
+    optionally grounded with real-time Google Web Search research.
+    Returns markdown script, word count, turn count, and estimated duration.
+    """
+    persona_obj = get_persona(req.persona)
+    if not getattr(persona_obj, "is_podcast", False):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Persona '{req.persona}' is not a multi-speaker podcast persona."
+        )
+
+    generator = GeminiAudioGenerator()
+    try:
+        script = generator.generate_podcast_script(
+            text=req.text,
+            persona=persona_obj,
+            director_notes=req.voice_customization,
+            target_duration_mins=req.target_duration_mins,
+            enable_web_search=req.enable_web_search
+        )
+        total_words = sum(len(t.text.split()) for t in script.turns)
+        est_duration_mins = round(total_words / 150.0, 1)
+
+        dialogue_lines = []
+        for t in script.turns:
+            style_part = f" ({t.style})" if t.style else ""
+            dialogue_lines.append(f"**{t.speaker}**{style_part}: {t.text}\n")
+        markdown_script = "\n".join(dialogue_lines)
+
+        turns_data = [t.model_dump() for t in script.turns]
+        json_script = json.dumps(
+            {
+                "title": script.title,
+                "summary": script.summary,
+                "turns": turns_data
+            },
+            indent=2
+        )
+
+        return {
+            "title": script.title,
+            "markdown_script": markdown_script,
+            "json_script": json_script,
+            "turns": turns_data,
+            "turn_count": len(script.turns),
+            "word_count": total_words,
+            "estimated_duration_mins": est_duration_mins,
+            "speakers": persona_obj.speakers
+        }
+    except Exception as e:
+        logger.error(f"Failed to draft podcast script: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to draft podcast script: {str(e)}")
+
 
 
 @app.get("/api/jobs/{job_id}/retry-preview")
@@ -1309,7 +1396,8 @@ def retry_job(
         critique_feedback=critique_text,
         retry_count=new_retry_count,
         previous_attempt_score=prev_score,
-        remediation_prompt=critique_text
+        remediation_prompt=critique_text,
+        podcast_script=job.transcript if ("**" in (job.transcript or "") and ":" in (job.transcript or "")) else None
     )
 
     return {

@@ -3,6 +3,7 @@ import io
 import os
 import re
 import time
+import json
 import uuid
 import wave
 import logging
@@ -27,10 +28,253 @@ try:
 except Exception:
     lameenc = None
 
+from pydantic import BaseModel, Field
 from src.config import settings
 from src.ai.personas import get_persona, VoicePersona
 
 logger = logging.getLogger(__name__)
+
+class PodcastTurn(BaseModel):
+    speaker: str = Field(..., description="Name of the speaking co-host (e.g. Joe, Jane, Alex, Maya)")
+    text: str = Field(..., description="The spoken dialogue line for this turn, including natural vocal reactions strictly in square brackets like [laughs], [sighs], [chuckles], [pauses]. NEVER use parentheses () for vocal cues.")
+    style: Optional[str] = Field(default="natural and conversational", description="Speaking style, emotion, or delivery nuance")
+
+class PodcastScript(BaseModel):
+    title: str = Field(..., description="An engaging, catchy podcast episode title")
+    summary: Optional[str] = Field(default=None, description="Brief episode summary")
+    turns: List[PodcastTurn] = Field(..., min_length=2, description="Ordered dialogue turns between the two co-hosts")
+
+
+def align_and_alternate_turns(
+    turns: List[PodcastTurn],
+    default_speakers: Optional[Any] = None
+) -> List[PodcastTurn]:
+    """
+    Normalizes a list of PodcastTurns ensuring:
+    1. Every turn's speaker is mapped to one of the two active persona co-hosts.
+    2. Cross-persona speaker names are remapped to the active persona (e.g. Jane -> Alex or Joe -> Jane).
+    3. Consecutive turns strictly alternate between Host 1 and Host 2 without duplicates.
+    4. Vocal cues in parentheses () are converted to square brackets [].
+    5. Minimum of 2 turns is guaranteed for PodcastScript schema compliance.
+    """
+    if not turns:
+        return []
+
+    def _extract_name(spk_item, fallback: str) -> str:
+        if isinstance(spk_item, dict):
+            return spk_item.get("speaker", fallback)
+        return getattr(spk_item, "speaker", fallback)
+
+    host1_name = "Joe"
+    host2_name = "Jane"
+    if default_speakers and len(default_speakers) >= 2:
+        host1_name = _extract_name(default_speakers[0], "Joe")
+        host2_name = _extract_name(default_speakers[1], "Jane")
+    elif default_speakers and len(default_speakers) == 1:
+        host1_name = _extract_name(default_speakers[0], "Joe")
+        host2_name = "Jane" if host1_name.lower() != "jane" else "Maya"
+
+    aligned: List[PodcastTurn] = []
+    for idx, turn in enumerate(turns):
+        spk_orig = turn.speaker.strip() if turn.speaker else ""
+        spk_lower = spk_orig.lower()
+
+        # 1. Match against active persona hosts
+        if spk_lower == host1_name.lower() or spk_lower in ("host 1", "host", "speaker 1"):
+            target_spk = host1_name
+        elif spk_lower == host2_name.lower() or spk_lower in ("host 2", "co-host", "cohost", "speaker 2"):
+            target_spk = host2_name
+        # 2. Known cross-persona mapping (handles switches between Man-Woman, Man-Man, Woman-Woman)
+        elif spk_lower in ("joe",):
+            target_spk = host1_name
+        elif spk_lower in ("alex", "maya"):
+            target_spk = host2_name
+        elif spk_lower in ("jane",):
+            # If Jane is host 1 (in Woman & Woman), she is host 1.
+            # If Jane was host 2 (in Man & Woman), and active persona is Man & Man, she maps to Alex (host2_name).
+            if host1_name.lower() == "jane":
+                target_spk = host1_name
+            else:
+                target_spk = host2_name
+        else:
+            # Unrecognized speaker name: fallback to index parity
+            target_spk = host1_name if idx % 2 == 0 else host2_name
+
+        # Normalize vocal cues into square brackets []
+        clean_text = re.sub(
+            r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
+            r"[\1]",
+            turn.text,
+            flags=re.IGNORECASE
+        )
+
+        # 3. Direct leading vocative attribution check:
+        # If a line opens with a host's name (e.g. "Joe, you can't..."), that line is addressed TO Joe by Host 2.
+        # Exclude self-introductions like "Joe here..." or "Joe, your host...".
+        is_self_intro_h1 = bool(re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host1_name) + r"(?:\s+here|\s*,\s*(?:your|the)\s+host)\b", clean_text, re.IGNORECASE))
+        is_self_intro_h2 = bool(re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host2_name) + r"(?:\s+here|\s*,\s*(?:your|the)\s+host)\b", clean_text, re.IGNORECASE))
+        leading_h1 = not is_self_intro_h1 and bool(re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host1_name) + r"[,\s!?]", clean_text, re.IGNORECASE))
+        leading_h2 = not is_self_intro_h2 and bool(re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host2_name) + r"[,\s!?]", clean_text, re.IGNORECASE))
+        if leading_h1 and not leading_h2:
+            target_spk = host2_name
+        elif leading_h2 and not leading_h1:
+            target_spk = host1_name
+
+        # 4. Strict alternation guarantee: adjacent turns MUST alternate co-hosts
+        if aligned:
+            prev_spk = aligned[-1].speaker
+            if target_spk == prev_spk:
+                target_spk = host2_name if prev_spk == host1_name else host1_name
+
+        # 5. Self-addressing vocative sanitization QA:
+        # If target_spk's name appears as a vocative in their own spoken turn (e.g. "... is real, Joe."),
+        # swap it to address the other co-host to guarantee 100% character and persona congruence.
+        # CRITICAL: Preserve legitimate self-introductions (e.g. "This is Joe", "I'm Joe", "Joe here", "your host, Joe").
+        other_host = host2_name if target_spk == host1_name else host1_name
+        intro_pattern = re.compile(
+            r"\b(this is|i'\''m|i am|it'\''s|your host,?|host|name is|i am your host,?|i'\''m your host,?)\s+" + re.escape(target_spk) + r"\b|\b" + re.escape(target_spk) + r"\s+here\b",
+            re.IGNORECASE
+        )
+        intros = []
+        def _save_intro(m):
+            intros.append(m.group(0))
+            return f"__SELF_INTRO_{len(intros)-1}__"
+
+        masked_text = intro_pattern.sub(_save_intro, clean_text)
+        masked_text = re.sub(
+            r"(\b)" + re.escape(target_spk) + r"([,\.!?\s]|$)",
+            lambda m: f"{m.group(1)}{other_host}{m.group(2)}",
+            masked_text,
+            flags=re.IGNORECASE
+        )
+        for i, intro in enumerate(intros):
+            masked_text = masked_text.replace(f"__SELF_INTRO_{i}__", intro)
+        clean_text = masked_text
+
+        # 6. Default style if missing (light, conversational, expressive)
+        turn_style = turn.style
+        if not turn_style:
+            turn_style = "cheerful and upbeat" if target_spk == host1_name else "warm and amused"
+
+        aligned.append(PodcastTurn(
+            speaker=target_spk,
+            text=clean_text,
+            style=turn_style
+        ))
+
+    # Defensive guarantee for schema requirement (min_length=2)
+    if len(aligned) == 1:
+        only_turn = aligned[0]
+        other_host = host2_name if only_turn.speaker == host1_name else host1_name
+        aligned.append(PodcastTurn(
+            speaker=other_host,
+            text=f"[laughs] Absolutely, {only_turn.speaker}! That's such a great point for our listeners.",
+            style="warm and conversational"
+        ))
+
+    return aligned
+
+
+def parse_markdown_script_to_turns(
+    script_text: str,
+    default_speakers: Optional[Tuple[Any, ...]] = None
+) -> PodcastScript:
+    """
+    Parses user-edited podcast script (formatted dialogue or structured JSON)
+    into a strongly typed PodcastScript with guaranteed speaker alternation
+    and persona voice alignment.
+    """
+    lines = script_text.strip().split("\n")
+    title = "Podcast Episode"
+    summary = None
+    turns: List[PodcastTurn] = []
+
+    # Check if script_text is structured JSON
+    stripped = script_text.strip()
+    if stripped.startswith("{") or stripped.startswith("["):
+        try:
+            parsed = json.loads(stripped)
+            raw_turns_list = []
+            if isinstance(parsed, dict):
+                title = parsed.get("title", title)
+                summary = parsed.get("summary")
+                turns_data = parsed.get("turns", [])
+            elif isinstance(parsed, list):
+                turns_data = parsed
+            else:
+                turns_data = []
+
+            for item in turns_data:
+                if isinstance(item, dict):
+                    raw_turns_list.append(PodcastTurn(
+                        speaker=item.get("speaker", "Joe"),
+                        text=item.get("text", ""),
+                        style=item.get("style")
+                    ))
+            if raw_turns_list:
+                turns = raw_turns_list
+        except Exception as e:
+            logger.debug(f"Input text appeared to be JSON but failed parsing: {e}, falling back to dialogue parser")
+
+    # If not JSON or JSON parsing yielded no turns, parse formatted dialogue
+    if not turns:
+        current_speaker: Optional[str] = None
+        current_style: Optional[str] = None
+        current_text_parts: List[str] = []
+
+        speaker_regex = re.compile(r"^\*{0,2}([\w\s]+?)\*{0,2}(?:\s*\(([^)]+)\))?\s*:\s*(.+)$")
+
+        def flush():
+            nonlocal current_speaker, current_style, current_text_parts
+            if current_speaker and current_text_parts:
+                text = " ".join(current_text_parts).strip()
+                if text:
+                    turns.append(PodcastTurn(
+                        speaker=current_speaker,
+                        text=text,
+                        style=current_style
+                    ))
+            current_speaker = None
+            current_style = None
+            current_text_parts = []
+
+        for line in lines:
+            line_clean = line.strip()
+            if not line_clean:
+                continue
+            if line_clean.startswith("# "):
+                title = line_clean[2:].strip()
+                continue
+            m = speaker_regex.match(line_clean)
+            if m:
+                flush()
+                current_speaker = m.group(1).strip()
+                current_style = m.group(2).strip() if m.group(2) else None
+                current_text_parts = [m.group(3).strip()]
+            else:
+                if current_speaker:
+                    current_text_parts.append(line_clean)
+        flush()
+
+    # Paragraph fallback if neither speaker lines nor JSON were found
+    if not turns:
+        paras = [p.strip() for p in script_text.split("\n\n") if p.strip()]
+        for idx, p in enumerate(paras):
+            turns.append(PodcastTurn(
+                speaker="Joe" if idx % 2 == 0 else "Jane",
+                text=p,
+                style=None
+            ))
+
+    # Apply strict alternation, cross-persona remapping, and vocal cue normalization
+    final_turns = align_and_alternate_turns(turns, default_speakers)
+
+    return PodcastScript(
+        title=title,
+        summary=summary or f"Podcast episode with {len(final_turns)} dialogue turns",
+        turns=final_turns
+    )
+
 
 @dataclass
 class AggregatedUsageMetadata:
@@ -47,6 +291,8 @@ class GenerationResult:
     persona_used: str
     model_used: str
     usage_metadata: Optional[Any] = None
+    transcript: Optional[str] = None
+    title: Optional[str] = None
 
 
 def split_text_into_chunks(text: str, target_words: Optional[int] = None) -> List[str]:
@@ -178,11 +424,14 @@ class GeminiAudioGenerator:
         self.location = location or settings.location
         # Default to official Gemini TTS model if not explicitly overridden
         self.model = model or os.getenv("GEMINI_VOICE_MODEL", "gemini-3.1-flash-tts-preview")
+        self.multi_speaker_model = os.getenv("GEMINI_MULTI_SPEAKER_VOICE_MODEL", self.model)
+        self.podcast_script_model = os.getenv("GEMINI_PODCAST_SCRIPT_MODEL", settings.judge_model)
         self._client: Optional[genai.Client] = None
+        self._reasoning_client: Optional[genai.Client] = None
 
     @property
     def client(self) -> genai.Client:
-        """Lazy-initialized Google Gen AI Client."""
+        """Lazy-initialized Google Gen AI Client for TTS speech synthesis (using location settings)."""
         if self._client is None:
             api_key = os.getenv("GEMINI_API_KEY")
             http_opts = types.HttpOptions(timeout=600000)  # 10 minute timeout for long audio generation
@@ -196,6 +445,33 @@ class GeminiAudioGenerator:
                     http_options=http_opts
                 )
         return self._client
+
+    @property
+    def reasoning_client(self) -> genai.Client:
+        """Lazy-initialized Client for text/multimodal reasoning (configured for global location on Vertex AI)."""
+        if self._reasoning_client is not None:
+            return self._reasoning_client
+        # In unit tests, if _client is a Mock/MagicMock and _reasoning_client is unset, reuse the mock
+        if self._client is not None and type(self._client).__name__ in ("Mock", "MagicMock"):
+            return self._client
+        api_key = os.getenv("GEMINI_API_KEY")
+        http_opts = types.HttpOptions(timeout=600000)
+        if api_key:
+            self._reasoning_client = genai.Client(api_key=api_key, http_options=http_opts)
+        else:
+            judge_loc = getattr(settings, "judge_location", "global")
+            self._reasoning_client = genai.Client(
+                vertexai=bool(self.project_id and self.project_id != "tts-demo-project"),
+                project=self.project_id if self.project_id != "tts-demo-project" else None,
+                location=judge_loc if self.project_id != "tts-demo-project" else None,
+                http_options=http_opts
+            )
+        return self._reasoning_client
+
+    @reasoning_client.setter
+    def reasoning_client(self, client: genai.Client):
+        self._reasoning_client = client
+
 
     def _generate_single_chunk(
         self,
@@ -324,6 +600,465 @@ class GeminiAudioGenerator:
                     logger.error(f"client.models.generate_content failed{turn_label} after {max_attempts} attempts: {e}", exc_info=True)
                     raise RuntimeError(f"Could not generate audio using model '{self.model}'{turn_label} ({e}). Verify Vertex AI quota and model availability.")
 
+    def research_podcast_context(
+        self,
+        source_text: str,
+        director_notes: Optional[str] = None,
+        job_id: Optional[str] = None
+    ) -> str:
+        """
+        Uses Gemini with Google Search Grounding to research real-time facts, current news,
+        market multiples, and verified figures relevant to the podcast topic.
+        """
+        job_label = f"[{job_id}] " if job_id else ""
+        logger.info(f"▶ {job_label}Conducting real-time web research to enrich podcast context...")
+
+        search_prompt = (
+            "You are an expert investigative research producer for a leading podcast.\n"
+            "Review the director's instructions and the core themes of this article:\n"
+            f"SOURCE ARTICLE EXCERPT: {source_text[:1200]}\n\n"
+            f"DIRECTOR'S EDITORIAL MANDATE: {director_notes or 'Focus on the key trade-offs, real-world implications, and market dynamics.'}\n\n"
+            "Using Google Search, find the latest real-world facts, recent data points, verified figures, or recent quotes directly relevant to the director's editorial mandate.\n"
+            "Provide a concise, bulleted research brief (max 250 words) with specific facts and figures the hosts can naturally drop into conversation."
+        )
+
+        try:
+            config = types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+                temperature=0.3,
+            )
+            response = self.reasoning_client.models.generate_content(
+                model=self.podcast_script_model,
+                contents=search_prompt,
+                config=config
+            )
+            dossier = response.text or ""
+            logger.info(f"✓ {job_label}Web research completed ({len(dossier)} chars)")
+            return dossier
+        except Exception as e:
+            logger.warning(f"Web research grounding could not be completed ({e}). Proceeding with source document only.")
+            return ""
+
+    def generate_podcast_script(
+        self,
+        text: str,
+        persona: VoicePersona,
+        director_notes: Optional[str] = None,
+        job_id: Optional[str] = None,
+        target_duration_mins: int = 10,
+        enable_web_search: bool = True,
+        progress_callback: Optional[Any] = None
+    ) -> PodcastScript:
+        """
+        Uses Gemini to generate an engaging, balanced 2-person podcast dialogue script (~10 minutes,
+        ~1400-1600 words) based on the source text, web research, co-host persona profiles, and director's notes.
+        Includes human vocal expressions (laughs, sighs, chuckles, pauses).
+        """
+        job_label = f"[{job_id}] " if job_id else ""
+        logger.info(f"▶ {job_label}Generating {target_duration_mins}-min podcast script for persona '{persona.name}' using model '{self.podcast_script_model}'...")
+
+        speakers = persona.speakers or (
+            {"speaker": "Joe", "voice_name": "Enceladus", "gender": "male", "role": "Host"},
+            {"speaker": "Jane", "voice_name": "Kore", "gender": "female", "role": "Co-host"},
+        )
+        s1 = speakers[0]
+        s2 = speakers[1]
+
+        research_section = ""
+        if enable_web_search:
+            if progress_callback:
+                progress_callback(
+                    stage="CHUNKING",
+                    message="Performing web research with Google Search Grounding to enrich dialogue...",
+                    current_turn=1,
+                    total_turns=2
+                )
+            research_dossier = self.research_podcast_context(
+                source_text=text,
+                director_notes=director_notes,
+                job_id=job_id
+            )
+            if research_dossier.strip():
+                research_section = (
+                    "======================================================================\n"
+                    "LATEST WEB RESEARCH & REAL-WORLD CONTEXT (GROUNDING):\n"
+                    f"{research_dossier.strip()}\n"
+                    "Weave these specific real-world facts, quotes, or numbers naturally into the discussion.\n"
+                    "======================================================================\n\n"
+                )
+
+        customization_section = ""
+        if director_notes and director_notes.strip():
+            customization_section = (
+                "======================================================================\n"
+                "★★★ PRIMARY EDITORIAL MANDATE & DISCUSSION DIRECTION (HIGHEST PRIORITY) ★★★\n"
+                "The Director has provided the following mandatory editorial vision for this episode:\n"
+                f"\"{director_notes.strip()}\"\n\n"
+                "CRITICAL DIRECTOR'S INSTRUCTIONS:\n"
+                "1. THE DIRECTOR'S VISION GOVERNS THE EPISODE: The source text and research provide background facts, "
+                "but the Director's Notes dictate the narrative direction, core thesis, debate angles, and tone.\n"
+                f"2. CO-HOST ROLES & STANCES: If the Director's Notes specify perspectives, biases, or debate sides for "
+                f"{s1['speaker']} and {s2['speaker']}, you MUST adopt those exact stances throughout the episode, overriding default personas.\n"
+                "3. CONVERSATIONAL TENSION & CLASH: Ensure the central tension, trade-off, or debate highlighted in the Director's Notes "
+                "forms the backbone of the conversation across all 5 acts.\n"
+                "4. COMPLETE THEMATIC COVERAGE: Every topic, question, or constraint specified in the Director's Notes must be "
+                "prominently discussed and addressed by the hosts.\n"
+                "======================================================================\n\n"
+            )
+
+        target_words = max(600, target_duration_mins * 150)
+        target_turns = max(14, int(target_duration_mins * 4.5))
+
+        if progress_callback:
+            progress_callback(
+                stage="CHUNKING",
+                message=f"Drafting full {target_duration_mins}-minute podcast dialogue ({target_turns} turns) with human expressions...",
+                current_turn=2 if enable_web_search else 1,
+                total_turns=2 if enable_web_search else 1
+            )
+
+        prompt = f"""
+You are the scriptwriter and producer for a lively, impromptu, fast-paced, and highly engaging 2-person podcast, modeled after the spontaneous human chemistry and natural flow of Google NotebookLM's Deep Dive.
+
+{customization_section}
+Your task is to transform the provided source document into a fun, relatable, and authentic conversation between two good friends and co-hosts: {s1['speaker']} and {s2['speaker']}.
+
+CO-HOST ROLES:
+- Host 1: {s1['speaker']} ({s1.get('gender', 'host')}, Voice: {s1['voice_name']}) — Enthusiastic, curious, relatable host who hooks the listener with funny hypotheticals, asks piercing questions, and grounds ideas in everyday analogies.
+- Host 2: {s2['speaker']} ({s2.get('gender', 'co-host')}, Voice: {s2['voice_name']}) — Warm, quick-witted partner who playfully pushes back on assumptions with common sense, and brings practical takeaways with clarity.
+*(Note: If the Director's Notes above assign specific debate sides, perspectives, or expertise to {s1['speaker']} or {s2['speaker']}, prioritize the Director's role assignments above all else.)*
+
+{research_section}
+NOTEBOOKLM 5-ACT NARRATIVE STORY ARC (~{target_duration_mins} MINUTES):
+Structure the conversation across 5 natural, entertaining acts, actively driven by the Director's Notes and source material:
+
+1. ACT I: THE FUN HOOK & WARM CO-HOST INTRODUCTION (~15% of episode)
+   - WARM, DYNAMIC INTRO (TURN 1):
+     * Host 1 ({s1['speaker']}) opens with a brief, friendly, and natural introduction introducing themselves as the host, introducing who is in the room ({s2['speaker']}), and setting up the topic/question being explored.
+     * EXAMPLES (Generate varied, spontaneous phrasing like this—DO NOT use rigid boilerplate):
+       - "Hello and welcome in! This is {s1['speaker']}, your host for today. I've got {s2['speaker']} with me in the studio, and today we are breaking down [Topic]..."
+       - "Hey everyone, {s1['speaker']} here, joined as always by {s2['speaker']}. Today we are digging into a question that's been making headlines: [Topic]..."
+       - "Welcome to the show! I'm {s1['speaker']} alongside {s2['speaker']}, and today we are diving into [Topic]..."
+     * NEVER open turn 1 with laughter or sighs (`[laughs]` or `[sighs]`). Keep the opening delivery crisp, welcoming, and confident.
+   - CO-HOST HANDOFF & THE FUN HOOK (TURN 2):
+     * Host 2 ({s2['speaker']}) responds warmly ("Hey {s1['speaker']}! Great to be here...", "Always good to be in the studio, {s1['speaker']}..."), reacts to the topic premise, and immediately pivots into the core thought-experiment, wild observation, or provocative paradox centered on the Director's editorial focus.
+   - Interleave quick conversational reactions ("Oh wow.", "Right? Yeah.").
+   - Directly frame the listener: Bring the listener into the conversation like a curious friend joining a fascinating discussion over coffee.
+
+2. ACT II: UNPACKING THE STORY WITH FUN ANALOGIES (~25% of episode)
+   - Unpack the key facts, research findings, and numbers from the source document and web grounding, focusing on the themes prioritized by the Director.
+   - VIVID, RELATABLE METAPHORS: Compare complex mechanics to relatable everyday situations.
+   - Co-hosts react with genuine curiosity and engagement.
+
+3. ACT III: THE PLAYFUL REALITY CHECK & BANTER (~25% of episode)
+   - Stage the primary debate or tension mandated by the Director. The designated skeptic playfully pushes back: "Okay, but hold on {s1['speaker']}! Is that really how it plays out in the real world? Because if people actually tried that..."
+   - Dynamic, snappy back-and-forth exchanges ("Wait, seriously?", "Exactly!", "Which is wild.", "It really is.").
+
+4. ACT IV: PRACTICAL "SO WHAT DOES THIS MEAN?" TAKEAWAYS (~25% of episode)
+   - Translate the big picture into actionable, relatable insights for the listener, addressing the practical implications highlighted in the Director's Notes.
+   - Focus on practical common sense, clear trade-offs, and smart takeaways.
+
+5. ACT V: THE WRAP-UP & PROVOCATIVE FOOD FOR THOUGHT (~10% of episode)
+   - Summarize the main takeaway reflecting the Director's editorial conclusion with warmth and clarity.
+   - Leave the listener with a thought-provoking question to chew on, and an authentic casual sign-off ("Good luck out there!", "Catch you on the next one!").
+
+HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL):
+This conversation must sound 100% human, lively, and spontaneous—NOT like a formal corporate lecture, and NOT like an over-rehearsed or exaggerated cartoon.
+- FAST PACING & BRISK MOMENTUM:
+  Keep the tempo nimble, brisk, and energetic. Co-hosts trade snappy thoughts without dragging, over-explaining, or awkward dead air.
+- STRICT RESTRAINT ON VOCAL EXPRESSIONS (CUT UNNECESSARY LAUGHS):
+  * DO NOT overdo laughter or sighing. Authentic impromptu discussions do NOT have laughing in every sentence.
+  * Maximum 2 to 3 total expressions (`[laughs]` or `[chuckles]`) across the ENTIRE episode, reserved strictly for moments where a genuinely witty punchline or absurd statistic occurs.
+  * NEVER open the podcast, episode, or turn 1 with laughter or sighs.
+  * If in doubt, err on the side of caution and cut the expression out completely. Most turns should simply have natural spoken delivery without any bracketed cues.
+  * All vocal cues MUST strictly use SQUARE BRACKETS: `[laughs]`, `[sighs]`, `[chuckles]`, `[pauses]`. You MUST NEVER use parentheses `(...)` for emotional expressions inside dialogue lines.
+- CO-HOST ADDRESSING & STRICT VOCATIVE ATTRIBUTION (NO SELF-ADDRESSING):
+  * Co-hosts MUST address the OTHER co-host by name across dialogue handoffs (e.g. {s1['speaker']} addresses {s2['speaker']}, and {s2['speaker']} addresses {s1['speaker']}).
+  * STRICT NEGATIVE CONSTRAINT: A co-host MUST NEVER use their own name in a vocative address (e.g. {s1['speaker']} must NEVER say "{s1['speaker']}, look at it this way"; {s2['speaker']} must NEVER say "{s2['speaker']}, imagine..."). Always ensure vocatives match the listening co-host.
+- Asymmetrical Micro-Turns:
+  Interleave snappy 1-sentence and half-sentence conversational glue turns:
+  e.g., "Oh wow.", "Right? Yeah.", "Wait, really?", "Yeah, exactly.", "Which is wild.", "It is.", "Totally.", "That's insane."
+- Natural Fillers & Informal Flow:
+  Use natural informal interjections: "Wait, seriously?", "Ugh, tell me about it", "Look...", "You know what’s wild?", "Right?! Exactly."
+- Vocal Delivery Styles:
+  In the 'style' field of every turn, specify a brisk, natural, and engaging vocal tone:
+  e.g., "brisk and enthusiastic", "quick and conversational", "playful skepticism", "warm and relatable", "curious and upbeat".
+  NEVER use dry, clinical labels like "analytical and measured", "formal", or "flat".
+- Scale & Volume:
+  Target approximately {target_words - 100} to {target_words + 200} total spoken words across {target_turns - 5} to {target_turns + 10} dynamic dialogue turns alternating between {s1['speaker']} and {s2['speaker']}.
+
+SOURCE DOCUMENT TO COVER:
+{text}
+""".strip()
+
+        try:
+            config = types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=PodcastScript,
+                system_instruction=persona.system_instruction,
+                temperature=0.75,
+                max_output_tokens=8192,
+            )
+            response = self.reasoning_client.models.generate_content(
+                model=self.podcast_script_model,
+                contents=prompt,
+                config=config
+            )
+            raw_text = response.text or ""
+            script = PodcastScript.model_validate_json(raw_text)
+            script.turns = align_and_alternate_turns(script.turns, persona.speakers)
+            logger.info(f"✓ {job_label}Generated podcast script '{script.title}' with {len(script.turns)} turns")
+            return script
+        except Exception as e:
+            logger.error(f"✗ {job_label}Failed to generate podcast script with model '{self.podcast_script_model}': {e}", exc_info=True)
+            # Resilient fallback: construct basic 2-turn script if model call fails
+            return PodcastScript(
+                title="Financial Insights Podcast",
+                turns=align_and_alternate_turns([
+                    PodcastTurn(speaker=s1['speaker'], text=f"Welcome to today's financial briefing! [laughs] Let's discuss this article: {text[:200]}...", style="cheerful and friendly"),
+                    PodcastTurn(speaker=s2['speaker'], text=f"[sighs] Thanks {s1['speaker']}. That's a critical topic for banking customers and investors to understand.", style="thoughtful and measured"),
+                ], persona.speakers)
+            )
+
+
+    def _generate_multi_speaker_speech(
+        self,
+        script: PodcastScript,
+        persona: VoicePersona,
+        job_id: str,
+        speed: float = 1.0,
+        critique_feedback: Optional[str] = None,
+        voice_customization: Optional[str] = None,
+        progress_callback: Optional[Any] = None
+    ) -> GenerationResult:
+        """
+        Synthesizes multi-speaker audio from a PodcastScript using Gemini's official
+        multi_speaker_voice_config and speech_metadata on parts.
+        """
+        speakers = persona.speakers or (
+            {"speaker": "Joe", "voice_name": "Enceladus", "gender": "male", "role": "Host"},
+            {"speaker": "Jane", "voice_name": "Kore", "gender": "female", "role": "Co-host"},
+        )
+        # Ensure strict speaker alternation and persona alignment across all turns
+        script.turns = align_and_alternate_turns(script.turns, speakers)
+        total_turns = len(script.turns)
+        logger.info(f"▶ [{job_id}] Synthesizing multi-speaker podcast audio ({total_turns} turns) using {speakers[0]['speaker']} ({speakers[0]['voice_name']}) and {speakers[1]['speaker']} ({speakers[1]['voice_name']}) on model '{self.multi_speaker_model}'...")
+
+        if progress_callback:
+            progress_callback(
+                stage="SYNTHESIZING",
+                message=f"Synthesizing multi-speaker podcast audio ({total_turns} dialogue turns)...",
+                current_turn=1,
+                total_turns=total_turns
+            )
+
+        # Safe speaker name mapping
+        speaker_map = {s["speaker"].lower(): s["speaker"] for s in speakers}
+        speaker_map["host 1"] = speakers[0]["speaker"]
+        speaker_map["host"] = speakers[0]["speaker"]
+        if len(speakers) > 1:
+            speaker_map["host 2"] = speakers[1]["speaker"]
+            speaker_map["co-host"] = speakers[1]["speaker"]
+
+        # Safe chapter chunking: Group turns into natural chapters of up to 8 turns (~1.0 to 1.2 mins each).
+        # Prevents Gemini neural vocoder exposure drift, metallic ringing, amplitude decay, and token window looping.
+        chapter_size = 8
+        chapters = [script.turns[i:i + chapter_size] for i in range(0, total_turns, chapter_size)]
+        pcm_segments = []
+        total_prompt_tokens = 0
+        total_candidates_tokens = 0
+        has_real_usage = False
+
+        speech_config = types.SpeechConfig(
+            multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
+                speaker_voice_configs=[
+                    types.SpeakerVoiceConfig(
+                        speaker=s["speaker"],
+                        voice_config=types.VoiceConfig(
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                voice_name=s["voice_name"]
+                            )
+                        )
+                    )
+                    for s in speakers
+                ]
+            )
+        )
+
+        config = types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=speech_config,
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+        )
+
+        for chapter_idx, chapter in enumerate(chapters, start=1):
+            if len(chapters) > 1 and progress_callback:
+                progress_callback(
+                    stage="SYNTHESIZING",
+                    message=f"Synthesizing podcast chapter {chapter_idx}/{len(chapters)} ({len(chapter)} turns)...",
+                    current_turn=chapter_idx,
+                    total_turns=len(chapters)
+                )
+
+            # Build content parts with text and speech_metadata directly from chapter dialogue turns
+            parts = []
+            for turn in chapter:
+                clean_turn_text = re.sub(
+                    r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
+                    r"[\1]",
+                    turn.text,
+                    flags=re.IGNORECASE
+                )
+                matched_speaker = speaker_map.get(turn.speaker.lower(), turn.speaker)
+
+                # Logic 1: Dynamic expressive podcast style determination with brisk, lively tempo
+                raw_style = (turn.style or "").strip().lower()
+                clean_lower = clean_turn_text.lower()
+
+                # Emotional vocal cue detection (understated, natural nuance without cartoonish overemphasis)
+                if "[laughs]" in clean_turn_text or "[chuckles]" in clean_turn_text:
+                    turn_style = "natural, lively podcast delivery, lightly amused"
+                elif "[sighs]" in clean_turn_text:
+                    turn_style = "relatable and warm delivery, thoughtful tone"
+                elif "[pauses]" in clean_turn_text:
+                    turn_style = "brief pause, crisp and engaging conversational pacing"
+                # Strip out any formal/dry legacy styles
+                elif any(dry in raw_style for dry in ("measured", "analytical", "serious", "formal", "dry", "flat", "cautious")):
+                    turn_style = "brisk, engaging, natural conversational podcast banter, lively tempo"
+                elif turn.style and turn.style.strip():
+                    turn_style = f"brisk podcast conversation, {turn.style.strip()}"
+                else:
+                    turn_style = "brisk, engaging, natural conversational podcast delivery, lively tempo"
+
+                # Pacing adjustment: emphasize brisk, nimble tempo
+                if abs(speed - 1.0) >= 0.05:
+                    if speed < 0.95:
+                        turn_style += ", relaxed and easygoing pacing"
+                    elif speed > 1.05:
+                        turn_style += ", brisk, energetic, and rapid tempo"
+                else:
+                    turn_style += ", brisk and nimble pacing"
+
+                # Incorporate user-specified Director's Notes / Voice Customization
+                if voice_customization and voice_customization.strip():
+                    turn_style += f", {voice_customization.strip()}"
+
+                # Anchor the text encoder with an explicit speaker prefix to ensure deterministic voice switching
+                # and prevent turn merging or speaker inversion across dialogue handoffs
+                anchored_text = f"{matched_speaker}: {clean_turn_text}"
+
+                parts.append({
+                    "text": anchored_text,
+                    "speech_metadata": {
+                        "speaker": matched_speaker,
+                        "style": turn_style,
+                    }
+                })
+
+            contents = [{
+                "role": "user",
+                "parts": parts,
+            }]
+
+            max_attempts = 2
+            raw_audio = None
+            usage = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    response = self.client.models.generate_content(
+                        model=self.multi_speaker_model,
+                        contents=contents,
+                        config=config
+                    )
+                    raw_audio, _ = self._extract_audio_from_response(response)
+                    usage = getattr(response, "usage_metadata", None)
+                    break
+                except Exception as e:
+                    if attempt < max_attempts:
+                        logger.warning(f"Multi-speaker generate_content attempt {attempt}/{max_attempts} failed: {e}. Retrying in 3s...")
+                        time.sleep(3.0)
+                    else:
+                        logger.error(f"Multi-speaker generate_content failed after {max_attempts} attempts: {e}", exc_info=True)
+                        raise RuntimeError(f"Could not generate multi-speaker audio using model '{self.multi_speaker_model}': {e}")
+
+            # Check if returned audio is a WAV container (starts with RIFF) or raw PCM
+            if raw_audio.startswith(b"RIFF"):
+                try:
+                    with wave.open(io.BytesIO(raw_audio), "rb") as wf:
+                        raw_pcm = wf.readframes(wf.getnframes())
+                except Exception as we:
+                    logger.warning(f"Could not read WAV container from response: {we}, falling back to raw bytes")
+                    raw_pcm = raw_audio[44:] if len(raw_audio) > 44 else raw_audio
+            else:
+                raw_pcm = raw_audio
+
+            # Apply per-chapter DSP mastering (RMS leveling + raised-cosine micro-fades)
+            mastered_pcm = apply_micro_fades(normalize_chunk_rms(raw_pcm))
+            pcm_segments.append(mastered_pcm)
+
+            if usage:
+                p_tokens = getattr(usage, "prompt_token_count", 0) or 0
+                c_tokens = getattr(usage, "candidates_token_count", 0) or 0
+                if isinstance(p_tokens, int) and isinstance(c_tokens, int):
+                    if p_tokens > 0 or c_tokens > 0:
+                        has_real_usage = True
+                        total_prompt_tokens += p_tokens
+                        total_candidates_tokens += c_tokens
+
+        if progress_callback:
+            progress_callback(
+                stage="STITCHING",
+                message="Mastering & normalizing multi-speaker broadcast audio...",
+                current_turn=total_turns,
+                total_turns=total_turns
+            )
+
+        # Stitch chapters together with natural 300ms pause
+        pause_samples = int(settings.sample_rate * 0.3)
+        pause_bytes = b"\x00" * (pause_samples * 2)
+        full_pcm = pause_bytes.join(pcm_segments)
+
+        mp3_bytes, duration_sec = self._transcode_pcm_to_mp3(full_pcm, rate=settings.sample_rate)
+
+        total_prompt_tokens = 0
+        total_candidates_tokens = 0
+        has_real_usage = False
+        if usage:
+            p_tokens = getattr(usage, "prompt_token_count", 0) or 0
+            c_tokens = getattr(usage, "candidates_token_count", 0) or 0
+            if isinstance(p_tokens, int) and isinstance(c_tokens, int):
+                if p_tokens > 0 or c_tokens > 0:
+                    has_real_usage = True
+                    total_prompt_tokens = p_tokens
+                    total_candidates_tokens = c_tokens
+
+        aggregated_usage = None
+        if has_real_usage:
+            aggregated_usage = AggregatedUsageMetadata(
+                prompt_token_count=total_prompt_tokens,
+                candidates_token_count=total_candidates_tokens,
+                total_token_count=total_prompt_tokens + total_candidates_tokens
+            )
+
+        # Build formatted transcript with speaker names
+        formatted_script = f"# {script.title}\n\n" + "\n\n".join(
+            f"**{turn.speaker}**: {turn.text}" for turn in script.turns
+        )
+
+        logger.info(f"✓ [{job_id}] Multi-speaker podcast speech complete: {total_turns} turns, duration {duration_sec:.1f}s, MP3 size {len(mp3_bytes)} bytes")
+
+        return GenerationResult(
+            job_id=job_id,
+            audio_bytes=mp3_bytes,
+            audio_format="audio/mpeg",
+            duration_seconds=duration_sec,
+            persona_used=persona.name,
+            model_used=self.multi_speaker_model,
+            usage_metadata=aggregated_usage,
+            transcript=formatted_script,
+            title=script.title
+        )
+
     def generate_speech(
         self,
         text: str,
@@ -332,15 +1067,55 @@ class GeminiAudioGenerator:
         voice_customization: Optional[str] = None,
         speed: float = 1.0,
         critique_feedback: Optional[str] = None,
+        podcast_script: Optional[str] = None,
+        target_duration_mins: int = 10,
         progress_callback: Optional[Any] = None
     ) -> GenerationResult:
         """
         Generates spoken audio from text using Gemini TTS API.
-        For articles exceeding the chunk threshold (~400 words), partitions into complete-sentence chunks,
+        For podcast personas, automatically writes a 2-person dialogue script incorporating
+        Director's Notes instructions and synthesizes with Gemini Multi-Speaker TTS.
+        If a user-edited podcast_script is provided, synthesizes it directly without re-generating.
+        For solo articles exceeding the chunk threshold (~400 words), partitions into complete-sentence chunks,
         processes sequentially, applies DSP mastering (RMS leveling + micro-fades), and losslessly stitches audio.
         """
         job_id = job_id or f"job_{uuid.uuid4().hex[:8]}"
         persona = get_persona(persona_name)
+
+        # ---------------- Podcast Multi-Speaker Workflow ----------------
+        if getattr(persona, "is_podcast", False):
+            if podcast_script and podcast_script.strip():
+                if progress_callback:
+                    progress_callback(
+                        stage="CHUNKING",
+                        message="Parsing customized podcast script for multi-speaker synthesis...",
+                        current_turn=1,
+                        total_turns=1
+                    )
+                script = parse_markdown_script_to_turns(
+                    script_text=podcast_script,
+                    default_speakers=persona.speakers
+                )
+            else:
+                script = self.generate_podcast_script(
+                    text=text,
+                    persona=persona,
+                    director_notes=voice_customization,
+                    job_id=job_id,
+                    target_duration_mins=target_duration_mins,
+                    enable_web_search=True,
+                    progress_callback=progress_callback
+                )
+            return self._generate_multi_speaker_speech(
+                script=script,
+                persona=persona,
+                job_id=job_id,
+                speed=speed,
+                critique_feedback=critique_feedback,
+                voice_customization=voice_customization,
+                progress_callback=progress_callback
+            )
+
         words = len(text.split())
 
         chunks = split_text_into_chunks(text, target_words=settings.tts_chunk_word_limit)
@@ -464,6 +1239,16 @@ class GeminiAudioGenerator:
 
     def _transcode_pcm_to_mp3(self, raw_pcm_bytes: bytes, rate: int = 24000) -> Tuple[bytes, float]:
         """Transcodes raw 24kHz 16-bit mono PCM into broadcast MP3 @ 320kbps (or fallback WAV container)."""
+        if raw_pcm_bytes.startswith(b"RIFF"):
+            try:
+                with wave.open(io.BytesIO(raw_pcm_bytes), "rb") as wf:
+                    rate = wf.getframerate()
+                    raw_pcm_bytes = wf.readframes(wf.getnframes())
+            except Exception as we:
+                logger.warning(f"Could not read WAV header in _transcode_pcm_to_mp3: {we}")
+                if len(raw_pcm_bytes) > 44:
+                    raw_pcm_bytes = raw_pcm_bytes[44:]
+
         duration_sec = len(raw_pcm_bytes) / (rate * 2.0)
 
         # 1. Preferred & Cloud Run Optimized: In-memory pure Python C-extension (lameenc)
