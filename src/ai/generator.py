@@ -100,13 +100,7 @@ def align_and_alternate_turns(
             # Unrecognized speaker name: fallback to index parity
             target_spk = host1_name if idx % 2 == 0 else host2_name
 
-        # 3. Strict alternation guarantee: adjacent turns MUST alternate co-hosts
-        if aligned:
-            prev_spk = aligned[-1].speaker
-            if target_spk == prev_spk:
-                target_spk = host2_name if prev_spk == host1_name else host1_name
-
-        # 4. Normalize vocal cues into square brackets []
+        # Normalize vocal cues into square brackets []
         clean_text = re.sub(
             r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
             r"[\1]",
@@ -114,7 +108,33 @@ def align_and_alternate_turns(
             flags=re.IGNORECASE
         )
 
-        # 5. Default style if missing (light, conversational, expressive)
+        # 3. Direct leading vocative attribution check:
+        # If a line opens with a host's name (e.g. "Joe, you can't..."), that line is addressed TO Joe by Host 2
+        leading_h1 = re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host1_name) + r"[,\s!?]", clean_text, re.IGNORECASE)
+        leading_h2 = re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host2_name) + r"[,\s!?]", clean_text, re.IGNORECASE)
+        if leading_h1 and not leading_h2:
+            target_spk = host2_name
+        elif leading_h2 and not leading_h1:
+            target_spk = host1_name
+
+        # 4. Strict alternation guarantee: adjacent turns MUST alternate co-hosts
+        if aligned:
+            prev_spk = aligned[-1].speaker
+            if target_spk == prev_spk:
+                target_spk = host2_name if prev_spk == host1_name else host1_name
+
+        # 5. Self-addressing vocative sanitization QA:
+        # If target_spk's name appears as a vocative in their own spoken turn (e.g. "... is real, Joe."),
+        # swap it to address the other co-host to guarantee 100% character and persona congruence.
+        other_host = host2_name if target_spk == host1_name else host1_name
+        clean_text = re.sub(
+            r"(\b)" + re.escape(target_spk) + r"([,\.!?\s]|$)",
+            lambda m: f"{m.group(1)}{other_host}{m.group(2)}",
+            clean_text,
+            flags=re.IGNORECASE
+        )
+
+        # 6. Default style if missing (light, conversational, expressive)
         turn_style = turn.style
         if not turn_style:
             turn_style = "cheerful and upbeat" if target_spk == host1_name else "warm and amused"
@@ -720,8 +740,9 @@ This conversation must sound 100% human, lively, and spontaneous—NOT like a fo
   * NEVER open the podcast, episode, or turn 1 with laughter or sighs.
   * If in doubt, err on the side of caution and cut the expression out completely. Most turns should simply have natural spoken delivery without any bracketed cues.
   * All vocal cues MUST strictly use SQUARE BRACKETS: `[laughs]`, `[sighs]`, `[chuckles]`, `[pauses]`. You MUST NEVER use parentheses `(...)` for emotional expressions inside dialogue lines.
-- CO-HOST ADDRESSING & RAPPORT:
-  Co-hosts MUST naturally address each other by name (e.g. "{s2['speaker']}, imagine...", "Oh absolutely, {s1['speaker']}...", "What do you think, {s2['speaker']}?", "Well {s1['speaker']}, look at it this way...") across dialogue handoffs.
+- CO-HOST ADDRESSING & STRICT VOCATIVE ATTRIBUTION (NO SELF-ADDRESSING):
+  * Co-hosts MUST address the OTHER co-host by name across dialogue handoffs (e.g. {s1['speaker']} addresses {s2['speaker']}, and {s2['speaker']} addresses {s1['speaker']}).
+  * STRICT NEGATIVE CONSTRAINT: A co-host MUST NEVER use their own name in a vocative address (e.g. {s1['speaker']} must NEVER say "{s1['speaker']}, look at it this way"; {s2['speaker']} must NEVER say "{s2['speaker']}, imagine..."). Always ensure vocatives match the listening co-host.
 - Asymmetrical Micro-Turns:
   Interleave snappy 1-sentence and half-sentence conversational glue turns:
   e.g., "Oh wow.", "Right? Yeah.", "Wait, really?", "Yeah, exactly.", "Which is wild.", "It is.", "Totally.", "That's insane."
@@ -807,9 +828,9 @@ SOURCE DOCUMENT TO COVER:
             speaker_map["host 2"] = speakers[1]["speaker"]
             speaker_map["co-host"] = speakers[1]["speaker"]
 
-        # Safe chapter chunking: Group turns into natural chapters of up to 14 turns (~3 to 3.5 mins each).
-        # Prevents Gemini neural vocoder exposure drift, metallic ringing, and amplitude decay on tracks > 4.5 mins.
-        chapter_size = 14
+        # Safe chapter chunking: Group turns into natural chapters of up to 8 turns (~1.0 to 1.2 mins each).
+        # Prevents Gemini neural vocoder exposure drift, metallic ringing, amplitude decay, and token window looping.
+        chapter_size = 8
         chapters = [script.turns[i:i + chapter_size] for i in range(0, total_turns, chapter_size)]
         pcm_segments = []
         total_prompt_tokens = 0
@@ -890,8 +911,12 @@ SOURCE DOCUMENT TO COVER:
                 if voice_customization and voice_customization.strip():
                     turn_style += f", {voice_customization.strip()}"
 
+                # Anchor the text encoder with an explicit speaker prefix to ensure deterministic voice switching
+                # and prevent turn merging or speaker inversion across dialogue handoffs
+                anchored_text = f"{matched_speaker}: {clean_turn_text}"
+
                 parts.append({
-                    "text": clean_turn_text,
+                    "text": anchored_text,
                     "speech_metadata": {
                         "speaker": matched_speaker,
                         "style": turn_style,

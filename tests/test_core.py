@@ -600,9 +600,9 @@ def test_multi_speaker_speech_synthesis_payload():
     contents = call_args["contents"]
     parts = contents[0]["parts"]
     assert len(parts) == 2
-    assert parts[0]["text"] == "Welcome to the show!"
+    assert parts[0]["text"] == "Joe: Welcome to the show!"
     assert parts[0]["speech_metadata"]["speaker"] == "Joe"
-    assert parts[1]["text"] == "Great to be here!"
+    assert parts[1]["text"] == "Jane: Great to be here!"
     assert parts[1]["speech_metadata"]["speaker"] == "Jane"
 
 
@@ -993,6 +993,38 @@ def test_multi_speaker_dynamic_expressive_styling():
     assert "relatable and warm delivery, thoughtful tone" in style_turn_1
     assert "relaxed and easygoing pacing" in style_turn_1
     assert "Laugh warmly and speak like old friends" in style_turn_1
+
+
+def test_vocative_qa_and_self_addressing_sanitization():
+    """Verify align_and_alternate_turns corrects leading vocatives and eliminates self-addressing."""
+    from src.ai.generator import align_and_alternate_turns, PodcastTurn
+
+    speakers = [
+        {"speaker": "Joe", "voice_name": "Enceladus", "gender": "male"},
+        {"speaker": "Jane", "voice_name": "Kore", "gender": "female"}
+    ]
+
+    # Test 1: Turn misattributed to Joe, but opens with "Joe, you cannot just print an artillery shell."
+    # Leading vocative check should reassign this turn to Jane.
+    turns = [
+        PodcastTurn(speaker="Joe", text="Joe, you cannot just print an artillery shell!"),
+        PodcastTurn(speaker="Jane", text="Exactly, that is why multi-year contracts exist.")
+    ]
+    aligned = align_and_alternate_turns(turns, speakers)
+    assert aligned[0].speaker == "Jane"
+    assert aligned[1].speaker == "Joe"
+
+    # Test 2: Speaker addresses themselves in the body of their line:
+    # "Allied fiscal drift is real, Joe." spoken by Joe -> sanitization should replace "Joe" with "Jane"
+    turns2 = [
+        PodcastTurn(speaker="Joe", text="Allied fiscal drift is real, Joe."),
+        PodcastTurn(speaker="Jane", text="I agree with you completely.")
+    ]
+    aligned2 = align_and_alternate_turns(turns2, speakers)
+    assert aligned2[0].speaker == "Joe"
+    assert "Allied fiscal drift is real, Jane." in aligned2[0].text
+    assert "real, Joe" not in aligned2[0].text
+
 
 
 
