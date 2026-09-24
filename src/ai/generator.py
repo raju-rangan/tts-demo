@@ -109,9 +109,12 @@ def align_and_alternate_turns(
         )
 
         # 3. Direct leading vocative attribution check:
-        # If a line opens with a host's name (e.g. "Joe, you can't..."), that line is addressed TO Joe by Host 2
-        leading_h1 = re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host1_name) + r"[,\s!?]", clean_text, re.IGNORECASE)
-        leading_h2 = re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host2_name) + r"[,\s!?]", clean_text, re.IGNORECASE)
+        # If a line opens with a host's name (e.g. "Joe, you can't..."), that line is addressed TO Joe by Host 2.
+        # Exclude self-introductions like "Joe here..." or "Joe, your host...".
+        is_self_intro_h1 = bool(re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host1_name) + r"(?:\s+here|\s*,\s*(?:your|the)\s+host)\b", clean_text, re.IGNORECASE))
+        is_self_intro_h2 = bool(re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host2_name) + r"(?:\s+here|\s*,\s*(?:your|the)\s+host)\b", clean_text, re.IGNORECASE))
+        leading_h1 = not is_self_intro_h1 and bool(re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host1_name) + r"[,\s!?]", clean_text, re.IGNORECASE))
+        leading_h2 = not is_self_intro_h2 and bool(re.match(r"^(?:\[[^\]]+\]\s*)?" + re.escape(host2_name) + r"[,\s!?]", clean_text, re.IGNORECASE))
         if leading_h1 and not leading_h2:
             target_spk = host2_name
         elif leading_h2 and not leading_h1:
@@ -126,13 +129,27 @@ def align_and_alternate_turns(
         # 5. Self-addressing vocative sanitization QA:
         # If target_spk's name appears as a vocative in their own spoken turn (e.g. "... is real, Joe."),
         # swap it to address the other co-host to guarantee 100% character and persona congruence.
+        # CRITICAL: Preserve legitimate self-introductions (e.g. "This is Joe", "I'm Joe", "Joe here", "your host, Joe").
         other_host = host2_name if target_spk == host1_name else host1_name
-        clean_text = re.sub(
+        intro_pattern = re.compile(
+            r"\b(this is|i'\''m|i am|it'\''s|your host,?|host|name is|i am your host,?|i'\''m your host,?)\s+" + re.escape(target_spk) + r"\b|\b" + re.escape(target_spk) + r"\s+here\b",
+            re.IGNORECASE
+        )
+        intros = []
+        def _save_intro(m):
+            intros.append(m.group(0))
+            return f"__SELF_INTRO_{len(intros)-1}__"
+
+        masked_text = intro_pattern.sub(_save_intro, clean_text)
+        masked_text = re.sub(
             r"(\b)" + re.escape(target_spk) + r"([,\.!?\s]|$)",
             lambda m: f"{m.group(1)}{other_host}{m.group(2)}",
-            clean_text,
+            masked_text,
             flags=re.IGNORECASE
         )
+        for i, intro in enumerate(intros):
+            masked_text = masked_text.replace(f"__SELF_INTRO_{i}__", intro)
+        clean_text = masked_text
 
         # 6. Default style if missing (light, conversational, expressive)
         turn_style = turn.style
@@ -715,8 +732,16 @@ CO-HOST ROLES:
 NOTEBOOKLM 5-ACT NARRATIVE STORY ARC (~{target_duration_mins} MINUTES):
 Structure the conversation across 5 natural, entertaining acts, actively driven by the Director's Notes and source material:
 
-1. ACT I: THE FUN HOOK & "WAIT, DID YOU SEE THIS?" COLD OPEN (~15% of episode)
-   - Do NOT say "Hello and welcome to the show." NEVER open turn 1 with laughter or sighs. Open directly in media res with an evocative thought experiment, wild observation, or provocative paradox centered on the Director's editorial focus.
+1. ACT I: THE FUN HOOK & WARM CO-HOST INTRODUCTION (~15% of episode)
+   - WARM, DYNAMIC INTRO (TURN 1):
+     * Host 1 ({s1['speaker']}) opens with a brief, friendly, and natural introduction introducing themselves as the host, introducing who is in the room ({s2['speaker']}), and setting up the topic/question being explored.
+     * EXAMPLES (Generate varied, spontaneous phrasing like this—DO NOT use rigid boilerplate):
+       - "Hello and welcome in! This is {s1['speaker']}, your host for today. I've got {s2['speaker']} with me in the studio, and today we are breaking down [Topic]..."
+       - "Hey everyone, {s1['speaker']} here, joined as always by {s2['speaker']}. Today we are digging into a question that's been making headlines: [Topic]..."
+       - "Welcome to the show! I'm {s1['speaker']} alongside {s2['speaker']}, and today we are diving into [Topic]..."
+     * NEVER open turn 1 with laughter or sighs (`[laughs]` or `[sighs]`). Keep the opening delivery crisp, welcoming, and confident.
+   - CO-HOST HANDOFF & THE FUN HOOK (TURN 2):
+     * Host 2 ({s2['speaker']}) responds warmly ("Hey {s1['speaker']}! Great to be here...", "Always good to be in the studio, {s1['speaker']}..."), reacts to the topic premise, and immediately pivots into the core thought-experiment, wild observation, or provocative paradox centered on the Director's editorial focus.
    - Interleave quick conversational reactions ("Oh wow.", "Right? Yeah.").
    - Directly frame the listener: Bring the listener into the conversation like a curious friend joining a fascinating discussion over coffee.
 

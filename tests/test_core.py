@@ -725,6 +725,8 @@ def test_generate_podcast_script_10min_and_research():
         assert "40 to 55 dynamic dialogue turns" in prompt
         assert "NOTEBOOKLM 5-ACT NARRATIVE STORY ARC" in prompt
         assert "ACT I: THE FUN HOOK" in prompt
+        assert "WARM, DYNAMIC INTRO (TURN 1)" in prompt
+        assert "CO-HOST HANDOFF & THE FUN HOOK (TURN 2)" in prompt
         assert "ACT II: UNPACKING THE STORY WITH FUN ANALOGIES" in prompt
         assert "ACT III: THE PLAYFUL REALITY CHECK & BANTER" in prompt
         assert "ACT IV: PRACTICAL" in prompt
