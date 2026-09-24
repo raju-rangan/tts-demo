@@ -27,10 +27,20 @@ try:
 except Exception:
     lameenc = None
 
+from pydantic import BaseModel, Field
 from src.config import settings
 from src.ai.personas import get_persona, VoicePersona
 
 logger = logging.getLogger(__name__)
+
+class PodcastTurn(BaseModel):
+    speaker: str = Field(..., description="Name of the speaking co-host (e.g. Joe, Jane, Alex, Maya)")
+    text: str = Field(..., description="The spoken dialogue line for this turn, without stage directions or brackets")
+    style: Optional[str] = Field(default="natural and conversational", description="Speaking style, emotion, or delivery nuance")
+
+class PodcastScript(BaseModel):
+    title: str = Field(..., description="An engaging, catchy podcast episode title")
+    turns: List[PodcastTurn] = Field(..., min_length=2, description="Ordered dialogue turns between the two co-hosts")
 
 @dataclass
 class AggregatedUsageMetadata:
@@ -47,6 +57,8 @@ class GenerationResult:
     persona_used: str
     model_used: str
     usage_metadata: Optional[Any] = None
+    transcript: Optional[str] = None
+    title: Optional[str] = None
 
 
 def split_text_into_chunks(text: str, target_words: Optional[int] = None) -> List[str]:
@@ -178,6 +190,8 @@ class GeminiAudioGenerator:
         self.location = location or settings.location
         # Default to official Gemini TTS model if not explicitly overridden
         self.model = model or os.getenv("GEMINI_VOICE_MODEL", "gemini-3.1-flash-tts-preview")
+        self.multi_speaker_model = os.getenv("GEMINI_MULTI_SPEAKER_VOICE_MODEL", "gemini-3.8-flash-tts")
+        self.podcast_script_model = os.getenv("GEMINI_PODCAST_SCRIPT_MODEL", settings.judge_model)
         self._client: Optional[genai.Client] = None
 
     @property
@@ -324,6 +338,262 @@ class GeminiAudioGenerator:
                     logger.error(f"client.models.generate_content failed{turn_label} after {max_attempts} attempts: {e}", exc_info=True)
                     raise RuntimeError(f"Could not generate audio using model '{self.model}'{turn_label} ({e}). Verify Vertex AI quota and model availability.")
 
+    def generate_podcast_script(
+        self,
+        text: str,
+        persona: VoicePersona,
+        director_notes: Optional[str] = None,
+        job_id: Optional[str] = None
+    ) -> PodcastScript:
+        """
+        Uses Gemini to generate an engaging, balanced 2-person podcast dialogue script
+        based on the source text, the selected co-host persona profiles, and director's notes.
+        """
+        job_label = f"[{job_id}] " if job_id else ""
+        logger.info(f"▶ {job_label}Generating 2-person podcast script for persona '{persona.name}' using model '{self.podcast_script_model}'...")
+
+        speakers = persona.speakers or (
+            {"speaker": "Joe", "voice_name": "Puck", "gender": "male", "role": "Host"},
+            {"speaker": "Jane", "voice_name": "Kore", "gender": "female", "role": "Co-host"},
+        )
+        s1 = speakers[0]
+        s2 = speakers[1]
+
+        customization_section = ""
+        if director_notes and director_notes.strip():
+            customization_section = (
+                "======================================================================\n"
+                "DIRECTOR'S NOTES & PODCAST CUSTOMIZATION DIRECTIVES (MANDATORY):\n"
+                "The director has provided the following specific instructions on what the podcast must cover, "
+                "the host dynamics, tone, topics to emphasize, or questions to address:\n"
+                f"\"{director_notes.strip()}\"\n"
+                "You MUST ensure these directives are prominently incorporated into the discussion.\n"
+                "======================================================================\n\n"
+            )
+
+        prompt = f"""
+You are an expert executive podcast producer and scriptwriter for a premier financial services show.
+Your task is to transform the provided source document into a vibrant, natural, 2-person podcast conversation between two knowledgeable co-hosts: {s1['speaker']} and {s2['speaker']}.
+
+CO-HOST PROFILES:
+- Host 1: {s1['speaker']} ({s1.get('gender', 'host')}, Voice: {s1['voice_name']}) - Lead conversational host who introduces topics, shares relatable observations, and asks engaging questions.
+- Host 2: {s2['speaker']} ({s2.get('gender', 'co-host')}, Voice: {s2['voice_name']}) - Insightful expert co-host who provides clarity, explains analytical trade-offs, and breaks down complex financial concepts.
+
+{customization_section}
+PODCAST SCRIPT GUIDELINES:
+1. Dynamic Chemistry: The conversation must feel authentic and engaging—hosts should react with genuine interest (e.g. "That's a great point, Joe", "Exactly, Jane"), bounce ideas back and forth, and explain concepts using clear real-world examples.
+2. Grounded Accuracy: Faithfully represent all key facts, numbers, interest rates, FDIC limits, and policies mentioned in the source document.
+3. Natural Turn Length: Keep each turn relatively concise (typically 1 to 3 sentences per turn). Avoid unbroken monologues. Alternate between {s1['speaker']} and {s2['speaker']}. Aim for approximately 8 to 14 dialogue turns.
+4. Vocal Style: For each turn, provide a delivery style in the 'style' field (e.g., "cheerful and friendly", "thoughtful and measured", "inquisitive and energetic", "reassuring and warm", "curious").
+5. Verbatim Purity: In the 'text' field of each turn, include ONLY the words that the speaker actually utters aloud. Do NOT include stage directions in asterisks or brackets (e.g. no '(laughs)' or '[chuckles]').
+
+SOURCE DOCUMENT TO COVER:
+{text}
+""".strip()
+
+        try:
+            config = types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=PodcastScript,
+                system_instruction=persona.system_instruction,
+                temperature=0.7,
+            )
+            response = self.client.models.generate_content(
+                model=self.podcast_script_model,
+                contents=prompt,
+                config=config
+            )
+            raw_text = response.text or ""
+            script = PodcastScript.model_validate_json(raw_text)
+            logger.info(f"✓ {job_label}Generated podcast script '{script.title}' with {len(script.turns)} turns")
+            return script
+        except Exception as e:
+            logger.error(f"✗ {job_label}Failed to generate podcast script with model '{self.podcast_script_model}': {e}", exc_info=True)
+            # Resilient fallback: construct basic 2-turn script if model call fails
+            return PodcastScript(
+                title="Financial Insights Podcast",
+                turns=[
+                    PodcastTurn(speaker=s1['speaker'], text=f"Welcome to today's financial briefing. Let's discuss this article: {text[:200]}...", style="cheerful and friendly"),
+                    PodcastTurn(speaker=s2['speaker'], text=f"Thanks {s1['speaker']}. That's a critical topic for banking customers to understand.", style="calm and relaxed"),
+                ]
+            )
+
+    def _generate_multi_speaker_speech(
+        self,
+        script: PodcastScript,
+        persona: VoicePersona,
+        job_id: str,
+        speed: float = 1.0,
+        critique_feedback: Optional[str] = None,
+        progress_callback: Optional[Any] = None
+    ) -> GenerationResult:
+        """
+        Synthesizes multi-speaker audio from a PodcastScript using Gemini's official
+        multi_speaker_voice_config and speech_metadata on parts.
+        """
+        speakers = persona.speakers or (
+            {"speaker": "Joe", "voice_name": "Puck", "gender": "male", "role": "Host"},
+            {"speaker": "Jane", "voice_name": "Kore", "gender": "female", "role": "Co-host"},
+        )
+        total_turns = len(script.turns)
+        logger.info(f"▶ [{job_id}] Synthesizing multi-speaker podcast audio ({total_turns} turns) using {speakers[0]['speaker']} ({speakers[0]['voice_name']}) and {speakers[1]['speaker']} ({speakers[1]['voice_name']}) on model '{self.multi_speaker_model}'...")
+
+        if progress_callback:
+            progress_callback(
+                stage="SYNTHESIZING",
+                message=f"Synthesizing multi-speaker podcast audio ({total_turns} dialogue turns)...",
+                current_turn=1,
+                total_turns=total_turns
+            )
+
+        # Batch turns in groups of up to 12 turns per request to guarantee high-fidelity audio
+        batch_size = 12
+        batches = [script.turns[i:i + batch_size] for i in range(0, total_turns, batch_size)]
+        pcm_segments = []
+        total_prompt_tokens = 0
+        total_candidates_tokens = 0
+        has_real_usage = False
+
+        for batch_idx, batch in enumerate(batches, start=1):
+            if len(batches) > 1 and progress_callback:
+                progress_callback(
+                    stage="SYNTHESIZING",
+                    message=f"Synthesizing podcast segment {batch_idx}/{len(batches)} ({len(batch)} turns)...",
+                    current_turn=batch_idx,
+                    total_turns=len(batches)
+                )
+
+            # Build content parts with text and speech_metadata
+            parts = []
+            for turn in batch:
+                turn_style = turn.style or "natural and conversational"
+                if abs(speed - 1.0) >= 0.05:
+                    if speed < 0.95:
+                        turn_style += ", deliberate and unhurried pacing"
+                    elif speed > 1.05:
+                        turn_style += ", brisk and energetic pacing"
+
+                parts.append({
+                    "text": turn.text,
+                    "speech_metadata": {
+                        "speaker": turn.speaker,
+                        "style": turn_style,
+                    }
+                })
+
+            contents = [{
+                "role": "user",
+                "parts": parts,
+            }]
+
+            speech_config = types.SpeechConfig(
+                multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
+                    speaker_voice_configs=[
+                        types.SpeakerVoiceConfig(
+                            speaker=s["speaker"],
+                            voice_config=types.VoiceConfig(
+                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                    voice_name=s["voice_name"]
+                                )
+                            )
+                        )
+                        for s in speakers
+                    ]
+                )
+            )
+
+            config = types.GenerateContentConfig(
+                response_modalities=["AUDIO"],
+                speech_config=speech_config,
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+            )
+
+            max_attempts = 2
+            raw_audio = None
+            usage = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    response = self.client.models.generate_content(
+                        model=self.multi_speaker_model,
+                        contents=contents,
+                        config=config
+                    )
+                    raw_audio, _ = self._extract_audio_from_response(response)
+                    usage = getattr(response, "usage_metadata", None)
+                    break
+                except Exception as e:
+                    if attempt < max_attempts:
+                        logger.warning(f"Multi-speaker generate_content attempt {attempt}/{max_attempts} failed: {e}. Retrying in 3s...")
+                        time.sleep(3.0)
+                    else:
+                        logger.error(f"Multi-speaker generate_content failed after {max_attempts} attempts: {e}", exc_info=True)
+                        raise RuntimeError(f"Could not generate multi-speaker audio using model '{self.multi_speaker_model}': {e}")
+
+            # Check if returned audio is a WAV container (starts with RIFF) or raw PCM
+            if raw_audio.startswith(b"RIFF"):
+                try:
+                    with wave.open(io.BytesIO(raw_audio), "rb") as wf:
+                        raw_pcm = wf.readframes(wf.getnframes())
+                except Exception as we:
+                    logger.warning(f"Could not read WAV container from response: {we}, falling back to raw bytes")
+                    raw_pcm = raw_audio[44:] if len(raw_audio) > 44 else raw_audio
+            else:
+                raw_pcm = raw_audio
+
+            # Apply DSP mastering (RMS leveling + raised-cosine micro-fades)
+            mastered_pcm = apply_micro_fades(normalize_chunk_rms(raw_pcm))
+            pcm_segments.append(mastered_pcm)
+
+            if usage:
+                p_tokens = getattr(usage, "prompt_token_count", 0) or 0
+                c_tokens = getattr(usage, "candidates_token_count", 0) or 0
+                if p_tokens > 0 or c_tokens > 0:
+                    has_real_usage = True
+                    total_prompt_tokens += p_tokens
+                    total_candidates_tokens += c_tokens
+
+        if progress_callback:
+            progress_callback(
+                stage="STITCHING",
+                message="Mastering & normalizing multi-speaker broadcast audio...",
+                current_turn=total_turns,
+                total_turns=total_turns
+            )
+
+        # Stitch segments together with natural 300ms pause
+        pause_samples = int(settings.sample_rate * 0.3)
+        pause_bytes = b"\x00" * (pause_samples * 2)
+        full_pcm = pause_bytes.join(pcm_segments)
+
+        mp3_bytes, duration_sec = self._transcode_pcm_to_mp3(full_pcm, rate=settings.sample_rate)
+
+        aggregated_usage = None
+        if has_real_usage:
+            aggregated_usage = AggregatedUsageMetadata(
+                prompt_token_count=total_prompt_tokens,
+                candidates_token_count=total_candidates_tokens,
+                total_token_count=total_prompt_tokens + total_candidates_tokens
+            )
+
+        # Build formatted transcript with speaker names
+        formatted_script = f"# {script.title}\n\n" + "\n\n".join(
+            f"**{turn.speaker}**: {turn.text}" for turn in script.turns
+        )
+
+        logger.info(f"✓ [{job_id}] Multi-speaker podcast speech complete: {len(batches)} batch(es), duration {duration_sec:.1f}s, MP3 size {len(mp3_bytes)} bytes")
+
+        return GenerationResult(
+            job_id=job_id,
+            audio_bytes=mp3_bytes,
+            audio_format="audio/mpeg",
+            duration_seconds=duration_sec,
+            persona_used=persona.name,
+            model_used=self.multi_speaker_model,
+            usage_metadata=aggregated_usage,
+            transcript=formatted_script,
+            title=script.title
+        )
+
     def generate_speech(
         self,
         text: str,
@@ -336,11 +606,38 @@ class GeminiAudioGenerator:
     ) -> GenerationResult:
         """
         Generates spoken audio from text using Gemini TTS API.
-        For articles exceeding the chunk threshold (~400 words), partitions into complete-sentence chunks,
+        For podcast personas, automatically writes a 2-person dialogue script incorporating
+        Director's Notes instructions and synthesizes with Gemini Multi-Speaker TTS.
+        For solo articles exceeding the chunk threshold (~400 words), partitions into complete-sentence chunks,
         processes sequentially, applies DSP mastering (RMS leveling + micro-fades), and losslessly stitches audio.
         """
         job_id = job_id or f"job_{uuid.uuid4().hex[:8]}"
         persona = get_persona(persona_name)
+
+        # ---------------- Podcast Multi-Speaker Workflow ----------------
+        if getattr(persona, "is_podcast", False):
+            if progress_callback:
+                progress_callback(
+                    stage="CHUNKING",
+                    message="Crafting 2-person podcast script from article with Gemini...",
+                    current_turn=1,
+                    total_turns=1
+                )
+            script = self.generate_podcast_script(
+                text=text,
+                persona=persona,
+                director_notes=voice_customization,
+                job_id=job_id
+            )
+            return self._generate_multi_speaker_speech(
+                script=script,
+                persona=persona,
+                job_id=job_id,
+                speed=speed,
+                critique_feedback=critique_feedback,
+                progress_callback=progress_callback
+            )
+
         words = len(text.split())
 
         chunks = split_text_into_chunks(text, target_words=settings.tts_chunk_word_limit)
