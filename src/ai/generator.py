@@ -597,12 +597,11 @@ class GeminiAudioGenerator:
         logger.info(f"▶ {job_label}Conducting real-time web research to enrich podcast context...")
 
         search_prompt = (
-            "You are an expert investigative research producer for a leading financial and geopolitical podcast.\n"
-            "Review the core themes of this article and the director's instructions:\n"
+            "You are an expert investigative research producer for a leading podcast.\n"
+            "Review the director's instructions and the core themes of this article:\n"
             f"SOURCE ARTICLE EXCERPT: {source_text[:1200]}\n\n"
-            f"DIRECTOR'S INSTRUCTIONS: {director_notes or 'Focus on the key trade-offs, fiscal constraints, and market dynamics.'}\n\n"
-            "Using Google Search, find the latest real-world facts, recent data points, company valuations (e.g. Rheinmetall, defense contractors), "
-            "government budget figures, debt metrics, or recent quotes that would make the podcast dialogue exceptionally rich, timely, and authentic.\n"
+            f"DIRECTOR'S EDITORIAL MANDATE: {director_notes or 'Focus on the key trade-offs, real-world implications, and market dynamics.'}\n\n"
+            "Using Google Search, find the latest real-world facts, recent data points, verified figures, or recent quotes directly relevant to the director's editorial mandate.\n"
             "Provide a concise, bulleted research brief (max 250 words) with specific facts and figures the hosts can naturally drop into conversation."
         )
 
@@ -675,11 +674,18 @@ class GeminiAudioGenerator:
         if director_notes and director_notes.strip():
             customization_section = (
                 "======================================================================\n"
-                "DIRECTOR'S NOTES & PODCAST CUSTOMIZATION DIRECTIVES (MANDATORY):\n"
-                "The director has provided the following specific instructions on what the podcast must cover, "
-                "the host dynamics, tone, topics to emphasize, or questions to address:\n"
-                f"\"{director_notes.strip()}\"\n"
-                "You MUST ensure these directives are prominently incorporated into the discussion.\n"
+                "★★★ PRIMARY EDITORIAL MANDATE & DISCUSSION DIRECTION (HIGHEST PRIORITY) ★★★\n"
+                "The Director has provided the following mandatory editorial vision for this episode:\n"
+                f"\"{director_notes.strip()}\"\n\n"
+                "CRITICAL DIRECTOR'S INSTRUCTIONS:\n"
+                "1. THE DIRECTOR'S VISION GOVERNS THE EPISODE: The source text and research provide background facts, "
+                "but the Director's Notes dictate the narrative direction, core thesis, debate angles, and tone.\n"
+                f"2. CO-HOST ROLES & STANCES: If the Director's Notes specify perspectives, biases, or debate sides for "
+                f"{s1['speaker']} and {s2['speaker']}, you MUST adopt those exact stances throughout the episode, overriding default personas.\n"
+                "3. CONVERSATIONAL TENSION & CLASH: Ensure the central tension, trade-off, or debate highlighted in the Director's Notes "
+                "forms the backbone of the conversation across all 5 acts.\n"
+                "4. COMPLETE THEMATIC COVERAGE: Every topic, question, or constraint specified in the Director's Notes must be "
+                "prominently discussed and addressed by the hosts.\n"
                 "======================================================================\n\n"
             )
 
@@ -697,38 +703,39 @@ class GeminiAudioGenerator:
         prompt = f"""
 You are the scriptwriter and producer for a lively, impromptu, fast-paced, and highly engaging 2-person podcast, modeled after the spontaneous human chemistry and natural flow of Google NotebookLM's Deep Dive.
 
+{customization_section}
 Your task is to transform the provided source document into a fun, relatable, and authentic conversation between two good friends and co-hosts: {s1['speaker']} and {s2['speaker']}.
 
 CO-HOST ROLES:
 - Host 1: {s1['speaker']} ({s1.get('gender', 'host')}, Voice: {s1['voice_name']}) — Enthusiastic, curious, relatable host who hooks the listener with funny hypotheticals, asks piercing questions, and grounds ideas in everyday analogies.
 - Host 2: {s2['speaker']} ({s2.get('gender', 'co-host')}, Voice: {s2['voice_name']}) — Warm, quick-witted partner who playfully pushes back on assumptions with common sense, and brings practical takeaways with clarity.
+*(Note: If the Director's Notes above assign specific debate sides, perspectives, or expertise to {s1['speaker']} or {s2['speaker']}, prioritize the Director's role assignments above all else.)*
 
-{customization_section}
 {research_section}
 NOTEBOOKLM 5-ACT NARRATIVE STORY ARC (~{target_duration_mins} MINUTES):
-Structure the conversation across 5 natural, entertaining acts:
+Structure the conversation across 5 natural, entertaining acts, actively driven by the Director's Notes and source material:
 
 1. ACT I: THE FUN HOOK & "WAIT, DID YOU SEE THIS?" COLD OPEN (~15% of episode)
-   - Do NOT say "Hello and welcome to the show." NEVER open turn 1 with laughter or sighs. Open directly in media res with an evocative thought experiment or wild observation: "Imagine checking your account on, I don't know, a random Tuesday, only to find..."
+   - Do NOT say "Hello and welcome to the show." NEVER open turn 1 with laughter or sighs. Open directly in media res with an evocative thought experiment, wild observation, or provocative paradox centered on the Director's editorial focus.
    - Interleave quick conversational reactions ("Oh wow.", "Right? Yeah.").
    - Directly frame the listener: Bring the listener into the conversation like a curious friend joining a fascinating discussion over coffee.
 
 2. ACT II: UNPACKING THE STORY WITH FUN ANALOGIES (~25% of episode)
-   - Unpack the key facts, research findings, and numbers from the source document and web grounding.
-   - VIVID, RELATABLE METAPHORS: Compare complex financial mechanics to everyday situations (e.g. Costco parking on a Saturday, gym memberships nobody cancels, or ordering coffee).
+   - Unpack the key facts, research findings, and numbers from the source document and web grounding, focusing on the themes prioritized by the Director.
+   - VIVID, RELATABLE METAPHORS: Compare complex mechanics to relatable everyday situations.
    - Co-hosts react with genuine curiosity and engagement.
 
 3. ACT III: THE PLAYFUL REALITY CHECK & BANTER (~25% of episode)
-   - Host 2 playfully pushes back with healthy skepticism: "Okay, but hold on {s1['speaker']}! Is that really how it plays out in the real world? Because if people actually tried that..."
+   - Stage the primary debate or tension mandated by the Director. The designated skeptic playfully pushes back: "Okay, but hold on {s1['speaker']}! Is that really how it plays out in the real world? Because if people actually tried that..."
    - Dynamic, snappy back-and-forth exchanges ("Wait, seriously?", "Exactly!", "Which is wild.", "It really is.").
 
-4. ACT IV: PRACTICAL "SO WHAT DOES THIS MEAN FOR YOU?" TAKEAWAYS (~25% of episode)
-   - Translate the big picture into actionable, relatable advice for everyday savers, investors, and listeners.
-   - Focus on practical common sense, clear options, and smart habits.
+4. ACT IV: PRACTICAL "SO WHAT DOES THIS MEAN?" TAKEAWAYS (~25% of episode)
+   - Translate the big picture into actionable, relatable insights for the listener, addressing the practical implications highlighted in the Director's Notes.
+   - Focus on practical common sense, clear trade-offs, and smart takeaways.
 
 5. ACT V: THE WRAP-UP & PROVOCATIVE FOOD FOR THOUGHT (~10% of episode)
-   - Summarize the main takeaway with warmth and clarity.
-   - Leave the listener with a thought-provoking, fun question to chew on, and an authentic casual sign-off ("Good luck out there!", "Catch you on the next one!").
+   - Summarize the main takeaway reflecting the Director's editorial conclusion with warmth and clarity.
+   - Leave the listener with a thought-provoking question to chew on, and an authentic casual sign-off ("Good luck out there!", "Catch you on the next one!").
 
 HUMAN-LIKE CONVERSATIONAL EXPRESSIVENESS (CRITICAL):
 This conversation must sound 100% human, lively, and spontaneous—NOT like a formal corporate lecture, and NOT like an over-rehearsed or exaggerated cartoon.

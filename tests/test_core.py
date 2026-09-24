@@ -534,10 +534,12 @@ def test_podcast_script_generation():
     # Verify prompt arguments
     call_args = mock_client.models.generate_content.call_args.kwargs
     prompt = call_args["contents"]
+    assert "PRIMARY EDITORIAL MANDATE & DISCUSSION DIRECTION" in prompt
     assert "Focus on the liquidity penalty and make Joe ask relatable questions." in prompt
     assert "Article text on HYSAs vs CDs." in prompt
     assert "Host 1: Joe (male, Voice: Enceladus)" in prompt
     assert "Host 2: Jane (female, Voice: Kore)" in prompt
+    assert prompt.index("PRIMARY EDITORIAL MANDATE") < prompt.index("CO-HOST ROLES:")
 
 
 def test_multi_speaker_speech_synthesis_payload():

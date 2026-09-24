@@ -406,11 +406,11 @@
       const studioCard = document.getElementById('podcastScriptStudioCard');
 
       if (isPodcast) {
-        if (labelText) labelText.textContent = "Podcast Content Directives & Host Dynamics";
-        if (badgeTag) badgeTag.textContent = "Director's Notes (Podcast Required/Recommended)";
+        if (labelText) labelText.textContent = "Director's Notes & Editorial Angle (Shapes Dialogue & Debate)";
+        if (badgeTag) badgeTag.textContent = "Editorial Steering (High Priority)";
         if (sampleBtn) sampleBtn.classList.remove('hidden');
-        if (inputCustom) inputCustom.placeholder = "e.g. Unpack interest rate risks, have Host 1 play the skeptical saver, and debate liquidity vs. yield...";
-        if (helpText) helpText.textContent = "Guides Gemini 3.8 Flash to write a 2-person podcast dialogue focused on these directions before multi-speaker synthesis.";
+        if (inputCustom) inputCustom.placeholder = "e.g. Frame this as a clash between defense hawks and fiscal skeptics. Joe argues the bull case on rearmament and industrial scale, while Jane challenges with deficit debt constraints and procurement bottlenecks. End with a provocative question on whether European sovereignty can outpace allied political drift.";
+        if (helpText) helpText.textContent = "Primary Editorial Mandate: Directly dictates the core thesis, debate direction, co-host stances, and conversational tension.";
         if (studioCard) studioCard.classList.remove('hidden');
 
         // Update co-host badge and auto-remap co-host names in script
