@@ -795,14 +795,6 @@ SOURCE DOCUMENT TO COVER:
                 total_turns=total_turns
             )
 
-        # Batch turns in conversational dialogue pairs of 2 turns to guarantee 100% voice fidelity on Gemini TTS
-        batch_size = 2
-        batches = [script.turns[i:i + batch_size] for i in range(0, total_turns, batch_size)]
-        pcm_segments = []
-        total_prompt_tokens = 0
-        total_candidates_tokens = 0
-        has_real_usage = False
-
         # Safe speaker name mapping
         speaker_map = {s["speaker"].lower(): s["speaker"] for s in speakers}
         speaker_map["host 1"] = speakers[0]["speaker"]
@@ -811,135 +803,113 @@ SOURCE DOCUMENT TO COVER:
             speaker_map["host 2"] = speakers[1]["speaker"]
             speaker_map["co-host"] = speakers[1]["speaker"]
 
-        for batch_idx, batch in enumerate(batches, start=1):
-            if len(batches) > 1 and progress_callback:
-                progress_callback(
-                    stage="SYNTHESIZING",
-                    message=f"Synthesizing podcast segment {batch_idx}/{len(batches)} ({len(batch)} turns)...",
-                    current_turn=batch_idx,
-                    total_turns=len(batches)
-                )
+        # Build content parts with text and speech_metadata directly from all dialogue turns
+        parts = []
+        for turn in script.turns:
+            clean_turn_text = re.sub(
+                r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
+                r"[\1]",
+                turn.text,
+                flags=re.IGNORECASE
+            )
+            matched_speaker = speaker_map.get(turn.speaker.lower(), turn.speaker)
 
-            # Build content parts with text and speech_metadata (Logic 1: Light, lively conversational banter)
-            parts = []
-            for turn in batch:
-                clean_turn_text = re.sub(
-                    r"\((laughs|sighs|chuckles|pauses|clears throat)\)",
-                    r"[\1]",
-                    turn.text,
-                    flags=re.IGNORECASE
-                )
-                matched_speaker = speaker_map.get(turn.speaker.lower(), turn.speaker)
+            # Logic 1: Dynamic expressive podcast style determination
+            raw_style = (turn.style or "").strip().lower()
+            clean_lower = clean_turn_text.lower()
 
-                # Logic 1: Dynamic expressive podcast style determination
-                raw_style = (turn.style or "").strip().lower()
-                clean_lower = clean_turn_text.lower()
+            # Emotional vocal cue detection
+            if "[laughs]" in clean_turn_text or "[chuckles]" in clean_turn_text or "haha" in clean_lower:
+                turn_style = "cheerful, amused, animated podcast delivery with genuine audible laughter"
+            elif "[sighs]" in clean_turn_text:
+                turn_style = "expressive, playful sigh, relatable and warm delivery"
+            elif "[pauses]" in clean_turn_text:
+                turn_style = "thoughtful, engaging, dynamic conversational pacing"
+            # Strip out any formal/dry legacy styles
+            elif any(dry in raw_style for dry in ("measured", "analytical", "serious", "formal", "dry", "flat", "cautious")):
+                turn_style = "lighthearted, warm, and engaging conversational podcast banter"
+            elif turn.style and turn.style.strip():
+                turn_style = f"lively podcast conversation, {turn.style.strip()}"
+            else:
+                turn_style = "warm, expressive, light and friendly conversational tone"
 
-                # Emotional vocal cue detection
-                if "[laughs]" in clean_turn_text or "[chuckles]" in clean_turn_text or "haha" in clean_lower:
-                    turn_style = "cheerful, amused, animated podcast delivery with genuine audible laughter"
-                elif "[sighs]" in clean_turn_text:
-                    turn_style = "expressive, playful sigh, relatable and warm delivery"
-                elif "[pauses]" in clean_turn_text:
-                    turn_style = "thoughtful, engaging, dynamic conversational pacing"
-                # Strip out any formal/dry legacy styles
-                elif any(dry in raw_style for dry in ("measured", "analytical", "serious", "formal", "dry", "flat", "cautious")):
-                    turn_style = "lighthearted, warm, and engaging conversational podcast banter"
-                elif turn.style and turn.style.strip():
-                    turn_style = f"lively podcast conversation, {turn.style.strip()}"
-                else:
-                    turn_style = "warm, expressive, light and friendly conversational tone"
+            # Pacing adjustment
+            if abs(speed - 1.0) >= 0.05:
+                if speed < 0.95:
+                    turn_style += ", relaxed and easygoing pacing"
+                elif speed > 1.05:
+                    turn_style += ", brisk, energetic, and upbeat pacing"
 
-                # Pacing adjustment
-                if abs(speed - 1.0) >= 0.05:
-                    if speed < 0.95:
-                        turn_style += ", relaxed and easygoing pacing"
-                    elif speed > 1.05:
-                        turn_style += ", brisk, energetic, and upbeat pacing"
+            # Incorporate user-specified Director's Notes / Voice Customization
+            if voice_customization and voice_customization.strip():
+                turn_style += f", {voice_customization.strip()}"
 
-                # Incorporate user-specified Director's Notes / Voice Customization
-                if voice_customization and voice_customization.strip():
-                    turn_style += f", {voice_customization.strip()}"
+            parts.append({
+                "text": clean_turn_text,
+                "speech_metadata": {
+                    "speaker": matched_speaker,
+                    "style": turn_style,
+                }
+            })
 
-                parts.append({
-                    "text": clean_turn_text,
-                    "speech_metadata": {
-                        "speaker": matched_speaker,
-                        "style": turn_style,
-                    }
-                })
+        contents = [{
+            "role": "user",
+            "parts": parts,
+        }]
 
-            contents = [{
-                "role": "user",
-                "parts": parts,
-            }]
-
-            speech_config = types.SpeechConfig(
-                multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
-                    speaker_voice_configs=[
-                        types.SpeakerVoiceConfig(
-                            speaker=s["speaker"],
-                            voice_config=types.VoiceConfig(
-                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                    voice_name=s["voice_name"]
-                                )
+        speech_config = types.SpeechConfig(
+            multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
+                speaker_voice_configs=[
+                    types.SpeakerVoiceConfig(
+                        speaker=s["speaker"],
+                        voice_config=types.VoiceConfig(
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                voice_name=s["voice_name"]
                             )
                         )
-                        for s in speakers
-                    ]
-                )
-            )
-
-            config = types.GenerateContentConfig(
-                response_modalities=["AUDIO"],
-                speech_config=speech_config,
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
-            )
-
-            max_attempts = 2
-            raw_audio = None
-            usage = None
-            for attempt in range(1, max_attempts + 1):
-                try:
-                    response = self.client.models.generate_content(
-                        model=self.multi_speaker_model,
-                        contents=contents,
-                        config=config
                     )
-                    raw_audio, _ = self._extract_audio_from_response(response)
-                    usage = getattr(response, "usage_metadata", None)
-                    break
-                except Exception as e:
-                    if attempt < max_attempts:
-                        logger.warning(f"Multi-speaker generate_content attempt {attempt}/{max_attempts} failed: {e}. Retrying in 3s...")
-                        time.sleep(3.0)
-                    else:
-                        logger.error(f"Multi-speaker generate_content failed after {max_attempts} attempts: {e}", exc_info=True)
-                        raise RuntimeError(f"Could not generate multi-speaker audio using model '{self.multi_speaker_model}': {e}")
+                    for s in speakers
+                ]
+            )
+        )
 
-            # Check if returned audio is a WAV container (starts with RIFF) or raw PCM
-            if raw_audio.startswith(b"RIFF"):
-                try:
-                    with wave.open(io.BytesIO(raw_audio), "rb") as wf:
-                        raw_pcm = wf.readframes(wf.getnframes())
-                except Exception as we:
-                    logger.warning(f"Could not read WAV container from response: {we}, falling back to raw bytes")
-                    raw_pcm = raw_audio[44:] if len(raw_audio) > 44 else raw_audio
-            else:
-                raw_pcm = raw_audio
+        config = types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=speech_config,
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+        )
 
-            # Apply DSP mastering (RMS leveling + raised-cosine micro-fades)
-            mastered_pcm = apply_micro_fades(normalize_chunk_rms(raw_pcm))
-            pcm_segments.append(mastered_pcm)
+        max_attempts = 2
+        raw_audio = None
+        usage = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.multi_speaker_model,
+                    contents=contents,
+                    config=config
+                )
+                raw_audio, _ = self._extract_audio_from_response(response)
+                usage = getattr(response, "usage_metadata", None)
+                break
+            except Exception as e:
+                if attempt < max_attempts:
+                    logger.warning(f"Multi-speaker generate_content attempt {attempt}/{max_attempts} failed: {e}. Retrying in 3s...")
+                    time.sleep(3.0)
+                else:
+                    logger.error(f"Multi-speaker generate_content failed after {max_attempts} attempts: {e}", exc_info=True)
+                    raise RuntimeError(f"Could not generate multi-speaker audio using model '{self.multi_speaker_model}': {e}")
 
-            if usage:
-                p_tokens = getattr(usage, "prompt_token_count", 0) or 0
-                c_tokens = getattr(usage, "candidates_token_count", 0) or 0
-                if isinstance(p_tokens, int) and isinstance(c_tokens, int):
-                    if p_tokens > 0 or c_tokens > 0:
-                        has_real_usage = True
-                        total_prompt_tokens += p_tokens
-                        total_candidates_tokens += c_tokens
+        # Check if returned audio is a WAV container (starts with RIFF) or raw PCM
+        if raw_audio.startswith(b"RIFF"):
+            try:
+                with wave.open(io.BytesIO(raw_audio), "rb") as wf:
+                    raw_pcm = wf.readframes(wf.getnframes())
+            except Exception as we:
+                logger.warning(f"Could not read WAV container from response: {we}, falling back to raw bytes")
+                raw_pcm = raw_audio[44:] if len(raw_audio) > 44 else raw_audio
+        else:
+            raw_pcm = raw_audio
 
         if progress_callback:
             progress_callback(
@@ -949,12 +919,22 @@ SOURCE DOCUMENT TO COVER:
                 total_turns=total_turns
             )
 
-        # Stitch segments together with natural 300ms pause
-        pause_samples = int(settings.sample_rate * 0.3)
-        pause_bytes = b"\x00" * (pause_samples * 2)
-        full_pcm = pause_bytes.join(pcm_segments)
+        # Apply DSP mastering (RMS leveling + raised-cosine micro-fades)
+        mastered_pcm = apply_micro_fades(normalize_chunk_rms(raw_pcm))
 
-        mp3_bytes, duration_sec = self._transcode_pcm_to_mp3(full_pcm, rate=settings.sample_rate)
+        mp3_bytes, duration_sec = self._transcode_pcm_to_mp3(mastered_pcm, rate=settings.sample_rate)
+
+        total_prompt_tokens = 0
+        total_candidates_tokens = 0
+        has_real_usage = False
+        if usage:
+            p_tokens = getattr(usage, "prompt_token_count", 0) or 0
+            c_tokens = getattr(usage, "candidates_token_count", 0) or 0
+            if isinstance(p_tokens, int) and isinstance(c_tokens, int):
+                if p_tokens > 0 or c_tokens > 0:
+                    has_real_usage = True
+                    total_prompt_tokens = p_tokens
+                    total_candidates_tokens = c_tokens
 
         aggregated_usage = None
         if has_real_usage:
@@ -969,7 +949,7 @@ SOURCE DOCUMENT TO COVER:
             f"**{turn.speaker}**: {turn.text}" for turn in script.turns
         )
 
-        logger.info(f"✓ [{job_id}] Multi-speaker podcast speech complete: {len(batches)} batch(es), duration {duration_sec:.1f}s, MP3 size {len(mp3_bytes)} bytes")
+        logger.info(f"✓ [{job_id}] Multi-speaker podcast speech complete: {total_turns} turns, duration {duration_sec:.1f}s, MP3 size {len(mp3_bytes)} bytes")
 
         return GenerationResult(
             job_id=job_id,

@@ -803,8 +803,8 @@ def test_square_bracket_vocal_cue_normalization():
     assert script.turns[2].style == "cheerful and upbeat"
 
 
-def test_multi_speaker_pairwise_turn_batching():
-    """Verify _generate_multi_speaker_speech batches turns into 2-turn conversational pairs."""
+def test_multi_speaker_all_turns_single_payload():
+    """Verify _generate_multi_speaker_speech sends all dialogue turns in a single generate_content request."""
     from unittest.mock import MagicMock
     from src.ai.generator import GeminiAudioGenerator, PodcastScript, PodcastTurn
     from src.ai.personas import get_persona
@@ -835,25 +835,19 @@ def test_multi_speaker_pairwise_turn_batching():
     res = gen._generate_multi_speaker_speech(
         script=script_4_turns,
         persona=persona,
-        job_id="job_4_turns_pairwise"
+        job_id="job_4_turns_single"
     )
 
-    # 4 turns with batch_size=2 MUST result in exactly 2 generate_content calls
-    assert mock_client.models.generate_content.call_count == 2
+    # All 4 turns MUST be sent together in exactly 1 generate_content call
+    assert mock_client.models.generate_content.call_count == 1
 
-    # Check batch 1 payload
-    b1_call = mock_client.models.generate_content.call_args_list[0].kwargs
-    b1_parts = b1_call["contents"][0]["parts"]
-    assert len(b1_parts) == 2
-    assert b1_parts[0]["speech_metadata"]["speaker"] == "Joe"
-    assert b1_parts[1]["speech_metadata"]["speaker"] == "Jane"
-
-    # Check batch 2 payload
-    b2_call = mock_client.models.generate_content.call_args_list[1].kwargs
-    b2_parts = b2_call["contents"][0]["parts"]
-    assert len(b2_parts) == 2
-    assert b2_parts[0]["speech_metadata"]["speaker"] == "Joe"
-    assert b2_parts[1]["speech_metadata"]["speaker"] == "Jane"
+    call_args = mock_client.models.generate_content.call_args.kwargs
+    parts = call_args["contents"][0]["parts"]
+    assert len(parts) == 4
+    assert parts[0]["speech_metadata"]["speaker"] == "Joe"
+    assert parts[1]["speech_metadata"]["speaker"] == "Jane"
+    assert parts[2]["speech_metadata"]["speaker"] == "Joe"
+    assert parts[3]["speech_metadata"]["speaker"] == "Jane"
 
 
 def test_reasoning_client_location_isolation():
